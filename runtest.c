@@ -617,9 +617,19 @@ static char *resultFilename(const char *filename, const char *out,
 }
 
 static int checkTestFile(const char *filename) {
+#if defined(_MSC_VER) && _MSC_VER >= 1500
+    struct _stat64 buf;
+#else
     struct stat buf;
+#endif
 
-    if (stat(filename, &buf) == -1)
+    if (
+#if defined(_MSC_VER) && _MSC_VER >= 1500
+        _stat64(filename, &buf)
+#else
+        stat(filename, &buf)
+#endif
+        == -1)
         return(0);
 
 #if defined(_WIN32)
@@ -698,7 +708,11 @@ static int compareFileMem(const char *filename, const char *mem, int size) {
     int fd;
     char bytes[4096];
     int idx = 0;
+#if defined(_MSC_VER) && _MSC_VER >= 1500
+    struct _stat64 info;
+#else
     struct stat info;
+#endif
 
     if (update_results) {
         if (size == 0) {
@@ -715,15 +729,21 @@ static int compareFileMem(const char *filename, const char *mem, int size) {
         return(res != size);
     }
 
-    if (stat(filename, &info) < 0) {
+    if (
+#if defined(_MSC_VER) && _MSC_VER >= 1500
+        _stat64(filename, &info)
+#else
+        stat(filename, &info)
+#endif
+        < 0) {
         if (size == 0)
             return(0);
         fprintf(stderr, "failed to stat %s\n", filename);
 	return(-1);
     }
     if (info.st_size != size) {
-        fprintf(stderr, "file %s is %ld bytes, result is %d bytes\n",
-	        filename, (long) info.st_size, size);
+        fprintf(stderr, "file %s is %lld bytes, result is %d bytes\n",
+	        filename, (long long) info.st_size, size);
         return(-1);
     }
     fd = open(filename, RD_FLAGS);
@@ -757,11 +777,23 @@ static int compareFileMem(const char *filename, const char *mem, int size) {
 
 static int loadMem(const char *filename, const char **mem, int *size) {
     int fd, res;
+#if defined(_MSC_VER) && _MSC_VER >= 1500
+    struct _stat64 info;
+#else
     struct stat info;
+#endif
     char *base;
     int siz = 0;
-    if (stat(filename, &info) < 0)
+    if (
+#if defined(_MSC_VER) && _MSC_VER >= 1500
+        _stat64(filename, &info)
+#else
+        stat(filename, &info)
+#endif
+        < 0)
 	return(-1);
+    if (sizeof(info.st_size) > sizeof(siz) && info.st_size > INT_MAX)
+	return(-1); /* File size too big */
     base = malloc(info.st_size + 1);
     if (base == NULL)
 	return(-1);
@@ -2930,6 +2962,8 @@ xpathDocTest(const char *filename,
     return(ret);
 }
 
+
+
 #ifdef LIBXML_XPTR_ENABLED
 /**
  * xptrDocTest:
@@ -3418,7 +3452,14 @@ schemasOneTest(const char *sch,
     /*
      * Test both memory and streaming validation.
      */
-    for (i = 0; i < 2; i++) {
+
+#ifdef LIBXML_XPATH_ENABLED
+    const int testCount = 3;
+#else
+    const int testCount = 2;
+#endif
+
+    for (i = 0; i < testCount; i++) {
         xmlSchemaValidCtxtPtr ctxt;
         int validResult = 0;
         FILE *schemasOutput;
@@ -3436,6 +3477,12 @@ schemasOneTest(const char *sch,
             return(-1);
         }
 
+        switch(i) {
+            case 0: printf("INFO: running memory tests for schemas...\n"); break;
+            case 1: printf("INFO: running streaming validation tests for schemas...\n"); break;
+            case 2: printf("INFO: running XPath verification tests for schemas...\n"); break;
+        };
+
         if (i == 0) {
             xmlDocPtr doc;
 
@@ -3446,8 +3493,29 @@ schemasOneTest(const char *sch,
             }
             validResult = xmlSchemaValidateDoc(ctxt, doc);
             xmlFreeDoc(doc);
-        } else {
+        } else if (i == 1) {
             validResult = xmlSchemaValidateFile(ctxt, filename, options);
+        } else {
+            /* TODO load XPath queries from a file */
+            printf("Running XPath verification against schema tests...\n");
+            xmlChar* query = "//GR.SEQ/TBL/ROW";
+
+            xmlSchemaVerifyXPathCtxtPtr verifyCtxt = xmlSchemaNewVerifyXPathCtxt(ctxt, query);
+            if (verifyCtxt == NULL) {
+                fprintf(stderr, "Error allocating memory for XPath verification context on schema %s\n", sch);
+                unlink(temp);
+                xmlSchemaFreeValidCtxt(ctxt);
+                continue;
+            }
+
+            validResult = xmlSchemaVerifyXPath(verifyCtxt);
+
+            xmlSchemaFreeVerifyXPathCtxt(verifyCtxt);
+
+            /* Skip file comparison, as we are going to treat it differently */
+            unlink(temp);
+            xmlSchemaFreeValidCtxt(ctxt);
+            continue;
         }
 
         if (validResult == 0) {

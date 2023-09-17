@@ -28,6 +28,10 @@
 #include <libxml/hash.h>
 #endif /* LIBXML_XPATH_ENABLED */
 
+#ifdef LIBXML_SCHEMAS_ENABLED
+#include <libxml/xmlschemas.h>
+#endif
+
 #if defined(LIBXML_XPATH_ENABLED) || defined(LIBXML_SCHEMAS_ENABLED)
 #ifdef __cplusplus
 extern "C" {
@@ -541,6 +545,8 @@ XMLPUBFUN xmlXPathObjectPtr
 XMLPUBFUN int
 		    xmlXPathEvalPredicate	(xmlXPathContextPtr ctxt,
 						 xmlXPathObjectPtr res);
+
+
 /**
  * Separate compilation/evaluation entry points.
  */
@@ -557,6 +563,7 @@ XMLPUBFUN int
 						 xmlXPathContextPtr ctxt);
 XMLPUBFUN void
 		    xmlXPathFreeCompExpr	(xmlXPathCompExprPtr comp);
+
 #endif /* LIBXML_XPATH_ENABLED */
 #if defined(LIBXML_XPATH_ENABLED) || defined(LIBXML_SCHEMAS_ENABLED)
 XML_DEPRECATED

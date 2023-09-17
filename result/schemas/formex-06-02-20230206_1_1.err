@@ -1,0 +1,1 @@
+./test/schemas/formex-06-02-20230206_1.xml:1: Schemas validity error : Element 'GR.SEQ': This element is not expected. Expected is ( BIB.INSTANCE ).

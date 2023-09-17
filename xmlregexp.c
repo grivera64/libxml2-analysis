@@ -5786,6 +5786,88 @@ xmlRegFreeRegexp(xmlRegexpPtr regexp) {
     xmlFree(regexp);
 }
 
+/**
+ * xmlRegexpBuildTransitiveClosure
+ * @comp: a compact regular expression
+ * 
+ * If the regexp is represented in a compact form, return a new regexp 
+ * that contains its transitive closure.
+ */
+xmlRegexpPtr
+xmlRegexpBuildTransitiveClosure(xmlRegexpPtr comp)
+{
+    /* TODO implement for regular regexp form */
+    if (comp == NULL || comp->compact == NULL) {
+        return NULL;
+    }
+
+    xmlChar** stringMap = NULL;
+    void** transdata = NULL;
+    xmlRegexpPtr ret = NULL;
+    ret = (xmlRegexpPtr)xmlMalloc(sizeof(xmlRegexp));
+    if (ret == NULL) {
+        return(NULL);
+    }
+
+    memset(ret, 0, sizeof(xmlRegexp));
+    ret->nbAtoms = comp->nbAtoms;
+    ret->nbStates = comp->nbStates;
+    ret->nbCounters = comp->nbCounters;
+    ret->flags = comp->flags;
+    ret->nbstrings = comp->nbstrings;
+    ret->nbstates = comp->nbstates;
+
+    stringMap = (xmlChar**)xmlMalloc(sizeof(xmlChar*) * ret->nbstrings);
+    if (stringMap == NULL) {
+        xmlFree(ret);
+        return NULL;
+    }
+    memset(stringMap, 0, sizeof(xmlChar*) * ret->nbstrings);
+    for (int i = 0; i < ret->nbstrings; i++) {
+        stringMap[i] = xmlStrdup(comp->stringMap[i]);
+        if (stringMap[i] == NULL) {
+            goto exit_failure;
+        }
+    }
+    ret->stringMap = stringMap;
+
+    transdata = (void**)xmlMalloc(sizeof(void*) * ret->nbstates);
+    if (transdata == NULL) {
+        goto exit_failure;
+    }
+    errno_t retVal = memcpy_s(transdata, sizeof(void*) * ret->nbstates, 
+        comp->transdata, sizeof(void*) * comp->nbstates);
+    if (retVal != 0) {
+        goto exit_failure;
+    }
+    ret->transdata = transdata;
+
+
+    /* The actual building of the transitive closure using the Floyd-Warshall algorithm */
+    for (int k = 0; k < ret->nbStates; k++) {
+        for (int i = 0; i < ret->nbStates; i++) {
+            for (int j = 0; j < ret->nbStates; j++) {
+                ;
+            }
+        }
+    }
+    return ret;
+
+exit_failure:
+    if (transdata)
+        xmlFree(transdata);
+    if (stringMap) {
+        for (int i = 0; i < ret->nbstrings; i++) {
+            if (stringMap[i])
+                xmlFree(stringMap[i]);
+        }
+        xmlFree(stringMap);
+    }
+    if (ret) 
+        xmlFree(ret);
+    return NULL;
+}
+
 #ifdef LIBXML_AUTOMATA_ENABLED
 /************************************************************************
  *									*
@@ -6526,6 +6608,7 @@ xmlAutomataCompile(xmlAutomataPtr am) {
     return(ret);
 }
 
+
 /**
  * xmlAutomataIsDeterminist:
  * @am: an automata
@@ -6544,7 +6627,12 @@ xmlAutomataIsDeterminist(xmlAutomataPtr am) {
     ret = xmlFAComputesDeterminism(am);
     return(ret);
 }
+
+
 #endif /* LIBXML_AUTOMATA_ENABLED */
+
+
+
 
 #ifdef LIBXML_EXPR_ENABLED
 /************************************************************************

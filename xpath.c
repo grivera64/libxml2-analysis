@@ -157,6 +157,11 @@ double xmlXPathNAN = 0.0;
 double xmlXPathPINF = 0.0;
 double xmlXPathNINF = 0.0;
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4723) // potential divide by 0
+#endif
+
 /**
  * xmlXPathInit:
  *
@@ -187,6 +192,10 @@ xmlInitXPathInternal(void) {
     xmlXPathNINF = -xmlXPathPINF;
 #endif
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 /**
  * xmlXPathIsNaN:
@@ -14025,6 +14034,67 @@ xmlXPathEvaluatePredicateResult(xmlXPathParserContextPtr ctxt,
     return(0);
 }
 
+
+#if defined(LIBXML_XPATH_ENABLED) && defined(LIBXML_SCHEMAS_ENABLED)
+
+/**
+ * xmlXPathIsSatisfiableOnSchema
+ *
+ * Verify if the given XPath expression is satisfiable on a schema.
+ * An XPath expression is satisfiable on the schema if there is any
+ * XML document that returns at least one result when evaluating
+ * the expression.
+ * 
+ */
+int
+xmlXPathIsSatisfiableOnSchema(xmlXPathContextPtr ctx,
+    const xmlChar* str,
+    const xmlRegexpPtr closure)
+{
+    int ret = 0;
+    if ((closure == NULL) || (str == NULL)) {
+        return (-1);
+    }
+
+    xmlXPathCompExprPtr comp = xmlXPathCtxtCompile(ctx, str);
+    if (comp == NULL) {
+        return (-1);
+    }
+
+    /* TODO code that checks the XPath query on the XML schema */
+    /* TODO build the closure of the XML schema */
+    xmlXPathStepOp* steps = comp->steps;
+    for (int i = 0; i < comp->maxStep; i++) {
+        switch (steps[i].op) {
+            case XPATH_OP_END: {printf("XPath end expression"); break;}
+            case XPATH_OP_AND: {printf("XPath and expression"); break;}
+            case XPATH_OP_OR: {printf("XPath or operator"); break;}
+            case XPATH_OP_EQUAL: {printf(""); break;}
+            case XPATH_OP_CMP: {printf(""); break;}
+            case XPATH_OP_PLUS: {printf(""); break;}
+            case XPATH_OP_MULT: {printf(""); break;}
+            case XPATH_OP_UNION: {printf(""); break;}
+            case XPATH_OP_ROOT: {printf(""); break;}
+            case XPATH_OP_NODE: {printf(""); break;}
+            case XPATH_OP_COLLECT: {printf(""); break;}
+            case XPATH_OP_VALUE: {printf(""); break;}
+            case XPATH_OP_VARIABLE: {printf(""); break;}
+            case XPATH_OP_FUNCTION: {printf(""); break;}
+            case XPATH_OP_ARG: {printf(""); break;}
+            case XPATH_OP_PREDICATE: {printf(""); break;}
+            case XPATH_OP_FILTER: {printf(""); break;}
+            case XPATH_OP_SORT: {printf(""); break;  }
+        }
+    }
+
+cleanup:
+    xmlXPathFreeCompExpr(comp);
+
+    return(ret);
+}
+
+#endif
+
 #ifdef XPATH_STREAMING
 /**
  * xmlXPathTryStreamCompile:
@@ -14105,6 +14175,7 @@ xmlXPathTryStreamCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
     }
     return(NULL);
 }
+
 #endif /* XPATH_STREAMING */
 
 static void
@@ -14200,9 +14271,9 @@ xmlXPathCtxtCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
     int oldDepth = 0;
 
 #ifdef XPATH_STREAMING
-    comp = xmlXPathTryStreamCompile(ctxt, str);
+    /*comp = xmlXPathTryStreamCompile(ctxt, str);
     if (comp != NULL)
-        return(comp);
+        return(comp);*/
 #endif
 
     xmlInitParser();

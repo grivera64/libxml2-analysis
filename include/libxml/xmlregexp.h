@@ -45,6 +45,7 @@ typedef xmlRegExecCtxt *xmlRegExecCtxtPtr;
 extern "C" {
 #endif
 
+
 /*
  * The POSIX like API
  */
@@ -59,6 +60,7 @@ XMLPUBFUN void
 					 xmlRegexpPtr regexp);
 XMLPUBFUN int
 		    xmlRegexpIsDeterminist(xmlRegexpPtr comp);
+
 
 /**
  * xmlRegExecCallbacks:
@@ -106,6 +108,8 @@ XMLPUBFUN int
 					 int *nbneg,
 					 xmlChar **values,
 					 int *terminal);
+
+
 #ifdef LIBXML_EXPR_ENABLED
 /*
  * Formal regular expression handling
