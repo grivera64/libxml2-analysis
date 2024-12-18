@@ -511,9 +511,6 @@ static const xmlNs xmlXPathXMLNamespaceStruct = {
 };
 static const xmlNs *const xmlXPathXMLNamespace = &xmlXPathXMLNamespaceStruct;
 
-static void
-xmlXPathNodeSetClear(xmlNodeSetPtr set, int hasNsNodes);
-
 #define XML_NODE_SORT_VALUE(n) XML_PTR_TO_INT((n)->content)
 
 #ifdef XP_OPTIMIZED_NON_ELEM_COMPARISON
@@ -3941,7 +3938,7 @@ xmlXPathFreeNodeSet(xmlNodeSetPtr obj) {
  * are feed), but does *not* free the list itself. Sets the length of the
  * list to 0.
  */
-static void
+void
 xmlXPathNodeSetClear(xmlNodeSetPtr set, int hasNsNodes)
 {
     if (set == NULL)
@@ -13718,27 +13715,9 @@ xmlXPathCompiledEvalToBoolean(xmlXPathCompExprPtr comp,
  * @ctxt:  the XPath Parser context
  *
  * DEPRECATED: Internal function, don't use.
- *
- * Parse and evaluate an XPath expression in the given context,
- * then push the result on the context stack
  */
 void
-xmlXPathEvalExpr(xmlXPathParserContextPtr ctxt) {
-    if ((ctxt == NULL) || (ctxt->context == NULL))
-        return;
-    if (ctxt->context->lastError.code != 0)
-        return;
-
-    xmlXPathDoCompile(ctxt);
-
-    if (ctxt->error == XPATH_EXPRESSION_OK) {
-        xmlXPathObjectPtr resObj = NULL;
-
-        xmlXPathRunEval(ctxt, &resObj, 0);
-
-        if (resObj != NULL)
-            xmlXPathValuePushInternal(ctxt, resObj);
-    }
+xmlXPathEvalExpr(xmlXPathParserContextPtr ctxt ATTRIBUTE_UNUSED) {
 }
 
 /**
