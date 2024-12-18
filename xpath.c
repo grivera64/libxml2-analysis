@@ -50,6 +50,10 @@
 #include "private/parser.h"
 #include "private/xpath.h"
 
+#ifndef SIZE_MAX
+  #define SIZE_MAX ((size_t) -1)
+#endif
+
 /* Disabled for now */
 #if 0
 #ifdef LIBXML_PATTERN_ENABLED
@@ -9714,8 +9718,6 @@ static void xmlXPathCompileExpr(xmlXPathParserContextPtr ctxt);
 static int xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter);
 static void xmlXPathCompLocationPath(xmlXPathParserContextPtr ctxt);
 static void xmlXPathCompRelativeLocationPath(xmlXPathParserContextPtr ctxt);
-static xmlChar * xmlXPathParseNameComplex(xmlXPathParserContextPtr ctxt,
-	                                  int qualified);
 
 /**
  * xmlXPathCurrentChar:
@@ -9802,6 +9804,29 @@ encoding_error:
     XP_ERROR0(XPATH_ENCODING_ERROR);
 }
 
+static xmlChar *
+xmlXPathParseNameInternal(xmlXPathParserContextPtr ctxt, int exclude) {
+    const xmlChar *start = ctxt->cur;
+    xmlChar *ret;
+    size_t size;
+
+    size = xmlScanXmlName(start, SIZE_MAX, exclude);
+    if (size == 0)
+        return(NULL);
+    if (size > XML_MAX_NAME_LENGTH) {
+        xmlXPathErr(ctxt, XPATH_EXPR_ERROR);
+        return(NULL);
+    }
+
+    ctxt->cur += size;
+
+    ret = xmlStrndup(start, size);
+    if (ret == NULL)
+        xmlXPathPErrMemory(ctxt);
+
+    return(ret);
+}
+
 /**
  * xmlXPathParseNCName:
  * @ctxt:  the XPath Parser context
@@ -9818,41 +9843,11 @@ encoding_error:
 
 xmlChar *
 xmlXPathParseNCName(xmlXPathParserContextPtr ctxt) {
-    const xmlChar *in;
-    xmlChar *ret;
-    int count = 0;
+    if ((ctxt == NULL) || (ctxt->cur == NULL))
+        return(NULL);
 
-    if ((ctxt == NULL) || (ctxt->cur == NULL)) return(NULL);
-    /*
-     * Accelerator for simple ASCII names
-     */
-    in = ctxt->cur;
-    if (((*in >= 0x61) && (*in <= 0x7A)) ||
-	((*in >= 0x41) && (*in <= 0x5A)) ||
-	(*in == '_')) {
-	in++;
-	while (((*in >= 0x61) && (*in <= 0x7A)) ||
-	       ((*in >= 0x41) && (*in <= 0x5A)) ||
-	       ((*in >= 0x30) && (*in <= 0x39)) ||
-	       (*in == '_') || (*in == '.') ||
-	       (*in == '-'))
-	    in++;
-	if ((*in == ' ') || (*in == '>') || (*in == '/') ||
-            (*in == '[') || (*in == ']') || (*in == ':') ||
-            (*in == '@') || (*in == '*')) {
-	    count = in - ctxt->cur;
-	    if (count == 0)
-		return(NULL);
-	    ret = xmlStrndup(ctxt->cur, count);
-            if (ret == NULL)
-                xmlXPathPErrMemory(ctxt);
-	    ctxt->cur = in;
-	    return(ret);
-	}
-    }
-    return(xmlXPathParseNameComplex(ctxt, 0));
+    return(xmlXPathParseNameInternal(ctxt, ':'));
 }
-
 
 /**
  * xmlXPathParseQName:
@@ -9876,11 +9871,11 @@ xmlXPathParseQName(xmlXPathParserContextPtr ctxt, xmlChar **prefix) {
     xmlChar *ret = NULL;
 
     *prefix = NULL;
-    ret = xmlXPathParseNCName(ctxt);
+    ret = xmlXPathParseNameInternal(ctxt, ':');
     if (ret && CUR == ':') {
         *prefix = ret;
 	NEXT;
-	ret = xmlXPathParseNCName(ctxt);
+	ret = xmlXPathParseNameInternal(ctxt, ':');
     }
     return(ret);
 }
@@ -9901,124 +9896,10 @@ xmlXPathParseQName(xmlXPathParserContextPtr ctxt, xmlChar **prefix) {
 
 xmlChar *
 xmlXPathParseName(xmlXPathParserContextPtr ctxt) {
-    const xmlChar *in;
-    xmlChar *ret;
-    size_t count = 0;
+    if ((ctxt == NULL) || (ctxt->cur == NULL))
+        return(NULL);
 
-    if ((ctxt == NULL) || (ctxt->cur == NULL)) return(NULL);
-    /*
-     * Accelerator for simple ASCII names
-     */
-    in = ctxt->cur;
-    if (((*in >= 0x61) && (*in <= 0x7A)) ||
-	((*in >= 0x41) && (*in <= 0x5A)) ||
-	(*in == '_') || (*in == ':')) {
-	in++;
-	while (((*in >= 0x61) && (*in <= 0x7A)) ||
-	       ((*in >= 0x41) && (*in <= 0x5A)) ||
-	       ((*in >= 0x30) && (*in <= 0x39)) ||
-	       (*in == '_') || (*in == '-') ||
-	       (*in == ':') || (*in == '.'))
-	    in++;
-	if ((*in > 0) && (*in < 0x80)) {
-	    count = in - ctxt->cur;
-            if (count > XML_MAX_NAME_LENGTH) {
-                ctxt->cur = in;
-                XP_ERRORNULL(XPATH_EXPR_ERROR);
-            }
-	    ret = xmlStrndup(ctxt->cur, count);
-            if (ret == NULL)
-                xmlXPathPErrMemory(ctxt);
-	    ctxt->cur = in;
-	    return(ret);
-	}
-    }
-    return(xmlXPathParseNameComplex(ctxt, 1));
-}
-
-static xmlChar *
-xmlXPathParseNameComplex(xmlXPathParserContextPtr ctxt, int qualified) {
-    xmlChar *ret;
-    xmlChar buf[XML_MAX_NAMELEN + 5];
-    int len = 0, l;
-    int c;
-
-    /*
-     * Handler for more complex cases
-     */
-    c = CUR_CHAR(l);
-    if ((c == ' ') || (c == '>') || (c == '/') || /* accelerators */
-        (c == '[') || (c == ']') || (c == '@') || /* accelerators */
-        (c == '*') || /* accelerators */
-	(!IS_LETTER(c) && (c != '_') &&
-         ((!qualified) || (c != ':')))) {
-	return(NULL);
-    }
-
-    while ((c != ' ') && (c != '>') && (c != '/') && /* test bigname.xml */
-	   ((IS_LETTER(c)) || (IS_DIGIT(c)) ||
-            (c == '.') || (c == '-') ||
-	    (c == '_') || ((qualified) && (c == ':')) ||
-	    (IS_COMBINING(c)) ||
-	    (IS_EXTENDER(c)))) {
-	COPY_BUF(buf,len,c);
-	NEXTL(l);
-	c = CUR_CHAR(l);
-	if (len >= XML_MAX_NAMELEN) {
-	    /*
-	     * Okay someone managed to make a huge name, so he's ready to pay
-	     * for the processing speed.
-	     */
-	    xmlChar *buffer;
-	    int max = len * 2;
-
-            if (len > XML_MAX_NAME_LENGTH) {
-                XP_ERRORNULL(XPATH_EXPR_ERROR);
-            }
-	    buffer = xmlMalloc(max);
-	    if (buffer == NULL) {
-                xmlXPathPErrMemory(ctxt);
-                return(NULL);
-	    }
-	    memcpy(buffer, buf, len);
-	    while ((IS_LETTER(c)) || (IS_DIGIT(c)) || /* test bigname.xml */
-		   (c == '.') || (c == '-') ||
-		   (c == '_') || ((qualified) && (c == ':')) ||
-		   (IS_COMBINING(c)) ||
-		   (IS_EXTENDER(c))) {
-		if (len + 10 > max) {
-                    xmlChar *tmp;
-                    int newSize;
-
-                    newSize = xmlGrowCapacity(max, 1, 1, XML_MAX_NAME_LENGTH);
-                    if (newSize < 0) {
-                        xmlFree(buffer);
-                        xmlXPathPErrMemory(ctxt);
-                        return(NULL);
-                    }
-		    tmp = xmlRealloc(buffer, newSize);
-		    if (tmp == NULL) {
-                        xmlFree(buffer);
-                        xmlXPathPErrMemory(ctxt);
-                        return(NULL);
-		    }
-                    buffer = tmp;
-		    max = newSize;
-		}
-		COPY_BUF(buffer,len,c);
-		NEXTL(l);
-		c = CUR_CHAR(l);
-	    }
-	    buffer[len] = 0;
-	    return(buffer);
-	}
-    }
-    if (len == 0)
-	return(NULL);
-    ret = xmlStrndup(buf, len);
-    if (ret == NULL)
-        xmlXPathPErrMemory(ctxt);
-    return(ret);
+    return(xmlXPathParseNameInternal(ctxt, 0));
 }
 
 #define MAX_FRAC 20
@@ -11373,7 +11254,7 @@ xmlXPathCompNodeTest(xmlXPathParserContextPtr ctxt, int *type,
     }
 
     if (name == NULL) {
-	name = xmlXPathParseNCName(ctxt);
+	name = xmlXPathParseNameInternal(ctxt, ':');
         if (name == NULL) {
             XP_ERROR(XPATH_EXPR_ERROR);
         }
@@ -11439,7 +11320,7 @@ xmlXPathCompNodeTest(xmlXPathParserContextPtr ctxt, int *type,
                 xmlXPathPErrMemory(ctxt);
 	    NEXT;
 	} else {
-            name = xmlXPathParseNCName(ctxt);
+	    name = xmlXPathParseNameInternal(ctxt, ':');
             if (name == NULL) {
                 XP_ERROR(XPATH_EXPR_ERROR);
             }
@@ -11577,7 +11458,7 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 	    axis = AXIS_CHILD;
 	} else {
 	    if (name == NULL)
-		name = xmlXPathParseNCName(ctxt);
+		name = xmlXPathParseNameInternal(ctxt, ':');
 	    if (name != NULL) {
 		axis = xmlXPathIsAxisName(name);
 		if (axis != 0) {

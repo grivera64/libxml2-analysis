@@ -72,6 +72,9 @@ struct _xmlAttrHashBucket {
     int index;
 };
 
+XML_HIDDEN size_t
+xmlScanXmlName(const xmlChar *str, size_t len, int exclude);
+
 XML_HIDDEN void
 xmlCtxtVErr(xmlParserCtxtPtr ctxt, xmlNodePtr node, xmlErrorDomain domain,
             xmlParserErrors code, xmlErrorLevel level,
