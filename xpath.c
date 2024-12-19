@@ -3749,6 +3749,8 @@ xmlXPathNodeSetDel(xmlNodeSetPtr cur, xmlNodePtr val) {
  * @cur:  the initial node set
  * @val:  the index to remove
  *
+ * DEPRECATED: Don't use.
+ *
  * Removes an entry from an existing NodeSet list.
  */
 void
@@ -3881,6 +3883,8 @@ xmlXPathNewValueTree(xmlNodePtr val) {
  * xmlXPathNewNodeSetList:
  * @val:  an existing NodeSet
  *
+ * DEPRECATED: Don't use.
+ *
  * Create a new xmlXPathObjectPtr of type NodeSet and initialize
  * it with the Nodeset @val
  *
@@ -3955,6 +3959,8 @@ xmlXPathFreeNodeSetList(xmlXPathObjectPtr obj) {
  * @nodes1:  a node-set
  * @nodes2:  a node-set
  *
+ * DEPRECATED: Don't use.
+ *
  * Implements the EXSLT - Sets difference() function:
  *    node-set set:difference (node-set, node-set)
  *
@@ -3995,6 +4001,8 @@ xmlXPathDifference (xmlNodeSetPtr nodes1, xmlNodeSetPtr nodes2) {
  * @nodes1:  a node-set
  * @nodes2:  a node-set
  *
+ * DEPRECATED: Don't use.
+ *
  * Implements the EXSLT - Sets intersection() function:
  *    node-set set:intersection (node-set, node-set)
  *
@@ -4031,6 +4039,8 @@ xmlXPathIntersection (xmlNodeSetPtr nodes1, xmlNodeSetPtr nodes2) {
 /**
  * xmlXPathDistinctSorted:
  * @nodes:  a node-set, sorted by document order
+ *
+ * DEPRECATED: Don't use.
  *
  * Implements the EXSLT - Sets distinct() function:
  *    node-set set:distinct (node-set)
@@ -4103,6 +4113,8 @@ xmlXPathDistinct (xmlNodeSetPtr nodes) {
  * @nodes1:  a node-set
  * @nodes2:  a node-set
  *
+ * DEPRECATED: Don't use.
+ *
  * Implements the EXSLT - Sets has-same-nodes function:
  *    boolean set:has-same-node(node-set, node-set)
  *
@@ -4134,6 +4146,8 @@ xmlXPathHasSameNodes (xmlNodeSetPtr nodes1, xmlNodeSetPtr nodes2) {
  *
  * Implements the EXSLT - Sets leading() function:
  *    node-set set:leading (node-set, node-set)
+ *
+ * DEPRECATED: Don't use.
  *
  * Returns the nodes in @nodes that precede @node in document order,
  *         @nodes if @node is NULL or an empty node-set if @nodes
@@ -4172,6 +4186,8 @@ xmlXPathNodeLeadingSorted (xmlNodeSetPtr nodes, xmlNodePtr node) {
  * xmlXPathNodeLeading:
  * @nodes:  a node-set
  * @node:  a node
+ *
+ * DEPRECATED: Don't use.
  *
  * Implements the EXSLT - Sets leading() function:
  *    node-set set:leading (node-set, node-set)
@@ -4213,6 +4229,8 @@ xmlXPathLeadingSorted (xmlNodeSetPtr nodes1, xmlNodeSetPtr nodes2) {
  * @nodes1:  a node-set
  * @nodes2:  a node-set
  *
+ * DEPRECATED: Don't use.
+ *
  * Implements the EXSLT - Sets leading() function:
  *    node-set set:leading (node-set, node-set)
  * @nodes1 and @nodes2 are sorted by document order, then
@@ -4238,6 +4256,8 @@ xmlXPathLeading (xmlNodeSetPtr nodes1, xmlNodeSetPtr nodes2) {
  * xmlXPathNodeTrailingSorted:
  * @nodes: a node-set, sorted by document order
  * @node: a node
+ *
+ * DEPRECATED: Don't use.
  *
  * Implements the EXSLT - Sets trailing() function:
  *    node-set set:trailing (node-set, node-set)
@@ -4281,6 +4301,8 @@ xmlXPathNodeTrailingSorted (xmlNodeSetPtr nodes, xmlNodePtr node) {
  * @nodes:  a node-set
  * @node:  a node
  *
+ * DEPRECATED: Don't use.
+ *
  * Implements the EXSLT - Sets trailing() function:
  *    node-set set:trailing (node-set, node-set)
  * @nodes is sorted by document order, then #xmlXPathNodeTrailingSorted
@@ -4320,6 +4342,8 @@ xmlXPathTrailingSorted (xmlNodeSetPtr nodes1, xmlNodeSetPtr nodes2) {
  * xmlXPathTrailing:
  * @nodes1:  a node-set
  * @nodes2:  a node-set
+ *
+ * DEPRECATED: Don't use.
  *
  * Implements the EXSLT - Sets trailing() function:
  *    node-set set:trailing (node-set, node-set)
@@ -6221,6 +6245,8 @@ error:
  * xmlXPathEqualValues:
  * @ctxt:  the XPath Parser context
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the equal operation on XPath objects content: @arg1 == @arg2
  *
  * Returns 0 or 1 depending on the results of the test.
@@ -6236,6 +6262,8 @@ xmlXPathEqualValues(xmlXPathParserContextPtr ctxt) {
 /**
  * xmlXPathNotEqualValues:
  * @ctxt:  the XPath Parser context
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the not-equal operation on XPath objects content:
  * @arg1 != @arg2
@@ -6255,6 +6283,8 @@ xmlXPathNotEqualValues(xmlXPathParserContextPtr ctxt) {
  * @ctxt:  the XPath Parser context
  * @inf:  less than (1) or greater than (0)
  * @strict:  is the comparison strict
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the compare operation on XPath objects:
  *     @arg1 < @arg2    (1, 1, ...
@@ -6326,6 +6356,8 @@ error:
  * xmlXPathValueFlipSign:
  * @ctxt:  the XPath Parser context
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the unary - operation on an XPath object
  * The numeric operators convert their operands to numbers as if
  * by calling the number function.
@@ -6346,6 +6378,8 @@ xmlXPathValueFlipSign(xmlXPathParserContextPtr ctxt) {
 /**
  * xmlXPathAddValues:
  * @ctxt:  the XPath Parser context
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the add operation on XPath objects:
  * The numeric operators convert their operands to numbers as if
@@ -6373,6 +6407,8 @@ xmlXPathAddValues(xmlXPathParserContextPtr ctxt) {
  * xmlXPathSubValues:
  * @ctxt:  the XPath Parser context
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the subtraction operation on XPath objects:
  * The numeric operators convert their operands to numbers as if
  * by calling the number function.
@@ -6398,6 +6434,8 @@ xmlXPathSubValues(xmlXPathParserContextPtr ctxt) {
 /**
  * xmlXPathMultValues:
  * @ctxt:  the XPath Parser context
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the multiply operation on XPath objects:
  * The numeric operators convert their operands to numbers as if
@@ -6425,6 +6463,8 @@ xmlXPathMultValues(xmlXPathParserContextPtr ctxt) {
  * xmlXPathDivValues:
  * @ctxt:  the XPath Parser context
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the div operation on XPath objects @arg1 / @arg2:
  * The numeric operators convert their operands to numbers as if
  * by calling the number function.
@@ -6451,6 +6491,8 @@ xmlXPathDivValues(xmlXPathParserContextPtr ctxt) {
 /**
  * xmlXPathModValues:
  * @ctxt:  the XPath Parser context
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the mod operation on XPath objects: @arg1 / @arg2
  * The numeric operators convert their operands to numbers as if
@@ -7189,6 +7231,8 @@ static const xmlIterStartFunc xmlIterStart[14] = {
  * @ctxt:  the XPath Parser context
  * @cur:  the current node in the traversal
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Traversal function for the "self" direction
  * The self axis contains just the context node itself
  *
@@ -7206,6 +7250,8 @@ xmlXPathNextSelf(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
  * xmlXPathNextChild:
  * @ctxt:  the XPath Parser context
  * @cur:  the current node in the traversal
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Traversal function for the "child" direction
  * The child axis contains the children of the context node in document order.
@@ -7254,6 +7300,8 @@ xmlXPathNextChild(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
  * xmlXPathNextDescendant:
  * @ctxt:  the XPath Parser context
  * @cur:  the current node in the traversal
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Traversal function for the "descendant" direction
  * the descendant axis contains the descendants of the context node in document
@@ -7316,6 +7364,8 @@ xmlXPathNextDescendant(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
  * @ctxt:  the XPath Parser context
  * @cur:  the current node in the traversal
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Traversal function for the "descendant-or-self" direction
  * the descendant-or-self axis contains the context node and the descendants
  * of the context node in document order; thus the context node is the first
@@ -7343,6 +7393,8 @@ xmlXPathNextDescendantOrSelf(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
  * xmlXPathNextParent:
  * @ctxt:  the XPath Parser context
  * @cur:  the current node in the traversal
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Traversal function for the "parent" direction
  * The parent axis contains the parent of the context node, if there is one.
@@ -7409,6 +7461,8 @@ xmlXPathNextParent(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
  * xmlXPathNextAncestor:
  * @ctxt:  the XPath Parser context
  * @cur:  the current node in the traversal
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Traversal function for the "ancestor" direction
  * the ancestor axis contains the ancestors of the context node; the ancestors
@@ -7525,6 +7579,8 @@ xmlXPathNextAncestor(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
  * @ctxt:  the XPath Parser context
  * @cur:  the current node in the traversal
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Traversal function for the "ancestor-or-self" direction
  * he ancestor-or-self axis contains the context node and ancestors of
  * the context node in reverse document order; thus the context node is
@@ -7545,6 +7601,8 @@ xmlXPathNextAncestorOrSelf(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
  * xmlXPathNextFollowingSibling:
  * @ctxt:  the XPath Parser context
  * @cur:  the current node in the traversal
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Traversal function for the "following-sibling" direction
  * The following-sibling axis contains the following siblings of the context
@@ -7567,6 +7625,8 @@ xmlXPathNextFollowingSibling(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
  * xmlXPathNextPrecedingSibling:
  * @ctxt:  the XPath Parser context
  * @cur:  the current node in the traversal
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Traversal function for the "preceding-sibling" direction
  * The preceding-sibling axis contains the preceding siblings of the context
@@ -7595,6 +7655,8 @@ xmlXPathNextPrecedingSibling(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
  * xmlXPathNextFollowing:
  * @ctxt:  the XPath Parser context
  * @cur:  the current node in the traversal
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Traversal function for the "following" direction
  * The following axis contains all nodes in the same document as the context
@@ -7671,6 +7733,8 @@ xmlXPathIsAncestor(xmlNodePtr ancestor, xmlNodePtr node) {
  * @ctxt:  the XPath Parser context
  * @cur:  the current node in the traversal
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Traversal function for the "preceding" direction
  * the preceding axis contains all nodes in the same document as the context
  * node that are before the context node in document order, excluding any
@@ -7721,6 +7785,8 @@ xmlXPathNextPreceding(xmlXPathParserContextPtr ctxt, xmlNodePtr cur)
  * @ctxt:  the XPath Parser context
  * @cur:  the current attribute in the traversal
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Traversal function for the "namespace" direction
  * the namespace axis contains the namespace nodes of the context node;
  * the order of nodes on this axis is implementation-defined; the axis will
@@ -7764,6 +7830,8 @@ xmlXPathNextNamespace(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
  * xmlXPathNextAttribute:
  * @ctxt:  the XPath Parser context
  * @cur:  the current attribute in the traversal
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Traversal function for the "attribute" direction
  * TODO: support DTD inherited default attributes
@@ -7809,6 +7877,8 @@ xmlXPathGetRoot(xmlXPathContextPtr xpctxt) {
  * xmlXPathRoot:
  * @ctxt:  the XPath Parser context
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Initialize the context to the root of the document
  */
 void
@@ -7834,6 +7904,8 @@ xmlXPathRoot(xmlXPathParserContextPtr ctxt) {
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the last() XPath function
  *    number last()
  * The last function returns the number of nodes in the context node list.
@@ -7853,6 +7925,8 @@ xmlXPathLastFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * xmlXPathPositionFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the position() XPath function
  *    number position()
@@ -7875,6 +7949,8 @@ xmlXPathPositionFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * xmlXPathCountFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the count() XPath function
  *    number count(node-set)
@@ -7960,6 +8036,8 @@ xmlXPathAddElementsByIds(xmlNodeSetPtr set, xmlDocPtr doc,
  * xmlXPathIdFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the id() XPath function
  *    node-set id(object)
@@ -8062,6 +8140,8 @@ xmlXPathGetNodeArg(xmlXPathParserContextPtr ctxt, int nargs) {
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the local-name() XPath function
  *    string local-name(node-set?)
  * The local-name function returns a string containing the local part
@@ -8110,6 +8190,8 @@ error:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the namespace-uri() XPath function
  *    string namespace-uri(node-set?)
  * The namespace-uri function returns a string containing the
@@ -8151,6 +8233,8 @@ error:
  * xmlXPathNameFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the name() XPath function
  *    string name(node-set?)
@@ -8225,6 +8309,8 @@ error:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the string() XPath function
  *    string string(object?)
  * The string function converts an object to a string as follows:
@@ -8288,6 +8374,8 @@ xmlXPathStringFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the string-length() XPath function
  *    number string-length(string?)
  * The string-length returns the number of characters in the string
@@ -8342,6 +8430,8 @@ typedef struct {
  * xmlXPathConcatFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the concat() XPath function
  *    string concat(string, string, string*)
@@ -8433,6 +8523,8 @@ error:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the contains() XPath function
  *    boolean contains(string, string)
  * The contains function returns true if the first argument string
@@ -8461,6 +8553,8 @@ error:
  * xmlXPathStartsWithFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the starts-with() XPath function
  *    boolean starts-with(string, string)
@@ -8493,6 +8587,8 @@ error:
  * xmlXPathSubstringFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the substring() XPath function
  *    string substring(string, number, number?)
@@ -8585,6 +8681,8 @@ xmlXPathSubstringFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the substring-before() XPath function
  *    string substring-before(string, string)
  * The substring-before function returns the substring of the first
@@ -8633,6 +8731,8 @@ error:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the substring-after() XPath function
  *    string substring-after(string, string)
  * The substring-after function returns the substring of the first
@@ -8677,6 +8777,8 @@ error:
  * xmlXPathNormalizeFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the normalize-space() XPath function
  *    string normalize-space(string?)
@@ -8737,6 +8839,8 @@ xmlXPathNormalizeFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * xmlXPathTranslateFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the translate() XPath function
  *    string translate(string, string, string)
@@ -8844,6 +8948,8 @@ error:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the boolean() XPath function
  *    boolean boolean(object)
  * The boolean function converts its argument to a boolean as follows:
@@ -8865,6 +8971,8 @@ xmlXPathBooleanFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * xmlXPathNotFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the not() XPath function
  *    boolean not(boolean)
@@ -8889,6 +8997,8 @@ xmlXPathNotFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the true() XPath function
  *    boolean true()
  */
@@ -8903,6 +9013,8 @@ xmlXPathTrueFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the false() XPath function
  *    boolean false()
  */
@@ -8916,6 +9028,8 @@ xmlXPathFalseFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * xmlXPathLangFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the lang() XPath function
  *    boolean lang(string)
@@ -8975,6 +9089,8 @@ not_equal:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the number() XPath function
  *    number number(object?)
  */
@@ -9007,6 +9123,8 @@ xmlXPathNumberFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * xmlXPathSumFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the sum() XPath function
  *    number sum(node-set)
@@ -9041,6 +9159,8 @@ xmlXPathSumFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
  *
+ * DEPRECATED: Internal function, don't use.
+ *
  * Implement the floor() XPath function
  *    number floor(number)
  * The floor function returns the largest (closest to positive infinity)
@@ -9063,6 +9183,8 @@ xmlXPathFloorFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * xmlXPathCeilingFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the ceiling() XPath function
  *    number ceiling(number)
@@ -9091,6 +9213,8 @@ xmlXPathCeilingFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * xmlXPathRoundFunction:
  * @ctxt:  the XPath Parser context
  * @nargs:  the number of arguments
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Implement the round() XPath function
  *    number round(number)
@@ -9797,6 +9921,8 @@ error:
 /**
  * xmlXPathIsNodeType:
  * @name:  a name string
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Is the name given a NodeType one.
  *
@@ -12567,6 +12693,8 @@ xmlXPathEvalPredicate(xmlXPathContextPtr ctxt, xmlXPathObjectPtr res) {
  * xmlXPathEvaluatePredicateResult:
  * @ctxt:  the XPath Parser context
  * @res:  the Predicate Expression evaluation result
+ *
+ * DEPRECATED: Internal function, don't use.
  *
  * Evaluate a predicate result for the current node.
  * A PredicateExpr is evaluated by evaluating the Expr and converting
