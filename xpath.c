@@ -998,8 +998,13 @@ xmlXPathFreeCompExpr(xmlXPathCompExprPtr comp)
             case XPATH_OP_VARIABLE:
             case XPATH_OP_FUNCTION:
                 if (comp->dict == NULL) {
+                    int flags = XML_XPATH_COMPILE_NS;
+
                     xmlFree(op->value4);
-                    if ((comp->flags & XML_XPATH_COMPILE_NS) == 0)
+
+                    if (op->op == XPATH_OP_FUNCTION)
+                        flags |= XML_XPATH_COMPILE_FUNC;
+                    if ((comp->flags & flags) == 0)
                         xmlFree(op->value5);
                 }
                 break;
@@ -1082,9 +1087,13 @@ xmlXPathCompExprAdd(xmlXPathParserContextPtr ctxt, int ch1, int ch2,
 	} else
 	    comp->steps[comp->nbStep].value4 = NULL;
         if (value5 != NULL) {
+            int flags = XML_XPATH_COMPILE_NS;
+
 	    comp->steps[comp->nbStep].value5 = (xmlChar *)
 	        (void *)xmlDictLookup(comp->dict, value5, -1);
-            if ((comp->flags & XML_XPATH_COMPILE_NS) == 0)
+            if (op == XPATH_OP_FUNCTION)
+                flags |= XML_XPATH_COMPILE_FUNC;
+            if ((comp->flags & flags) == 0)
 	        xmlFree(value5);
 	} else
 	    comp->steps[comp->nbStep].value5 = NULL;
@@ -1457,7 +1466,9 @@ xmlXPathDebugDumpStepOp(FILE *output, xmlXPathCompExprPtr comp,
 	    const xmlChar *prefix = op->value5;
 	    const xmlChar *name = op->value4;
 
-	    if (prefix != NULL)
+            if (comp->flags & XML_XPATH_COMPILE_FUNC)
+		fprintf(output, "FUNCTION [compiled](%d args)", nbargs);
+            else if (prefix != NULL)
 		fprintf(output, "FUNCTION %s:%s(%d args)",
 			prefix, name, nbargs);
 	    else
@@ -9091,7 +9102,7 @@ static void
 xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
     xmlChar *name;
     xmlChar *prefix;
-    xmlChar *value5;
+    void *value5;
     int nbargs = 0;
     int sort = 1;
 
@@ -9123,7 +9134,8 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
 
     if ((prefix != NULL) &&
         ((ctxt->comp->flags & XML_XPATH_CHECKNS) ||
-         (ctxt->comp->flags & XML_XPATH_COMPILE_NS))) {
+         (ctxt->comp->flags & XML_XPATH_COMPILE_NS) ||
+         (ctxt->comp->flags & XML_XPATH_COMPILE_FUNC))) {
         const xmlChar *nsUri;
 
         nsUri = xmlXPathNsLookup(ctxt->context, prefix);
@@ -9131,11 +9143,26 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
             xmlXPathErr(ctxt, XPATH_UNDEF_PREFIX_ERROR);
         }
 
-        if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
+        if (ctxt->comp->flags & XML_XPATH_COMPILE_FUNC) {
+            value5 = (void *) xmlXPathFunctionLookupNS(ctxt->context,
+                                                       name, nsUri);
+            if (value5 == NULL)
+                xmlXPathErr(ctxt, XPATH_UNKNOWN_FUNC_ERROR);
+            xmlFree(prefix);
+            xmlFree(name);
+            prefix = NULL;
+            name = NULL;
+        } else if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
             value5 = (xmlChar *) nsUri;
             xmlFree(prefix);
             prefix = NULL;
         }
+    } else if (ctxt->comp->flags & XML_XPATH_COMPILE_FUNC) {
+        value5 = (void *) xmlXPathFunctionLookupNS(ctxt->context, name, NULL);
+        if (value5 == NULL)
+            xmlXPathErr(ctxt, XPATH_UNKNOWN_FUNC_ERROR);
+        xmlFree(name);
+        name = NULL;
     }
 
     ctxt->comp->last = -1;
@@ -11579,9 +11606,13 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathStepOpPtr op)
 		    if (ctxt->valueTab[(ctxt->valueNr - 1) - i] == NULL)
 			XP_ERROR0(XPATH_INVALID_OPERAND);
                 }
-                if (op->cache != NULL)
+                if (op->cache != NULL) {
                     func = op->cache;
-                else {
+                } else if (ctxt->comp->flags & XML_XPATH_COMPILE_FUNC) {
+                    func = (xmlXPathFunction) op->value5;
+                    if (func == NULL)
+                        XP_ERROR0(XPATH_UNKNOWN_FUNC_ERROR);
+                } else {
                     const xmlChar *URI = NULL;
 
                     if (op->value5 != NULL) {
@@ -11597,6 +11628,10 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathStepOpPtr op)
                                                     op->value4, URI);
                     if (func == NULL)
                         XP_ERROR0(XPATH_UNKNOWN_FUNC_ERROR);
+                    /*
+                     * This modifies the compiled expression and isn't
+                     * thread-safe.
+                     */
                     op->cache = func;
                     op->cacheURI = (void *) URI;
                 }
