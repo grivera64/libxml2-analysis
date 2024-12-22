@@ -930,10 +930,10 @@ static void
 xmlXPathReleaseObject(xmlXPathContextPtr ctxt, xmlXPathObjectPtr obj);
 static int
 xmlXPathCompOpEvalFirst(xmlXPathParserContextPtr ctxt,
-                        xmlXPathStepOpPtr op, xmlNodePtr *first);
+                        const xmlXPathStepOp *op, xmlNodePtr *first);
 static int
 xmlXPathCompOpEvalToBoolean(xmlXPathParserContextPtr ctxt,
-			    xmlXPathStepOpPtr op,
+			    const xmlXPathStepOp *op,
 			    int isPredicate);
 static void
 xmlXPathFreeObjectEntry(void *obj, const xmlChar *name);
@@ -1316,8 +1316,8 @@ xmlXPathDebugDumpObject(FILE *output, xmlXPathObjectPtr cur, int depth) {
 }
 
 static void
-xmlXPathDebugDumpStepOp(FILE *output, xmlXPathCompExprPtr comp,
-	                     xmlXPathStepOpPtr op, int depth) {
+xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
+                        const xmlXPathStepOp *op, int depth) {
     int i;
     char shift[100];
 
@@ -10196,7 +10196,7 @@ xmlXPathCompLocationPath(xmlXPathParserContextPtr ctxt) {
  ************************************************************************/
 
 static int
-xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathStepOpPtr op);
+xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op);
 
 /**
  * xmlXPathNodeSetFilter:
@@ -10221,7 +10221,7 @@ xmlXPathNodeSetFilter(xmlXPathParserContextPtr ctxt,
     xmlXPathContextPtr xpctxt;
     xmlNodePtr oldnode;
     xmlDocPtr olddoc;
-    xmlXPathStepOpPtr filterOp;
+    const xmlXPathStepOp *filterOp;
     int oldcs, oldpp;
     int i, j, pos;
 
@@ -10347,13 +10347,13 @@ xmlXPathNodeSetFilter(xmlXPathParserContextPtr ctxt,
  */
 static void
 xmlXPathCompOpEvalPredicate(xmlXPathParserContextPtr ctxt,
-			    xmlXPathStepOpPtr op,
+			    const xmlXPathStepOp *op,
 			    xmlNodeSetPtr set,
                             int minPos, int maxPos,
 			    int hasNsNodes)
 {
     if (op->ch1 != -1) {
-	xmlXPathCompExprPtr comp = ctxt->comp;
+	const xmlXPathCompExpr *comp = ctxt->comp;
 	/*
 	* Process inner predicates first.
 	*/
@@ -10375,11 +10375,10 @@ xmlXPathCompOpEvalPredicate(xmlXPathParserContextPtr ctxt,
 
 static int
 xmlXPathIsPositionalPredicate(xmlXPathParserContextPtr ctxt,
-			    xmlXPathStepOpPtr op,
-			    int *maxPos)
+			      const xmlXPathStepOp *op,
+			      int *maxPos)
 {
-
-    xmlXPathStepOpPtr exprOp;
+    const xmlXPathStepOp *exprOp;
 
     /*
     * BIG NOTE: This is not intended for XPATH_OP_FILTER yet!
@@ -10431,7 +10430,7 @@ xmlXPathIsPositionalPredicate(xmlXPathParserContextPtr ctxt,
 
 static int
 xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
-                           xmlXPathStepOpPtr op,
+                           const xmlXPathStepOp *op,
 			   xmlNodePtr * first, xmlNodePtr * last,
 			   int toBool)
 {
@@ -10483,7 +10482,7 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
     xmlNodeSetPtr seq;
     xmlNodePtr cur;
     /* First predicate operator */
-    xmlXPathStepOpPtr predOp;
+    const xmlXPathStepOp *predOp;
     int maxPos; /* The requested position() (when a "[n]" predicate) */
     int hasPredicateRange, hasAxisRange, pos;
     int breakOnFirstHit;
@@ -11035,7 +11034,7 @@ error:
 
 static int
 xmlXPathCompOpEvalFilterFirst(xmlXPathParserContextPtr ctxt,
-			      xmlXPathStepOpPtr op, xmlNodePtr * first);
+			      const xmlXPathStepOp *op, xmlNodePtr *first);
 
 /**
  * xmlXPathCompOpEvalFirst:
@@ -11050,10 +11049,10 @@ xmlXPathCompOpEvalFilterFirst(xmlXPathParserContextPtr ctxt,
  */
 static int
 xmlXPathCompOpEvalFirst(xmlXPathParserContextPtr ctxt,
-                        xmlXPathStepOpPtr op, xmlNodePtr * first)
+                        const xmlXPathStepOp *op, xmlNodePtr *first)
 {
     int total = 0, cur;
-    xmlXPathCompExprPtr comp;
+    const xmlXPathCompExpr *comp;
     xmlXPathObjectPtr arg1, arg2;
 
     CHECK_ERROR0;
@@ -11189,11 +11188,11 @@ xmlXPathCompOpEvalFirst(xmlXPathParserContextPtr ctxt,
  * Returns the number of nodes traversed
  */
 static int
-xmlXPathCompOpEvalLast(xmlXPathParserContextPtr ctxt, xmlXPathStepOpPtr op,
+xmlXPathCompOpEvalLast(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op,
                        xmlNodePtr * last)
 {
     int total = 0, cur;
-    xmlXPathCompExprPtr comp;
+    const xmlXPathCompExpr *comp;
     xmlXPathObjectPtr arg1, arg2;
 
     CHECK_ERROR0;
@@ -11314,10 +11313,10 @@ xmlXPathCompOpEvalLast(xmlXPathParserContextPtr ctxt, xmlXPathStepOpPtr op,
 #ifdef XP_OPTIMIZED_FILTER_FIRST
 static int
 xmlXPathCompOpEvalFilterFirst(xmlXPathParserContextPtr ctxt,
-			      xmlXPathStepOpPtr op, xmlNodePtr * first)
+			      const xmlXPathStepOp *op, xmlNodePtr *first)
 {
     int total = 0;
-    xmlXPathCompExprPtr comp;
+    const xmlXPathCompExpr *comp;
     xmlXPathObjectPtr obj;
     xmlNodeSetPtr set;
 
@@ -11397,11 +11396,11 @@ xmlXPathCompOpEvalFilterFirst(xmlXPathParserContextPtr ctxt,
  * Returns the number of nodes traversed
  */
 static int
-xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathStepOpPtr op)
+xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
 {
     int total = 0;
     int equal, ret;
-    xmlXPathCompExprPtr comp;
+    const xmlXPathCompExpr *comp;
     xmlXPathObjectPtr arg1, arg2;
 
     CHECK_ERROR0;
@@ -11632,8 +11631,8 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathStepOpPtr op)
                      * This modifies the compiled expression and isn't
                      * thread-safe.
                      */
-                    op->cache = func;
-                    op->cacheURI = (void *) URI;
+                    ((xmlXPathStepOpPtr) op)->cache = func;
+                    ((xmlXPathStepOpPtr) op)->cacheURI = (void *) URI;
                 }
                 oldFunc = ctxt->context->function;
                 oldFuncURI = ctxt->context->functionURI;
@@ -11808,7 +11807,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathStepOpPtr op)
  */
 static int
 xmlXPathCompOpEvalToBoolean(xmlXPathParserContextPtr ctxt,
-			    xmlXPathStepOpPtr op,
+			    const xmlXPathStepOp *op,
 			    int isPredicate)
 {
     xmlXPathObjectPtr resObj = NULL;
@@ -12132,7 +12131,7 @@ return_1:
 static int
 xmlXPathRunEval(xmlXPathParserContextPtr ctxt, int toBool)
 {
-    xmlXPathCompExprPtr comp;
+    const xmlXPathCompExpr *comp;
     int oldDepth;
 
     if ((ctxt == NULL) || (ctxt->comp == NULL))
