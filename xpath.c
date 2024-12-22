@@ -912,6 +912,7 @@ struct _xmlXPathCompExpr {
     int maxStep;		/* Maximum number of steps allocated */
     xmlXPathStepOp *steps;	/* ops for computation of this expression */
     int last;			/* index of last step in expression */
+    int flags;
     xmlChar *expr;		/* the expression being computed */
     xmlDictPtr dict;		/* the dictionary to use if any */
 #ifdef XPATH_STREAMING
@@ -985,26 +986,29 @@ xmlXPathFreeCompExpr(xmlXPathCompExprPtr comp)
 
     if (comp == NULL)
         return;
-    if (comp->dict == NULL) {
-	for (i = 0; i < comp->nbStep; i++) {
-	    op = &comp->steps[i];
-	    if (op->value4 != NULL) {
-		if (op->op == XPATH_OP_VALUE)
-		    xmlXPathFreeObject(op->value4);
-		else
-		    xmlFree(op->value4);
-	    }
-	    if (op->value5 != NULL)
-		xmlFree(op->value5);
-	}
-    } else {
-	for (i = 0; i < comp->nbStep; i++) {
-	    op = &comp->steps[i];
-	    if (op->value4 != NULL) {
-		if (op->op == XPATH_OP_VALUE)
-		    xmlXPathFreeObject(op->value4);
-	    }
-	}
+    for (i = 0; i < comp->nbStep; i++) {
+        op = &comp->steps[i];
+
+        switch (op->op) {
+            case XPATH_OP_VALUE:
+                xmlXPathFreeObject(op->value4);
+                break;
+
+            case XPATH_OP_COLLECT:
+            case XPATH_OP_VARIABLE:
+            case XPATH_OP_FUNCTION:
+                if (comp->dict == NULL) {
+                    xmlFree(op->value4);
+                    if ((comp->flags & XML_XPATH_COMPILE_NS) == 0)
+                        xmlFree(op->value5);
+                }
+                break;
+
+            default:
+                break;
+        }
+    }
+    if (comp->dict != NULL) {
         xmlDictFree(comp->dict);
     }
     if (comp->steps != NULL) {
@@ -1080,7 +1084,8 @@ xmlXPathCompExprAdd(xmlXPathParserContextPtr ctxt, int ch1, int ch2,
         if (value5 != NULL) {
 	    comp->steps[comp->nbStep].value5 = (xmlChar *)
 	        (void *)xmlDictLookup(comp->dict, value5, -1);
-	    xmlFree(value5);
+            if ((comp->flags & XML_XPATH_COMPILE_NS) == 0)
+	        xmlFree(value5);
 	} else
 	    comp->steps[comp->nbStep].value5 = NULL;
     } else {
@@ -1367,8 +1372,8 @@ xmlXPathDebugDumpStepOp(FILE *output, xmlXPathCompExprPtr comp,
 	    xmlXPathAxisVal axis = (xmlXPathAxisVal)op->value;
 	    xmlXPathTestVal test = (xmlXPathTestVal)op->value2;
 	    xmlXPathTypeVal type = (xmlXPathTypeVal)op->value3;
-	    const xmlChar *prefix = op->value4;
-	    const xmlChar *name = op->value5;
+	    const xmlChar *prefix = op->value5;
+	    const xmlChar *name = op->value4;
 
 	    fprintf(output, "COLLECT ");
 	    switch (axis) {
@@ -9000,6 +9005,7 @@ static void
 xmlXPathCompVariableReference(xmlXPathParserContextPtr ctxt) {
     xmlChar *name;
     xmlChar *prefix;
+    xmlChar *value5;
 
     SKIP_BLANKS;
     if (CUR != '$') {
@@ -9011,13 +9017,33 @@ xmlXPathCompVariableReference(xmlXPathParserContextPtr ctxt) {
         xmlFree(prefix);
 	XP_ERROR(XPATH_VARIABLE_REF_ERROR);
     }
+
+    value5 = prefix;
+
+    if ((prefix != NULL) &&
+        ((ctxt->comp->flags & XML_XPATH_CHECKNS) ||
+         (ctxt->comp->flags & XML_XPATH_COMPILE_NS))) {
+        const xmlChar *nsUri;
+
+        nsUri = xmlXPathNsLookup(ctxt->context, prefix);
+        if (nsUri == NULL) {
+            xmlXPathErr(ctxt, XPATH_UNDEF_PREFIX_ERROR);
+        }
+
+        if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
+            value5 = (xmlChar *) nsUri;
+            xmlFree(prefix);
+            prefix = NULL;
+        }
+    }
+
     ctxt->comp->last = -1;
-    if (PUSH_LONG_EXPR(XPATH_OP_VARIABLE, 0, 0, 0, name, prefix) == -1) {
+    if (PUSH_LONG_EXPR(XPATH_OP_VARIABLE, 0, 0, 0, name, value5) == -1) {
         xmlFree(prefix);
         xmlFree(name);
     }
     SKIP_BLANKS;
-    if ((ctxt->context != NULL) && (ctxt->context->flags & XML_XPATH_NOVAR)) {
+    if (ctxt->comp->flags & XML_XPATH_NOVAR) {
 	XP_ERROR(XPATH_FORBID_VARIABLE_ERROR);
     }
 }
@@ -9065,6 +9091,7 @@ static void
 xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
     xmlChar *name;
     xmlChar *prefix;
+    xmlChar *value5;
     int nbargs = 0;
     int sort = 1;
 
@@ -9091,6 +9118,26 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
     {
 	sort = 0;
     }
+
+    value5 = prefix;
+
+    if ((prefix != NULL) &&
+        ((ctxt->comp->flags & XML_XPATH_CHECKNS) ||
+         (ctxt->comp->flags & XML_XPATH_COMPILE_NS))) {
+        const xmlChar *nsUri;
+
+        nsUri = xmlXPathNsLookup(ctxt->context, prefix);
+        if (nsUri == NULL) {
+            xmlXPathErr(ctxt, XPATH_UNDEF_PREFIX_ERROR);
+        }
+
+        if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
+            value5 = (xmlChar *) nsUri;
+            xmlFree(prefix);
+            prefix = NULL;
+        }
+    }
+
     ctxt->comp->last = -1;
     if (CUR != ')') {
 	while (CUR != 0) {
@@ -9114,7 +9161,7 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
 	    SKIP_BLANKS;
 	}
     }
-    if (PUSH_LONG_EXPR(XPATH_OP_FUNCTION, nbargs, 0, 0, name, prefix) == -1) {
+    if (PUSH_LONG_EXPR(XPATH_OP_FUNCTION, nbargs, 0, 0, name, value5) == -1) {
         xmlFree(prefix);
         xmlFree(name);
     }
@@ -9946,6 +9993,7 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
     } else {
 	xmlChar *name = NULL;
 	xmlChar *prefix = NULL;
+        xmlChar *value5;
 	xmlXPathTestVal test = (xmlXPathTestVal) 0;
 	xmlXPathAxisVal axis = (xmlXPathAxisVal) 0;
 	xmlXPathTypeVal type = (xmlXPathTypeVal) 0;
@@ -9988,11 +10036,23 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 	if (test == 0)
 	    return;
 
-        if ((prefix != NULL) && (ctxt->context != NULL) &&
-	    (ctxt->context->flags & XML_XPATH_CHECKNS)) {
-	    if (xmlXPathNsLookup(ctxt->context, prefix) == NULL) {
+        value5 = prefix;
+
+        if ((prefix != NULL) &&
+	    ((ctxt->comp->flags & XML_XPATH_CHECKNS) ||
+             (ctxt->comp->flags & XML_XPATH_COMPILE_NS))) {
+            const xmlChar *nsUri;
+
+	    nsUri = xmlXPathNsLookup(ctxt->context, prefix);
+            if (nsUri == NULL) {
 		xmlXPathErr(ctxt, XPATH_UNDEF_PREFIX_ERROR);
 	    }
+
+            if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
+                value5 = (xmlChar *) nsUri;
+                xmlFree(prefix);
+                prefix = NULL;
+            }
 	}
 
 	op1 = ctxt->comp->last;
@@ -10004,7 +10064,7 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 	}
 
         if (PUSH_FULL_EXPR(XPATH_OP_COLLECT, op1, ctxt->comp->last, axis,
-                           test, type, (void *)prefix, (void *)name) == -1) {
+                           test, type, name, value5) == -1) {
             xmlFree(prefix);
             xmlFree(name);
         }
@@ -10376,8 +10436,8 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
     xmlXPathAxisVal axis = (xmlXPathAxisVal) op->value;
     xmlXPathTestVal test = (xmlXPathTestVal) op->value2;
     xmlXPathTypeVal type = (xmlXPathTypeVal) op->value3;
-    const xmlChar *prefix = op->value4;
-    const xmlChar *name = op->value5;
+    const xmlChar *value5 = op->value5;
+    const xmlChar *name = op->value4;
     const xmlChar *URI = NULL;
 
     int total = 0, hasNsNodes = 0;
@@ -10413,12 +10473,16 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
     /*
     * Setup namespaces.
     */
-    if (prefix != NULL) {
-        URI = xmlXPathNsLookup(xpctxt, prefix);
-        if (URI == NULL) {
-	    xmlXPathReleaseObject(xpctxt, obj);
-            XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
-	}
+    if (value5 != NULL) {
+        if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
+            URI = value5;
+        } else {
+            URI = xmlXPathNsLookup(xpctxt, value5);
+            if (URI == NULL) {
+                xmlXPathReleaseObject(xpctxt, obj);
+                XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
+            }
+        }
     }
     /*
     * Setup axis.
@@ -10687,7 +10751,7 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
                     if (axis == AXIS_ATTRIBUTE) {
                         if (cur->type == XML_ATTRIBUTE_NODE)
 			{
-                            if (prefix == NULL)
+                            if (URI == NULL)
 			    {
 				XP_TEST_HIT
                             } else if ((cur->ns != NULL) &&
@@ -10703,7 +10767,7 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
                         }
                     } else {
                         if (cur->type == XML_ELEMENT_NODE) {
-                            if (prefix == NULL)
+                            if (URI == NULL)
 			    {
 				XP_TEST_HIT
 
@@ -10733,7 +10797,7 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
                     switch (cur->type) {
                         case XML_ELEMENT_NODE:
                             if (xmlStrEqual(name, cur->name)) {
-                                if (prefix == NULL) {
+                                if (URI == NULL) {
                                     if (cur->ns == NULL)
 				    {
 					XP_TEST_HIT
@@ -10751,7 +10815,7 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
                                 xmlAttrPtr attr = (xmlAttrPtr) cur;
 
                                 if (xmlStrEqual(name, attr->name)) {
-                                    if (prefix == NULL) {
+                                    if (URI == NULL) {
                                         if ((attr->ns == NULL) ||
                                             (attr->ns->prefix == NULL))
 					{
@@ -11472,29 +11536,28 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathStepOpPtr op)
             break;
         case XPATH_OP_VARIABLE:{
 		xmlXPathObjectPtr val;
+                const xmlChar *URI = NULL;
 
                 if (op->ch1 != -1)
                     total +=
                         xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-                if (op->value5 == NULL) {
-		    val = xmlXPathVariableLookup(ctxt->context, op->value4);
-		    if (val == NULL)
-			XP_ERROR0(XPATH_UNDEF_VARIABLE_ERROR);
-                    valuePush(ctxt, val);
-		} else {
-                    const xmlChar *URI;
 
-                    URI = xmlXPathNsLookup(ctxt->context, op->value5);
-                    if (URI == NULL) {
-                        XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
-                        break;
+                if (op->value5 != NULL) {
+                    if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
+                        URI = op->value5;
+                    } else {
+                        URI = xmlXPathNsLookup(ctxt->context, op->value5);
+                        if (URI == NULL) {
+                            XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
+                            break;
+                        }
                     }
-		    val = xmlXPathVariableLookupNS(ctxt->context,
-                                                       op->value4, URI);
-		    if (val == NULL)
-			XP_ERROR0(XPATH_UNDEF_VARIABLE_ERROR);
-                    valuePush(ctxt, val);
                 }
+                val = xmlXPathVariableLookupNS(ctxt->context,
+                                                   op->value4, URI);
+                if (val == NULL)
+                    XP_ERROR0(XPATH_UNDEF_VARIABLE_ERROR);
+                valuePush(ctxt, val);
                 break;
             }
         case XPATH_OP_FUNCTION:{
@@ -11521,17 +11584,17 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathStepOpPtr op)
                 else {
                     const xmlChar *URI = NULL;
 
-                    if (op->value5 == NULL)
-                        func =
-                            xmlXPathFunctionLookup(ctxt->context,
-                                                   op->value4);
-                    else {
-                        URI = xmlXPathNsLookup(ctxt->context, op->value5);
-                        if (URI == NULL)
-                            XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
-                        func = xmlXPathFunctionLookupNS(ctxt->context,
-                                                        op->value4, URI);
+                    if (op->value5 != NULL) {
+                        if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
+                            URI = op->value5;
+                        } else {
+                            URI = xmlXPathNsLookup(ctxt->context, op->value5);
+                            if (URI == NULL)
+                                XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
+                        }
                     }
+                    func = xmlXPathFunctionLookupNS(ctxt->context,
+                                                    op->value4, URI);
                     if (func == NULL)
                         XP_ERROR0(XPATH_UNKNOWN_FUNC_ERROR);
                     op->cache = func;
@@ -12392,6 +12455,7 @@ xmlXPathCtxtCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
             xmlXPathFreeContext(tmpctxt);
         return NULL;
     }
+    pctxt->comp->flags = ctxt->flags;
 
     oldDepth = ctxt->depth;
     xmlXPathCompileExpr(pctxt, 1);
@@ -12573,6 +12637,8 @@ xmlXPathEvalExpr(xmlXPathParserContextPtr ctxt) {
     } else
 #endif
     {
+        ctxt->comp->flags = ctxt->context->flags;
+
         if (ctxt->context != NULL)
             oldDepth = ctxt->context->depth;
 	xmlXPathCompileExpr(ctxt, 1);

@@ -267,6 +267,12 @@ typedef xmlXPathFunction (*xmlXPathFuncLookupFunc) (void *ctxt,
  * forbid variables in expression
  */
 #define XML_XPATH_NOVAR	  (1<<1)
+/**
+ * XML_XPATH_COMPILE_NS:
+ *
+ * Look up namespaces during compilation
+ */
+#define XML_XPATH_COMPILE_NS    (1<<2)
 
 /**
  * xmlXPathContext:
