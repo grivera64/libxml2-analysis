@@ -1,7 +1,7 @@
 <!DOCTYPE doc [
-<!ENTITY lt     "&#38;#60;"> 
+<!ENTITY lt     "&#38;#000000000000000000060;"> 
 <!ENTITY gt     "&#62;"> 
-<!ENTITY amp    "&#38;#38;"> 
+<!ENTITY amp    "&#38;#00000000038;"> 
 <!ENTITY apos   "&#39;"> 
 <!ENTITY quot   "&#34;"> 
 ]>

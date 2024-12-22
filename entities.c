@@ -29,6 +29,7 @@
 #include "private/entities.h"
 #include "private/error.h"
 #include "private/parser.h"
+#include "private/tree.h"
 
 #ifndef SIZE_MAX
   #define SIZE_MAX ((size_t) -1)
@@ -226,22 +227,13 @@ xmlAddEntity(xmlDocPtr doc, int extSubset, const xmlChar *name, int type,
                         ((c == '>') || (c == '\'') || (c == '"'))) {
                         valid = 1;
                     } else if ((content[0] == '&') && (content[1] == '#')) {
-                        if (content[2] == 'x') {
-                            xmlChar *hex = BAD_CAST "0123456789ABCDEF";
-                            xmlChar ref[] = "00;";
+                        int len = INT_MAX;
+                        int charval;
 
-                            ref[0] = hex[c / 16 % 16];
-                            ref[1] = hex[c % 16];
-                            if (xmlStrcasecmp(&content[3], ref) == 0)
-                                valid = 1;
-                        } else {
-                            xmlChar ref[] = "00;";
+                        charval = xmlParseStringCharRef(content, &len);
 
-                            ref[0] = '0' + c / 10 % 10;
-                            ref[1] = '0' + c % 10;
-                            if (xmlStrEqual(&content[2], ref))
-                                valid = 1;
-                        }
+                        if ((charval == c) && (content[len] == 0))
+                            valid = 1;
                     }
                 }
                 if (!valid)
