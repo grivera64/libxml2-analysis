@@ -902,7 +902,6 @@ struct _xmlXPathStepOp {
     int ch2;			/* Second child */
     int value;
     int value2;
-    int value3;
     void *value4;
     void *value5;
     xmlXPathFunction cache;
@@ -1041,7 +1040,6 @@ xmlXPathFreeCompExpr(xmlXPathCompExprPtr comp)
  * @op:  an op
  * @value:  the first int value
  * @value2:  the second int value
- * @value3:  the third int value
  * @value4:  the first string value
  * @value5:  the second string value
  *
@@ -1052,7 +1050,7 @@ xmlXPathFreeCompExpr(xmlXPathCompExprPtr comp)
 static int
 xmlXPathCompExprAdd(xmlXPathParserContextPtr ctxt, int ch1, int ch2,
    xmlXPathOp op, int value,
-   int value2, int value3, void *value4, void *value5) {
+   int value2, void *value4, void *value5) {
     xmlXPathCompExprPtr comp = ctxt->comp;
     if (comp->nbStep >= comp->maxStep) {
 	xmlXPathStepOp *real;
@@ -1078,7 +1076,6 @@ xmlXPathCompExprAdd(xmlXPathParserContextPtr ctxt, int ch1, int ch2,
     comp->steps[comp->nbStep].op = op;
     comp->steps[comp->nbStep].value = value;
     comp->steps[comp->nbStep].value2 = value2;
-    comp->steps[comp->nbStep].value3 = value3;
     if ((comp->dict != NULL) &&
         ((op == XPATH_OP_FUNCTION) || (op == XPATH_OP_VARIABLE) ||
 	 (op == XPATH_OP_COLLECT))) {
@@ -1107,22 +1104,22 @@ xmlXPathCompExprAdd(xmlXPathParserContextPtr ctxt, int ch1, int ch2,
     return(comp->nbStep++);
 }
 
-#define PUSH_FULL_EXPR(op, op1, op2, val, val2, val3, val4, val5)	\
+#define PUSH_FULL_EXPR(op, op1, op2, val, val2, val4, val5)	\
     xmlXPathCompExprAdd(ctxt, (op1), (op2),			\
-	                (op), (val), (val2), (val3), (val4), (val5))
-#define PUSH_LONG_EXPR(op, val, val2, val3, val4, val5)			\
+	                (op), (val), (val2), (val4), (val5))
+#define PUSH_LONG_EXPR(op, val, val2, val4, val5)			\
     xmlXPathCompExprAdd(ctxt, ctxt->comp->last, -1,		\
-	                (op), (val), (val2), (val3), (val4), (val5))
+	                (op), (val), (val2), (val4), (val5))
 
 #define PUSH_LEAVE_EXPR(op, val, val2)					\
-xmlXPathCompExprAdd(ctxt, -1, -1, (op), (val), (val2), 0 ,NULL ,NULL)
+xmlXPathCompExprAdd(ctxt, -1, -1, (op), (val), (val2), NULL, NULL)
 
 #define PUSH_UNARY_EXPR(op, ch, val, val2)				\
-xmlXPathCompExprAdd(ctxt, (ch), -1, (op), (val), (val2), 0 ,NULL ,NULL)
+xmlXPathCompExprAdd(ctxt, (ch), -1, (op), (val), (val2), NULL, NULL)
 
 #define PUSH_BINARY_EXPR(op, ch1, ch2, val, val2)			\
 xmlXPathCompExprAdd(ctxt, (ch1), (ch2), (op),			\
-			(val), (val2), 0 ,NULL ,NULL)
+			(val), (val2), NULL, NULL)
 
 /************************************************************************
  *									*
@@ -1381,7 +1378,7 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	     fprintf(output, "SORT"); break;
         case XPATH_OP_COLLECT: {
 	    xmlXPathAxisVal axis = (xmlXPathAxisVal)op->value;
-	    int type = op->value3;
+	    int type = op->value2;
 	    const xmlChar *prefix = op->value5;
 	    const xmlChar *name = op->value4;
 
@@ -8893,7 +8890,7 @@ xmlXPathCompNumber(xmlXPathParserContextPtr ctxt)
     num = xmlXPathCacheNewFloat(ctxt, ret);
     if (num == NULL) {
 	ctxt->error = XPATH_MEMORY_ERROR;
-    } else if (PUSH_LONG_EXPR(XPATH_OP_VALUE, XPATH_NUMBER, 0, 0, num,
+    } else if (PUSH_LONG_EXPR(XPATH_OP_VALUE, XPATH_NUMBER, 0, num,
                               NULL) == -1) {
         xmlXPathReleaseObject(ctxt->context, num);
     }
@@ -8966,7 +8963,7 @@ xmlXPathCompLiteral(xmlXPathParserContextPtr ctxt) {
     lit = xmlXPathCacheNewString(ctxt, ret);
     if (lit == NULL) {
         ctxt->error = XPATH_MEMORY_ERROR;
-    } else if (PUSH_LONG_EXPR(XPATH_OP_VALUE, XPATH_STRING, 0, 0, lit,
+    } else if (PUSH_LONG_EXPR(XPATH_OP_VALUE, XPATH_STRING, 0, lit,
                               NULL) == -1) {
         xmlXPathReleaseObject(ctxt->context, lit);
     }
@@ -9027,7 +9024,7 @@ xmlXPathCompVariableReference(xmlXPathParserContextPtr ctxt) {
     }
 
     ctxt->comp->last = -1;
-    if (PUSH_LONG_EXPR(XPATH_OP_VARIABLE, 0, 0, 0, name, value5) == -1) {
+    if (PUSH_LONG_EXPR(XPATH_OP_VARIABLE, 0, 0, name, value5) == -1) {
         xmlFree(prefix);
         xmlFree(name);
     }
@@ -9166,7 +9163,7 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
 	    SKIP_BLANKS;
 	}
     }
-    if (PUSH_LONG_EXPR(XPATH_OP_FUNCTION, nbargs, 0, 0, name, value5) == -1) {
+    if (PUSH_LONG_EXPR(XPATH_OP_FUNCTION, nbargs, 0, name, value5) == -1) {
         xmlFree(prefix);
         xmlFree(name);
     }
@@ -9409,7 +9406,7 @@ xmlXPathCompPathExpr(xmlXPathParserContextPtr ctxt) {
 	    SKIP_BLANKS;
 
 	    PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_DESCENDANT_OR_SELF,
-                           0, TYPE_MASK_NODE, NULL, NULL);
+                           TYPE_MASK_NODE, NULL, NULL);
 
 	    xmlXPathCompRelativeLocationPath(ctxt);
 	} else if (CUR == '/') {
@@ -9983,7 +9980,7 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 	SKIP(2);
 	SKIP_BLANKS;
 	PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_PARENT,
-                       0, TYPE_MASK_NODE, NULL, NULL);
+                       TYPE_MASK_NODE, NULL, NULL);
     } else if (CUR == '.') {
 	NEXT;
 	SKIP_BLANKS;
@@ -10070,7 +10067,7 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 	}
 
         if (PUSH_FULL_EXPR(XPATH_OP_COLLECT, op1, ctxt->comp->last, axis,
-                           0, type, name, value5) == -1) {
+                           type, name, value5) == -1) {
             xmlFree(prefix);
             xmlFree(name);
         }
@@ -10096,7 +10093,7 @@ xmlXPathCompRelativeLocationPath
 	SKIP(2);
 	SKIP_BLANKS;
 	PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_DESCENDANT_OR_SELF,
-                       0, TYPE_MASK_NODE, NULL, NULL);
+                       TYPE_MASK_NODE, NULL, NULL);
     } else if (CUR == '/') {
 	    NEXT;
 	SKIP_BLANKS;
@@ -10109,7 +10106,7 @@ xmlXPathCompRelativeLocationPath
 	    SKIP(2);
 	    SKIP_BLANKS;
 	    PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_DESCENDANT_OR_SELF,
-                           0, TYPE_MASK_NODE, NULL, NULL);
+                           TYPE_MASK_NODE, NULL, NULL);
 	    xmlXPathCompStep(ctxt);
 	} else if (CUR == '/') {
 	    NEXT;
@@ -10152,7 +10149,7 @@ xmlXPathCompLocationPath(xmlXPathParserContextPtr ctxt) {
 		SKIP(2);
 		SKIP_BLANKS;
 		PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_DESCENDANT_OR_SELF,
-                               0, TYPE_MASK_NODE, NULL, NULL);
+                               TYPE_MASK_NODE, NULL, NULL);
 		xmlXPathCompRelativeLocationPath(ctxt);
 	    } else if (CUR == '/') {
 		NEXT;
@@ -10414,7 +10411,7 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 			   int toBool)
 {
     xmlXPathAxisVal axis = (xmlXPathAxisVal) op->value;
-    int typeMask = op->value3;
+    int typeMask = op->value2;
     const xmlChar *value5 = op->value5;
     const xmlChar *name = op->value4;
     const xmlChar *URI = NULL;
@@ -12218,7 +12215,7 @@ xmlXPathOptimizeExpression(xmlXPathParserContextPtr pctxt,
             ((xmlXPathAxisVal) prevop->value ==
                 AXIS_DESCENDANT_OR_SELF) &&
             (prevop->ch2 == -1) &&
-            (prevop->value3 == TYPE_MASK_NODE))
+            (prevop->value2 == TYPE_MASK_NODE))
         {
             /*
             * This is a "descendant-or-self::node()" without predicates.
