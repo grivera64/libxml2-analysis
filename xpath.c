@@ -126,6 +126,24 @@
 #define XPATH_MAX_RECURSION_DEPTH 5000
 #endif
 
+#define TYPE_MASK_DOC       ((1 << XML_DOCUMENT_NODE) | \
+                             (1 << XML_HTML_DOCUMENT_NODE))
+#define TYPE_MASK_ELEM       (1 << XML_ELEMENT_NODE)
+#define TYPE_MASK_TEXT      ((1 << XML_TEXT_NODE) | \
+                             (1 << XML_CDATA_SECTION_NODE))
+#define TYPE_MASK_COMMENT    (1 << XML_COMMENT_NODE)
+#define TYPE_MASK_PI         (1 << XML_PI_NODE)
+#define TYPE_MASK_ATTR       (1 << XML_ATTRIBUTE_NODE)
+#define TYPE_MASK_NS         (1 << XML_NAMESPACE_DECL)
+
+#define TYPE_MASK_NODE      (TYPE_MASK_DOC | \
+                             TYPE_MASK_ELEM | \
+                             TYPE_MASK_TEXT | \
+                             TYPE_MASK_COMMENT | \
+                             TYPE_MASK_PI | \
+                             TYPE_MASK_ATTR | \
+                             TYPE_MASK_NS)
+
 /*
  * TODO:
  * There are a few spots where some tests are done which depend upon ascii
@@ -9847,10 +9865,11 @@ xmlXPathCompNodeTest(xmlXPathParserContextPtr ctxt, xmlXPathTestVal *test,
 	else if (xmlStrEqual(name, BAD_CAST "text"))
 	    *type = NODE_TYPE_TEXT;
 	else {
-	    if (name != NULL)
-		xmlFree(name);
+	    xmlFree(name);
 	    XP_ERRORNULL(XPATH_EXPR_ERROR);
 	}
+
+	xmlFree(name);
 
 	*test = NODE_TEST_TYPE;
 
@@ -9859,9 +9878,6 @@ xmlXPathCompNodeTest(xmlXPathParserContextPtr ctxt, xmlXPathTestVal *test,
 	    /*
 	     * Specific case: search a PI by name.
 	     */
-	    if (name != NULL)
-		xmlFree(name);
-	    name = NULL;
 	    if (CUR != ')') {
 		name = xmlXPathParseLiteral(ctxt);
 		*test = NODE_TEST_PI;
@@ -9869,12 +9885,10 @@ xmlXPathCompNodeTest(xmlXPathParserContextPtr ctxt, xmlXPathTestVal *test,
 	    }
 	}
 	if (CUR != ')') {
-	    if (name != NULL)
-		xmlFree(name);
 	    XP_ERRORNULL(XPATH_UNCLOSED_ERROR);
 	}
 	NEXT;
-	return(name);
+	return(NULL);
     }
     *test = NODE_TEST_NAME;
     if ((!blanks) && (CUR == ':')) {
@@ -9893,15 +9907,17 @@ xmlXPathCompNodeTest(xmlXPathParserContextPtr ctxt, xmlXPathTestVal *test,
 	    /*
 	     * All elements
 	     */
+            name = xmlStrdup(BAD_CAST "*");
+            if (name == NULL)
+                xmlXPathPErrMemory(ctxt);
 	    NEXT;
 	    *test = NODE_TEST_ALL;
-	    return(NULL);
-	}
-
-	name = xmlXPathParseNCName(ctxt);
-	if (name == NULL) {
-	    XP_ERRORNULL(XPATH_EXPR_ERROR);
-	}
+	} else {
+            name = xmlXPathParseNCName(ctxt);
+            if (name == NULL) {
+                XP_ERRORNULL(XPATH_EXPR_ERROR);
+            }
+        }
     }
     return(name);
 }
@@ -10434,31 +10450,6 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 			   xmlNodePtr * first, xmlNodePtr * last,
 			   int toBool)
 {
-
-#define XP_TEST_HIT \
-    if (hasAxisRange != 0) { \
-	if (++pos == maxPos) { \
-	    if (addNode(seq, cur) < 0) \
-	        xmlXPathPErrMemory(ctxt); \
-	    goto axis_range_end; } \
-    } else { \
-	if (addNode(seq, cur) < 0) \
-	    xmlXPathPErrMemory(ctxt); \
-	if (breakOnFirstHit) goto first_hit; }
-
-#define XP_TEST_HIT_NS \
-    if (hasAxisRange != 0) { \
-	if (++pos == maxPos) { \
-	    hasNsNodes = 1; \
-	    if (xmlXPathNodeSetAddNs(seq, xpctxt->node, (xmlNsPtr) cur) < 0) \
-	        xmlXPathPErrMemory(ctxt); \
-	goto axis_range_end; } \
-    } else { \
-	hasNsNodes = 1; \
-	if (xmlXPathNodeSetAddNs(seq, xpctxt->node, (xmlNsPtr) cur) < 0) \
-	    xmlXPathPErrMemory(ctxt); \
-	if (breakOnFirstHit) goto first_hit; }
-
     xmlXPathAxisVal axis = (xmlXPathAxisVal) op->value;
     xmlXPathTestVal test = (xmlXPathTestVal) op->value2;
     xmlXPathTypeVal type = (xmlXPathTypeVal) op->value3;
@@ -10488,14 +10479,16 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
     int breakOnFirstHit;
 
     xmlXPathTraversalFunction next = NULL;
-    int (*addNode) (xmlNodeSetPtr, xmlNodePtr);
     xmlXPathNodeSetMergeFunction mergeAndClear;
     xmlNodePtr oldContextNode;
     xmlXPathContextPtr xpctxt = ctxt->context;
 
+    int typeMask;
+
 
     CHECK_TYPE0(XPATH_NODESET);
     obj = valuePop(ctxt);
+
     /*
     * Setup namespaces.
     */
@@ -10510,18 +10503,9 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
             }
         }
     }
+
     /*
     * Setup axis.
-    *
-    * MAYBE FUTURE TODO: merging optimizations:
-    * - If the nodes to be traversed wrt to the initial nodes and
-    *   the current axis cannot overlap, then we could avoid searching
-    *   for duplicates during the merge.
-    *   But the question is how/when to evaluate if they cannot overlap.
-    *   Example: if we know that for two initial nodes, the one is
-    *   not in the ancestor-or-self axis of the other, then we could safely
-    *   avoid a duplicate-aware merge, if the axis to be traversed is e.g.
-    *   the descendant-or-self axis.
     */
     mergeAndClear = xmlXPathNodeSetMergeAndClear;
     switch (axis) {
@@ -10598,6 +10582,43 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 	xmlXPathReleaseObject(xpctxt, obj);
         return(0);
     }
+
+    typeMask = 0;
+
+    switch (test) {
+        case NODE_TEST_TYPE:
+            switch (type) {
+                case NODE_TYPE_NODE:
+                    typeMask = TYPE_MASK_NODE;
+                    break;
+                case NODE_TYPE_TEXT:
+                    typeMask = TYPE_MASK_TEXT;
+                    break;
+                case NODE_TYPE_COMMENT:
+                    typeMask = TYPE_MASK_COMMENT;
+                    break;
+                case NODE_TYPE_PI:
+                    typeMask = TYPE_MASK_PI;
+                    break;
+            }
+            break;
+        case NODE_TEST_ALL:
+        case NODE_TEST_NAME:
+            /* principal node type */
+            if (axis == AXIS_ATTRIBUTE)
+                typeMask = TYPE_MASK_ATTR;
+            else if (axis == AXIS_NAMESPACE)
+                typeMask = TYPE_MASK_NS;
+            else
+                typeMask = TYPE_MASK_ELEM;
+            break;
+        case NODE_TEST_PI:
+            typeMask = TYPE_MASK_PI;
+            break;
+        default:
+            return(0);
+    }
+
     contextSeq = obj->nodesetval;
     if ((contextSeq == NULL) || (contextSeq->nodeNr <= 0)) {
         valuePush(ctxt, obj);
@@ -10661,7 +10682,6 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
      * select all element children of the context node
      */
     oldContextNode = xpctxt->node;
-    addNode = xmlXPathNodeSetAddUnique;
     outSeq = NULL;
     seq = NULL;
     contextNode = NULL;
@@ -10687,6 +10707,8 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 	cur = NULL;
 	hasNsNodes = 0;
         do {
+            xmlNodePtr add;
+
             if (OP_LIMIT_EXCEEDED(ctxt, 1))
                 goto error;
 
@@ -10726,154 +10748,74 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 
             total++;
 
-	    switch (test) {
-                case NODE_TEST_NONE:
-		    total = 0;
-		    goto error;
-                case NODE_TEST_TYPE:
-		    if (type == NODE_TYPE_NODE) {
-			switch (cur->type) {
-			    case XML_DOCUMENT_NODE:
-			    case XML_HTML_DOCUMENT_NODE:
-			    case XML_ELEMENT_NODE:
-			    case XML_ATTRIBUTE_NODE:
-			    case XML_PI_NODE:
-			    case XML_COMMENT_NODE:
-			    case XML_CDATA_SECTION_NODE:
-			    case XML_TEXT_NODE:
-				XP_TEST_HIT
-				break;
-			    case XML_NAMESPACE_DECL: {
-				if (axis == AXIS_NAMESPACE) {
-				    XP_TEST_HIT_NS
-				} else {
-	                            hasNsNodes = 1;
-				    XP_TEST_HIT
-				}
-				break;
-                            }
-			    default:
-				break;
-			}
-		    } else if (cur->type == (xmlElementType) type) {
-			if (cur->type == XML_NAMESPACE_DECL)
-			    XP_TEST_HIT_NS
-			else
-			    XP_TEST_HIT
-		    } else if ((type == NODE_TYPE_TEXT) &&
-			 (cur->type == XML_CDATA_SECTION_NODE))
-		    {
-			XP_TEST_HIT
-		    }
-		    break;
-                case NODE_TEST_PI:
-                    if ((cur->type == XML_PI_NODE) &&
-                        ((name == NULL) || xmlStrEqual(name, cur->name)))
-		    {
-			XP_TEST_HIT
-                    }
-                    break;
-                case NODE_TEST_ALL:
-                    if (axis == AXIS_ATTRIBUTE) {
-                        if (cur->type == XML_ATTRIBUTE_NODE)
-			{
-                            if (URI == NULL)
-			    {
-				XP_TEST_HIT
-                            } else if ((cur->ns != NULL) &&
-				(xmlStrEqual(URI, cur->ns->href)))
-			    {
-				XP_TEST_HIT
-                            }
-                        }
-                    } else if (axis == AXIS_NAMESPACE) {
-                        if (cur->type == XML_NAMESPACE_DECL)
-			{
-			    XP_TEST_HIT_NS
-                        }
+            if (((1 << cur->type) & typeMask) == 0)
+                continue;
+
+            if (name != NULL) {
+                if (cur->type == XML_NAMESPACE_DECL) {
+                    xmlNsPtr ns = (xmlNsPtr) cur;
+
+                    if ((ns->prefix == NULL) ||
+                        (strcmp((char *) name, (char *) ns->prefix) != 0))
+                        continue;
+
+                    if (URI != NULL)
+                        continue;
+                } else {
+                    if ((name[0] != '*') &&
+                        ((cur->name == NULL) ||
+                         (strcmp((char *) name, (char *) cur->name) != 0)))
+                        continue;
+
+                    if (URI != NULL) {
+                        if ((cur->ns == NULL) ||
+                            (strcmp((char *) URI, (char *) cur->ns->href) != 0))
+                            continue;
                     } else {
-                        if (cur->type == XML_ELEMENT_NODE) {
-                            if (URI == NULL)
-			    {
-				XP_TEST_HIT
-
-                            } else if ((cur->ns != NULL) &&
-				(xmlStrEqual(URI, cur->ns->href)))
-			    {
-				XP_TEST_HIT
-                            }
-                        }
+                        if (cur->ns != NULL)
+                            continue;
                     }
-                    break;
-                case NODE_TEST_NS:{
-                        /* TODO */
-                        break;
-                    }
-                case NODE_TEST_NAME:
-                    if (axis == AXIS_ATTRIBUTE) {
-                        if (cur->type != XML_ATTRIBUTE_NODE)
-			    break;
-		    } else if (axis == AXIS_NAMESPACE) {
-                        if (cur->type != XML_NAMESPACE_DECL)
-			    break;
-		    } else {
-		        if (cur->type != XML_ELEMENT_NODE)
-			    break;
-		    }
-                    switch (cur->type) {
-                        case XML_ELEMENT_NODE:
-                            if (xmlStrEqual(name, cur->name)) {
-                                if (URI == NULL) {
-                                    if (cur->ns == NULL)
-				    {
-					XP_TEST_HIT
-                                    }
-                                } else {
-                                    if ((cur->ns != NULL) &&
-                                        (xmlStrEqual(URI, cur->ns->href)))
-				    {
-					XP_TEST_HIT
-                                    }
-                                }
-                            }
-                            break;
-                        case XML_ATTRIBUTE_NODE:{
-                                xmlAttrPtr attr = (xmlAttrPtr) cur;
+                }
+            }
 
-                                if (xmlStrEqual(name, attr->name)) {
-                                    if (URI == NULL) {
-                                        if ((attr->ns == NULL) ||
-                                            (attr->ns->prefix == NULL))
-					{
-					    XP_TEST_HIT
-                                        }
-                                    } else {
-                                        if ((attr->ns != NULL) &&
-                                            (xmlStrEqual(URI,
-					      attr->ns->href)))
-					{
-					    XP_TEST_HIT
-                                        }
-                                    }
-                                }
-                                break;
-                            }
-                        case XML_NAMESPACE_DECL:
-                            if (cur->type == XML_NAMESPACE_DECL) {
-                                xmlNsPtr ns = (xmlNsPtr) cur;
+            if (hasAxisRange) {
+                if (++pos != maxPos)
+                    continue;
+            }
 
-                                if ((ns->prefix != NULL) && (name != NULL)
-                                    && (xmlStrEqual(ns->prefix, name)))
-				{
-				    XP_TEST_HIT_NS
-                                }
-                            }
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-	    } /* switch(test) */
+            if (seq->nodeNr >= seq->nodeMax) {
+                if (xmlXPathNodeSetGrow(seq) < 0) {
+                    xmlXPathPErrMemory(ctxt);
+                    goto error;
+                }
+            }
+
+            if (cur->type == XML_NAMESPACE_DECL) {
+                xmlNodePtr parent = xpctxt->node;
+
+                if (parent->type == XML_NAMESPACE_DECL) {
+                    xmlNsPtr ns = (xmlNsPtr) xpctxt->node;
+
+                    /* namespace::* / self::node() */
+                    parent = (xmlNodePtr) ns->next;
+                }
+
+                add = xmlXPathNodeSetDupNs(parent, (xmlNsPtr) cur);
+                if (add == NULL) {
+                    xmlXPathPErrMemory(ctxt);
+                    goto error;
+                }
+                hasNsNodes = 1;
+            } else {
+                add = cur;
+            }
+
+            seq->nodeTab[seq->nodeNr++] = add;
+
+            if (hasAxisRange)
+                goto axis_range_end;
+	    else if (breakOnFirstHit)
+                goto first_hit;
         } while ((cur != NULL) && (ctxt->error == XPATH_EXPRESSION_OK));
 
 	goto apply_predicates;

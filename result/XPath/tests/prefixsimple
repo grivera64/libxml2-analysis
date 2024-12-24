@@ -16,3 +16,19 @@ Expression: //b:group[a:elem]
 Object is a Node Set :
 Set contains 1 nodes:
 1  ELEMENT b:group
+
+========================
+Expression: //a:*
+Object is a Node Set :
+Set contains 2 nodes:
+1  ELEMENT a:doc
+    namespace a href=urn:a
+    namespace b href=urn:b
+2  ELEMENT a:elem
+
+========================
+Expression: //b:*
+Object is a Node Set :
+Set contains 2 nodes:
+1  ELEMENT b:group
+2  ELEMENT b:elem

@@ -1,3 +1,5 @@
 //a:elem
 //b:elem
 //b:group[a:elem]
+//a:*
+//b:*
