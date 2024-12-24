@@ -10667,7 +10667,7 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 	    }
 	}
     }
-    breakOnFirstHit = ((toBool) && (predOp == NULL)) ? 1 : 0;
+    breakOnFirstHit = (hasAxisRange) || ((toBool) && (predOp == NULL));
     /*
     * Axis traversal -----------------------------------------------------
     */
@@ -10812,52 +10812,10 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 
             seq->nodeTab[seq->nodeNr++] = add;
 
-            if (hasAxisRange)
-                goto axis_range_end;
-	    else if (breakOnFirstHit)
-                goto first_hit;
+	    if (breakOnFirstHit)
+                goto done;
         } while ((cur != NULL) && (ctxt->error == XPATH_EXPRESSION_OK));
 
-	goto apply_predicates;
-
-axis_range_end: /* ----------------------------------------------------- */
-	/*
-	* We have a "/foo[n]", and position() = n was reached.
-	* Note that we can have as well "/foo/::parent::foo[1]", so
-	* a duplicate-aware merge is still needed.
-	* Merge with the result.
-	*/
-	if (outSeq == NULL) {
-	    outSeq = seq;
-	    seq = NULL;
-	} else {
-	    outSeq = mergeAndClear(outSeq, seq);
-            if (outSeq == NULL)
-                xmlXPathPErrMemory(ctxt);
-        }
-	/*
-	* Break if only a true/false result was requested.
-	*/
-	if (toBool)
-	    break;
-	continue;
-
-first_hit: /* ---------------------------------------------------------- */
-	/*
-	* Break if only a true/false result was requested and
-	* no predicates existed and a node test succeeded.
-	*/
-	if (outSeq == NULL) {
-	    outSeq = seq;
-	    seq = NULL;
-	} else {
-	    outSeq = mergeAndClear(outSeq, seq);
-            if (outSeq == NULL)
-                xmlXPathPErrMemory(ctxt);
-        }
-	break;
-
-apply_predicates: /* --------------------------------------------------- */
         if (ctxt->error != XPATH_EXPRESSION_OK)
 	    goto error;
 
@@ -10906,6 +10864,7 @@ apply_predicates: /* --------------------------------------------------- */
 	    }
         }
 
+done:
         if (seq->nodeNr > 0) {
 	    /*
 	    * Add to result set.
