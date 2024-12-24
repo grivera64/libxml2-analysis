@@ -6318,30 +6318,364 @@ xmlXPathModValues(xmlXPathParserContextPtr ctxt) {
  ************************************************************************/
 
 /*
- * A traversal function enumerates nodes along an axis.
- * Initially it must be called with NULL, and it indicates
- * termination on the axis by returning NULL.
- */
-typedef xmlNodePtr (*xmlXPathTraversalFunction)
-                    (xmlXPathParserContextPtr ctxt, xmlNodePtr cur);
-
-/*
- * xmlXPathTraversalFunctionExt:
- * A traversal function enumerates nodes along an axis.
- * Initially it must be called with NULL, and it indicates
- * termination on the axis by returning NULL.
- * The context node of the traversal is specified via @contextNode.
- */
-typedef xmlNodePtr (*xmlXPathTraversalFunctionExt)
-                    (xmlNodePtr cur, xmlNodePtr contextNode);
-
-/*
  * xmlXPathNodeSetMergeFunction:
  * Used for merging node sets in xmlXPathCollectAndTest().
  */
 typedef xmlNodeSetPtr (*xmlXPathNodeSetMergeFunction)
 		    (xmlNodeSetPtr, xmlNodeSetPtr);
 
+typedef struct {
+    union {
+        xmlNodePtr node;
+        struct {
+            xmlNsPtr *list;
+            int index;
+        } ns;
+    } as;
+} xmlIterCtxt;
+
+typedef xmlNodePtr
+(*xmlIterNextFunc)(xmlIterCtxt *ctxt, xmlNodePtr cur);
+
+typedef xmlNodePtr
+(*xmlIterStartFunc)(xmlIterCtxt *ctxt, xmlNodePtr cur, xmlIterNextFunc *next);
+
+static xmlNodePtr
+xmlIterEnd(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+    (void) ctxt;
+    (void) cur;
+
+    return(NULL);
+}
+
+static xmlNodePtr
+xmlIterNextSibling(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+    (void) ctxt;
+
+    return(cur->next);
+}
+
+static xmlNodePtr
+xmlIterPrevSibling(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+    (void) ctxt;
+
+    return(cur->prev);
+}
+
+static xmlNodePtr
+xmlIterNextParent(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+    (void) ctxt;
+
+    return(cur->parent);
+}
+
+static xmlNodePtr
+xmlIterNextParentNs(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+    (void) ctxt;
+
+    if (cur->type == XML_NAMESPACE_DECL) {
+        xmlNsPtr ns = (xmlNsPtr) cur;
+
+        return((xmlNodePtr) ns->next);
+    }
+
+    return(cur->parent);
+}
+
+static xmlNodePtr
+xmlIterNextDescendant(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+    if ((cur->children != NULL) && ((1 << cur->type) & TYPE_MASK_NODE))
+        return(cur->children);
+
+    while (cur->next == NULL) {
+        cur = cur->parent;
+
+        if ((cur == NULL) || (cur == ctxt->as.node))
+            return(NULL);
+    }
+
+    return(cur->next);
+}
+
+static xmlNodePtr
+xmlIterNextPreceding(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+    if (cur->prev == NULL) {
+        cur = cur->parent;
+        if (cur == NULL)
+            return(NULL);
+        if (cur != ctxt->as.node)
+            return(cur);
+
+        /* Skip ancestors */
+        while (cur->prev == NULL) {
+            cur = cur->parent;
+            if (cur == NULL)
+                return(NULL);
+        }
+        ctxt->as.node = cur->parent;
+    }
+
+    cur = cur->prev;
+
+    while ((cur->last != NULL) && ((1 << cur->last->type) & TYPE_MASK_NODE))
+        cur = cur->last;
+
+    return(cur);
+}
+
+static xmlNodePtr
+xmlIterNextNamespace(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+    (void) cur;
+
+    if (ctxt->as.ns.index == 0)
+        return(NULL);
+
+    return((xmlNodePtr) ctxt->as.ns.list[--ctxt->as.ns.index]);
+}
+
+static xmlNodePtr
+xmlIterStartSelf(xmlIterCtxt *ctxt, xmlNodePtr cur, xmlIterNextFunc *next) {
+    (void) ctxt;
+
+    *next = xmlIterEnd;
+    return(cur);
+}
+
+static xmlNodePtr
+xmlIterStartChild(xmlIterCtxt *ctxt, xmlNodePtr cur, xmlIterNextFunc *next) {
+    (void) ctxt;
+
+    if ((cur->type == XML_ATTRIBUTE_NODE) ||
+        (cur->type == XML_NAMESPACE_DECL))
+        return(NULL);
+
+    *next = xmlIterNextSibling;
+    return(cur->children);
+}
+
+static xmlNodePtr
+xmlIterStartAttribute(xmlIterCtxt *ctxt, xmlNodePtr cur,
+                      xmlIterNextFunc *next) {
+    (void) ctxt;
+
+    if (cur->type != XML_ELEMENT_NODE)
+        return(NULL);
+
+    *next = xmlIterNextSibling;
+    return((xmlNodePtr) cur->properties);
+}
+
+static xmlNodePtr
+xmlIterStartDescendant(xmlIterCtxt *ctxt, xmlNodePtr cur,
+                       xmlIterNextFunc *next) {
+    if ((cur->type == XML_ATTRIBUTE_NODE) ||
+        (cur->type == XML_NAMESPACE_DECL))
+        return(NULL);
+
+    *next = xmlIterNextDescendant;
+    ctxt->as.node = cur;
+    return(cur->children);
+}
+
+static xmlNodePtr
+xmlIterStartDescendantOrSelf(xmlIterCtxt *ctxt, xmlNodePtr cur,
+                             xmlIterNextFunc *next) {
+    if ((cur->type == XML_ATTRIBUTE_NODE) ||
+        (cur->type == XML_NAMESPACE_DECL)) {
+        *next = xmlIterEnd;
+        return(cur);
+    }
+
+    *next = xmlIterNextDescendant;
+    ctxt->as.node = cur;
+    return(cur);
+}
+
+static xmlNodePtr
+xmlIterStartParent(xmlIterCtxt *ctxt, xmlNodePtr cur, xmlIterNextFunc *next) {
+    (void) ctxt;
+
+    *next = xmlIterEnd;
+
+    if (cur->type == XML_NAMESPACE_DECL) {
+        xmlNsPtr ns = (xmlNsPtr) cur;
+
+        return((xmlNodePtr) ns->next);
+    } else {
+        return(cur->parent);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartAncestor(xmlIterCtxt *ctxt, xmlNodePtr cur,
+                     xmlIterNextFunc *next) {
+    (void) ctxt;
+
+    *next = xmlIterNextParent;
+
+    if (cur->type == XML_NAMESPACE_DECL) {
+        xmlNsPtr ns = (xmlNsPtr) cur;
+
+        return((xmlNodePtr) ns->next);
+    } else {
+        return(cur->parent);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartAncestorOrSelf(xmlIterCtxt *ctxt, xmlNodePtr cur,
+                           xmlIterNextFunc *next) {
+    (void) ctxt;
+
+    if (cur->type == XML_NAMESPACE_DECL)
+        *next = xmlIterNextParentNs;
+    else
+        *next = xmlIterNextParent;
+
+    return(cur);
+}
+
+static xmlNodePtr
+xmlIterStartFollowingSibling(xmlIterCtxt *ctxt, xmlNodePtr cur,
+                             xmlIterNextFunc *next) {
+    (void) ctxt;
+
+    if ((cur->type == XML_ATTRIBUTE_NODE) ||
+        (cur->type == XML_NAMESPACE_DECL) ||
+        (cur->type == XML_DOCUMENT_NODE) ||
+        (cur->type == XML_HTML_DOCUMENT_NODE))
+        return(NULL);
+
+    *next = xmlIterNextSibling;
+    return(cur->next);
+}
+
+static xmlNodePtr
+xmlIterStartPrecedingSibling(xmlIterCtxt *ctxt, xmlNodePtr cur,
+                             xmlIterNextFunc *next) {
+    (void) ctxt;
+
+    if ((cur->type == XML_ATTRIBUTE_NODE) ||
+        (cur->type == XML_NAMESPACE_DECL) ||
+        (cur->type == XML_DOCUMENT_NODE) ||
+        (cur->type == XML_HTML_DOCUMENT_NODE))
+        return(NULL);
+
+    *next = xmlIterPrevSibling;
+    return(cur->prev);
+}
+
+static xmlNodePtr
+xmlIterStartFollowing(xmlIterCtxt *ctxt, xmlNodePtr cur,
+                      xmlIterNextFunc *next) {
+    xmlNodePtr ancestor;
+
+    if (cur->type == XML_ATTRIBUTE_NODE) {
+        ancestor = cur->parent;
+    } else if (cur->type == XML_NAMESPACE_DECL) {
+        xmlNsPtr ns = (xmlNsPtr) cur;
+
+        ancestor = (xmlNodePtr) ns->next;
+    } else {
+        ancestor = cur;
+    }
+
+    while ((ancestor != NULL) &&
+           (ancestor->type != XML_DOCUMENT_NODE) &&
+           (ancestor->type != XML_HTML_DOCUMENT_NODE)) {
+        if (ancestor->next != NULL) {
+            *next = xmlIterNextDescendant;
+            ctxt->as.node = (xmlNodePtr) ancestor->doc;
+            return(ancestor->next);
+        }
+
+        ancestor = ancestor->parent;
+    }
+
+    return(NULL);
+}
+
+static xmlNodePtr
+xmlIterStartPreceding(xmlIterCtxt *ctxt, xmlNodePtr cur,
+                      xmlIterNextFunc *next) {
+    xmlNodePtr ancestor, last;
+
+    if (cur->type == XML_ATTRIBUTE_NODE) {
+        ancestor = cur->parent;
+    } else if (cur->type == XML_NAMESPACE_DECL) {
+        xmlNsPtr ns = (xmlNsPtr) cur;
+
+        ancestor = (xmlNodePtr) ns->next;
+    } else {
+        ancestor = cur;
+    }
+
+    while (ancestor->prev == NULL) {
+        ancestor = ancestor->parent;
+        if ((ancestor == NULL) ||
+            (ancestor->type == XML_DOCUMENT_NODE) ||
+            (ancestor->type == XML_HTML_DOCUMENT_NODE))
+            return(NULL);
+    }
+
+    *next = xmlIterNextPreceding;
+    ctxt->as.node = ancestor->parent;
+
+    last = ancestor->prev;
+
+    while ((last->last != NULL) && ((1 << last->last->type) & TYPE_MASK_NODE))
+        last = last->last;
+
+    return(last);
+}
+
+static xmlNodePtr
+xmlIterStartNamespace(xmlIterCtxt *ctxt, xmlNodePtr cur,
+                      xmlIterNextFunc *next) {
+    xmlNsPtr *list;
+    int i = 0;
+
+    ctxt->as.ns.list = NULL;
+    ctxt->as.ns.index = 0;
+
+    if (cur->type != XML_ELEMENT_NODE)
+        return(NULL);
+
+    if (xmlGetNsListSafe(cur->doc, cur, &list) < 0) {
+        /*
+        TODO
+        xmlXPathPErrMemory(ctxt);
+        */
+        return(NULL);
+    }
+    if (list != NULL) {
+        while (list[i] != NULL) {
+            i++;
+        }
+    }
+
+    *next = xmlIterNextNamespace;
+    ctxt->as.ns.list = list;
+    ctxt->as.ns.index = i;
+    return((xmlNodePtr) xmlXPathXMLNamespace);
+}
+
+static const xmlIterStartFunc xmlIterStart[14] = {
+    NULL,
+    xmlIterStartAncestor,
+    xmlIterStartAncestorOrSelf,
+    xmlIterStartAttribute,
+    xmlIterStartChild,
+    xmlIterStartDescendant,
+    xmlIterStartDescendantOrSelf,
+    xmlIterStartFollowing,
+    xmlIterStartFollowingSibling,
+    xmlIterStartNamespace,
+    xmlIterStartParent,
+    xmlIterStartPreceding,
+    xmlIterStartPrecedingSibling,
+    xmlIterStartSelf
+};
 
 /**
  * xmlXPathNextSelf:
@@ -6407,78 +6741,6 @@ xmlXPathNextChild(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
         (cur->type == XML_HTML_DOCUMENT_NODE))
 	return(NULL);
     return(cur->next);
-}
-
-/**
- * xmlXPathNextChildElement:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "child" direction and nodes of type element.
- * The child axis contains the children of the context node in document order.
- *
- * Returns the next element following that axis
- */
-static xmlNodePtr
-xmlXPathNextChildElement(xmlXPathParserContextPtr ctxt, xmlNodePtr cur) {
-    if ((ctxt == NULL) || (ctxt->context == NULL)) return(NULL);
-    if (cur == NULL) {
-	cur = ctxt->context->node;
-	if (cur == NULL) return(NULL);
-	/*
-	* Get the first element child.
-	*/
-	switch (cur->type) {
-            case XML_ELEMENT_NODE:
-	    case XML_DOCUMENT_FRAG_NODE:
-	    case XML_ENTITY_REF_NODE: /* URGENT TODO: entify-refs as well? */
-            case XML_ENTITY_NODE:
-		cur = cur->children;
-		if (cur != NULL) {
-		    if (cur->type == XML_ELEMENT_NODE)
-			return(cur);
-		    do {
-			cur = cur->next;
-		    } while ((cur != NULL) &&
-			(cur->type != XML_ELEMENT_NODE));
-		    return(cur);
-		}
-		return(NULL);
-            case XML_DOCUMENT_NODE:
-            case XML_HTML_DOCUMENT_NODE:
-		return(xmlDocGetRootElement((xmlDocPtr) cur));
-	    default:
-		return(NULL);
-	}
-	return(NULL);
-    }
-    /*
-    * Get the next sibling element node.
-    */
-    switch (cur->type) {
-	case XML_ELEMENT_NODE:
-	case XML_TEXT_NODE:
-	case XML_ENTITY_REF_NODE:
-	case XML_ENTITY_NODE:
-	case XML_CDATA_SECTION_NODE:
-	case XML_PI_NODE:
-	case XML_COMMENT_NODE:
-	case XML_XINCLUDE_END:
-	    break;
-	/* case XML_DTD_NODE: */ /* URGENT TODO: DTD-node as well? */
-	default:
-	    return(NULL);
-    }
-    if (cur->next != NULL) {
-	if (cur->next->type == XML_ELEMENT_NODE)
-	    return(cur->next);
-	cur = cur->next;
-	do {
-	    cur = cur->next;
-	} while ((cur != NULL) && (cur->type != XML_ELEMENT_NODE));
-	return(cur);
-    }
-    return(NULL);
 }
 
 /**
@@ -6951,62 +7213,6 @@ xmlXPathNextPreceding(xmlXPathParserContextPtr ctxt, xmlNodePtr cur)
         if (cur == ctxt->context->doc->children)
             return (NULL);
     } while (xmlXPathIsAncestor(cur, ctxt->context->node));
-    return (cur);
-}
-
-/**
- * xmlXPathNextPrecedingInternal:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "preceding" direction
- * the preceding axis contains all nodes in the same document as the context
- * node that are before the context node in document order, excluding any
- * ancestors and excluding attribute nodes and namespace nodes; the nodes are
- * ordered in reverse document order
- * This is a faster implementation but internal only since it requires a
- * state kept in the parser context: ctxt->ancestor.
- *
- * Returns the next element following that axis
- */
-static xmlNodePtr
-xmlXPathNextPrecedingInternal(xmlXPathParserContextPtr ctxt,
-                              xmlNodePtr cur)
-{
-    if ((ctxt == NULL) || (ctxt->context == NULL)) return(NULL);
-    if (cur == NULL) {
-        cur = ctxt->context->node;
-        if (cur == NULL)
-            return (NULL);
-        if (cur->type == XML_ATTRIBUTE_NODE) {
-            cur = cur->parent;
-        } else if (cur->type == XML_NAMESPACE_DECL) {
-            xmlNsPtr ns = (xmlNsPtr) cur;
-
-            if ((ns->next == NULL) ||
-                (ns->next->type == XML_NAMESPACE_DECL))
-                return (NULL);
-            cur = (xmlNodePtr) ns->next;
-        }
-        ctxt->ancestor = cur->parent;
-    }
-    if (cur->type == XML_NAMESPACE_DECL)
-        return(NULL);
-    if ((cur->prev != NULL) && (cur->prev->type == XML_DTD_NODE))
-	cur = cur->prev;
-    while (cur->prev == NULL) {
-        cur = cur->parent;
-        if (cur == NULL)
-            return (NULL);
-        if (cur == ctxt->context->doc->children)
-            return (NULL);
-        if (cur != ctxt->ancestor)
-            return (cur);
-        ctxt->ancestor = cur->parent;
-    }
-    cur = cur->prev;
-    while (cur->last != NULL)
-        cur = cur->last;
     return (cur);
 }
 
@@ -10437,7 +10643,6 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
     int hasPredicateRange, hasAxisRange, pos;
     int breakOnFirstHit;
 
-    xmlXPathTraversalFunction next = NULL;
     xmlXPathNodeSetMergeFunction mergeAndClear;
     xmlNodePtr oldContextNode;
     xmlXPathContextPtr xpctxt = ctxt->context;
@@ -10468,75 +10673,50 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
     switch (axis) {
         case AXIS_ANCESTOR:
             first = NULL;
-            next = xmlXPathNextAncestor;
             break;
         case AXIS_ANCESTOR_OR_SELF:
             first = NULL;
-            next = xmlXPathNextAncestorOrSelf;
             break;
         case AXIS_ATTRIBUTE:
             first = NULL;
 	    last = NULL;
-            next = xmlXPathNextAttribute;
 	    mergeAndClear = xmlXPathNodeSetMergeAndClearNoDupls;
             break;
         case AXIS_CHILD:
 	    last = NULL;
-	    if (typeMask == TYPE_MASK_ELEM)
-	    {
-		/*
-		* Optimization if an element node type is 'element'.
-		*/
-		next = xmlXPathNextChildElement;
-	    } else
-		next = xmlXPathNextChild;
 	    mergeAndClear = xmlXPathNodeSetMergeAndClearNoDupls;
             break;
         case AXIS_DESCENDANT:
 	    last = NULL;
-            next = xmlXPathNextDescendant;
             break;
         case AXIS_DESCENDANT_OR_SELF:
 	    last = NULL;
-            next = xmlXPathNextDescendantOrSelf;
             break;
         case AXIS_FOLLOWING:
 	    last = NULL;
-            next = xmlXPathNextFollowing;
             break;
         case AXIS_FOLLOWING_SIBLING:
 	    last = NULL;
-            next = xmlXPathNextFollowingSibling;
             break;
         case AXIS_NAMESPACE:
             first = NULL;
 	    last = NULL;
-            next = (xmlXPathTraversalFunction) xmlXPathNextNamespace;
 	    mergeAndClear = xmlXPathNodeSetMergeAndClearNoDupls;
             break;
         case AXIS_PARENT:
             first = NULL;
-            next = xmlXPathNextParent;
             break;
         case AXIS_PRECEDING:
             first = NULL;
-            next = xmlXPathNextPrecedingInternal;
             break;
         case AXIS_PRECEDING_SIBLING:
             first = NULL;
-            next = xmlXPathNextPrecedingSibling;
             break;
         case AXIS_SELF:
             first = NULL;
 	    last = NULL;
-            next = xmlXPathNextSelf;
 	    mergeAndClear = xmlXPathNodeSetMergeAndClearNoDupls;
             break;
-    }
-
-    if (next == NULL) {
-	xmlXPathReleaseObject(xpctxt, obj);
-        return(0);
     }
 
     contextSeq = obj->nodesetval;
@@ -10610,6 +10790,9 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 
     while (((contextIdx < contextSeq->nodeNr) || (contextNode != NULL)) &&
            (ctxt->error == XPATH_EXPRESSION_OK)) {
+        xmlIterCtxt iterCtxt;
+        xmlIterNextFunc next;
+
 	xpctxt->node = contextSeq->nodeTab[contextIdx++];
 
 	if (seq == NULL) {
@@ -10620,20 +10803,18 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 		goto error;
 	    }
 	}
+
 	/*
 	* Traverse the axis and test the nodes.
 	*/
+
+        cur = xmlIterStart[axis](&iterCtxt, xpctxt->node, &next);
 	pos = 0;
-	cur = NULL;
 	hasNsNodes = 0;
-        do {
+        while ((cur != NULL) && (ctxt->error == XPATH_EXPRESSION_OK)) {
             xmlNodePtr add;
 
             if (OP_LIMIT_EXCEEDED(ctxt, 1))
-                goto error;
-
-            cur = next(ctxt, cur);
-            if (cur == NULL)
                 break;
 
 	    /*
@@ -10669,7 +10850,7 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
             total++;
 
             if (((1 << cur->type) & typeMask) == 0)
-                continue;
+                goto no_match;
 
             if (name != NULL) {
                 if (cur->type == XML_NAMESPACE_DECL) {
@@ -10677,30 +10858,30 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 
                     if ((ns->prefix == NULL) ||
                         (strcmp((char *) name, (char *) ns->prefix) != 0))
-                        continue;
+                        goto no_match;
 
                     if (URI != NULL)
-                        continue;
+                        goto no_match;
                 } else {
                     if ((name[0] != '*') &&
                         ((cur->name == NULL) ||
                          (strcmp((char *) name, (char *) cur->name) != 0)))
-                        continue;
+                        goto no_match;
 
                     if (URI != NULL) {
                         if ((cur->ns == NULL) ||
                             (strcmp((char *) URI, (char *) cur->ns->href) != 0))
-                            continue;
+                            goto no_match;
                     } else {
                         if (cur->ns != NULL)
-                            continue;
+                            goto no_match;
                     }
                 }
             }
 
             if (hasAxisRange) {
                 if (++pos != maxPos)
-                    continue;
+                    goto no_match;
             }
 
             if (seq->nodeNr >= seq->nodeMax) {
@@ -10733,8 +10914,14 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
             seq->nodeTab[seq->nodeNr++] = add;
 
 	    if (breakOnFirstHit)
-                goto done;
-        } while ((cur != NULL) && (ctxt->error == XPATH_EXPRESSION_OK));
+                break;
+
+no_match:
+            cur = next(&iterCtxt, cur);
+        }
+
+        if (axis == AXIS_NAMESPACE)
+            xmlFree(iterCtxt.as.ns.list);
 
         if (ctxt->error != XPATH_EXPRESSION_OK)
 	    goto error;
@@ -10742,7 +10929,7 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
         /*
 	* Apply predicates.
 	*/
-        if ((predOp != NULL) && (seq->nodeNr > 0)) {
+        if ((!hasAxisRange) && (predOp != NULL) && (seq->nodeNr > 0)) {
 	    /*
 	    * E.g. when we have a "/foo[some expression][n]".
 	    */
@@ -10784,7 +10971,6 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 	    }
         }
 
-done:
         if (seq->nodeNr > 0) {
 	    /*
 	    * Add to result set.
