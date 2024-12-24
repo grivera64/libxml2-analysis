@@ -894,15 +894,6 @@ typedef enum {
     AXIS_SELF
 } xmlXPathAxisVal;
 
-typedef enum {
-    NODE_TEST_NONE = 0,
-    NODE_TEST_TYPE = 1,
-    NODE_TEST_PI = 2,
-    NODE_TEST_ALL = 3,
-    NODE_TEST_NS = 4,
-    NODE_TEST_NAME = 5
-} xmlXPathTestVal;
-
 typedef struct _xmlXPathStepOp xmlXPathStepOp;
 typedef xmlXPathStepOp *xmlXPathStepOpPtr;
 struct _xmlXPathStepOp {
@@ -1390,7 +1381,6 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	     fprintf(output, "SORT"); break;
         case XPATH_OP_COLLECT: {
 	    xmlXPathAxisVal axis = (xmlXPathAxisVal)op->value;
-	    xmlXPathTestVal test = (xmlXPathTestVal)op->value2;
 	    int type = op->value3;
 	    const xmlChar *prefix = op->value5;
 	    const xmlChar *name = op->value4;
@@ -1423,20 +1413,6 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 		    fprintf(output, " 'preceding-sibling' "); break;
 		case AXIS_SELF:
 		    fprintf(output, " 'self' "); break;
-	    }
-	    switch (test) {
-                case NODE_TEST_NONE:
-		    fprintf(output, "'none' "); break;
-                case NODE_TEST_TYPE:
-		    fprintf(output, "'type' "); break;
-                case NODE_TEST_PI:
-		    fprintf(output, "'PI' "); break;
-                case NODE_TEST_ALL:
-		    fprintf(output, "'all' "); break;
-                case NODE_TEST_NS:
-		    fprintf(output, "'namespace' "); break;
-                case NODE_TEST_NAME:
-		    fprintf(output, "'name' "); break;
 	    }
 	    fprintf(output, "typeMask=%0X ", type); break;
 	    if (prefix != NULL)
@@ -9433,7 +9409,7 @@ xmlXPathCompPathExpr(xmlXPathParserContextPtr ctxt) {
 	    SKIP_BLANKS;
 
 	    PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_DESCENDANT_OR_SELF,
-		    NODE_TEST_TYPE, TYPE_MASK_NODE, NULL, NULL);
+                           0, TYPE_MASK_NODE, NULL, NULL);
 
 	    xmlXPathCompRelativeLocationPath(ctxt);
 	} else if (CUR == '/') {
@@ -9786,9 +9762,9 @@ xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter) {
 /**
  * xmlXPathCompNodeTest:
  * @ctxt:  the XPath Parser context
- * @test:  pointer to a xmlXPathTestVal
  * @type:  pointer to int
  * @prefix:  placeholder for a possible name prefix
+ * @namePtr:  pointer to pre-parsed name (in/out)
  *
  * [7] NodeTest ::=   NameTest
  *		    | NodeType '(' ')'
@@ -9802,20 +9778,17 @@ xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter) {
  *		   | 'processing-instruction'
  *		   | 'node'
  *
- * Returns the name found and updates @test, @type and @prefix appropriately
+ * Updates @type, @prefix and @namePtr appropriately.
  */
-static xmlChar *
-xmlXPathCompNodeTest(xmlXPathParserContextPtr ctxt, xmlXPathTestVal *test,
-	             int *type, xmlChar **prefix,
-		     xmlChar *name) {
+static void
+xmlXPathCompNodeTest(xmlXPathParserContextPtr ctxt, int *type,
+                     xmlChar **prefix, xmlChar **namePtr) {
+    xmlChar *name = *namePtr;
     int blanks;
 
-    if ((test == NULL) || (type == NULL) || (prefix == NULL)) {
-	return(NULL);
-    }
     *type = 0;
-    *test = (xmlXPathTestVal) 0;
     *prefix = NULL;
+    *namePtr = NULL;
     SKIP_BLANKS;
 
     if ((name == NULL) && (CUR == '*')) {
@@ -9823,14 +9796,14 @@ xmlXPathCompNodeTest(xmlXPathParserContextPtr ctxt, xmlXPathTestVal *test,
 	 * All elements
 	 */
 	NEXT;
-	*test = NODE_TEST_ALL;
-	return(NULL);
+	return;
     }
 
-    if (name == NULL)
-	name = xmlXPathParseNCName(ctxt);
     if (name == NULL) {
-	XP_ERRORNULL(XPATH_EXPR_ERROR);
+	name = xmlXPathParseNCName(ctxt);
+        if (name == NULL) {
+            XP_ERROR(XPATH_EXPR_ERROR);
+        }
     }
 
     blanks = IS_BLANK_CH(CUR);
@@ -9850,12 +9823,10 @@ xmlXPathCompNodeTest(xmlXPathParserContextPtr ctxt, xmlXPathTestVal *test,
 	    *type = TYPE_MASK_TEXT;
 	else {
 	    xmlFree(name);
-	    XP_ERRORNULL(XPATH_EXPR_ERROR);
+	    XP_ERROR(XPATH_EXPR_ERROR);
 	}
 
 	xmlFree(name);
-
-	*test = NODE_TEST_TYPE;
 
 	SKIP_BLANKS;
 	if (*type == TYPE_MASK_PI) {
@@ -9863,18 +9834,17 @@ xmlXPathCompNodeTest(xmlXPathParserContextPtr ctxt, xmlXPathTestVal *test,
 	     * Specific case: search a PI by name.
 	     */
 	    if (CUR != ')') {
-		name = xmlXPathParseLiteral(ctxt);
-		*test = NODE_TEST_PI;
+		*namePtr = xmlXPathParseLiteral(ctxt);
 		SKIP_BLANKS;
 	    }
 	}
 	if (CUR != ')') {
-	    XP_ERRORNULL(XPATH_UNCLOSED_ERROR);
+	    XP_ERROR(XPATH_UNCLOSED_ERROR);
 	}
 	NEXT;
-	return(NULL);
+	return;
     }
-    *test = NODE_TEST_NAME;
+
     if ((!blanks) && (CUR == ':')) {
 	NEXT;
 
@@ -9895,15 +9865,15 @@ xmlXPathCompNodeTest(xmlXPathParserContextPtr ctxt, xmlXPathTestVal *test,
             if (name == NULL)
                 xmlXPathPErrMemory(ctxt);
 	    NEXT;
-	    *test = NODE_TEST_ALL;
 	} else {
             name = xmlXPathParseNCName(ctxt);
             if (name == NULL) {
-                XP_ERRORNULL(XPATH_EXPR_ERROR);
+                XP_ERROR(XPATH_EXPR_ERROR);
             }
         }
     }
-    return(name);
+
+    *namePtr = name;
 }
 
 /**
@@ -10013,7 +9983,7 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 	SKIP(2);
 	SKIP_BLANKS;
 	PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_PARENT,
-		    NODE_TEST_TYPE, TYPE_MASK_NODE, NULL, NULL);
+                       0, TYPE_MASK_NODE, NULL, NULL);
     } else if (CUR == '.') {
 	NEXT;
 	SKIP_BLANKS;
@@ -10021,7 +9991,6 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 	xmlChar *name = NULL;
 	xmlChar *prefix = NULL;
         xmlChar *value5;
-	xmlXPathTestVal test = (xmlXPathTestVal) 0;
 	xmlXPathAxisVal axis = (xmlXPathAxisVal) 0;
 	int type = 0;
 	int op1;
@@ -10059,9 +10028,9 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
             return;
         }
 
-	name = xmlXPathCompNodeTest(ctxt, &test, &type, &prefix, name);
-	if (test == 0)
-	    return;
+	xmlXPathCompNodeTest(ctxt, &type, &prefix, &name);
+        CHECK_ERROR;
+
         if (type == 0) {
             /* principal node type */
 
@@ -10101,7 +10070,7 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 	}
 
         if (PUSH_FULL_EXPR(XPATH_OP_COLLECT, op1, ctxt->comp->last, axis,
-                           test, type, name, value5) == -1) {
+                           0, type, name, value5) == -1) {
             xmlFree(prefix);
             xmlFree(name);
         }
@@ -10127,7 +10096,7 @@ xmlXPathCompRelativeLocationPath
 	SKIP(2);
 	SKIP_BLANKS;
 	PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_DESCENDANT_OR_SELF,
-		         NODE_TEST_TYPE, TYPE_MASK_NODE, NULL, NULL);
+                       0, TYPE_MASK_NODE, NULL, NULL);
     } else if (CUR == '/') {
 	    NEXT;
 	SKIP_BLANKS;
@@ -10140,7 +10109,7 @@ xmlXPathCompRelativeLocationPath
 	    SKIP(2);
 	    SKIP_BLANKS;
 	    PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_DESCENDANT_OR_SELF,
-			     NODE_TEST_TYPE, TYPE_MASK_NODE, NULL, NULL);
+                           0, TYPE_MASK_NODE, NULL, NULL);
 	    xmlXPathCompStep(ctxt);
 	} else if (CUR == '/') {
 	    NEXT;
@@ -10183,7 +10152,7 @@ xmlXPathCompLocationPath(xmlXPathParserContextPtr ctxt) {
 		SKIP(2);
 		SKIP_BLANKS;
 		PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_DESCENDANT_OR_SELF,
-			     NODE_TEST_TYPE, TYPE_MASK_NODE, NULL, NULL);
+                               0, TYPE_MASK_NODE, NULL, NULL);
 		xmlXPathCompRelativeLocationPath(ctxt);
 	    } else if (CUR == '/') {
 		NEXT;
@@ -12249,7 +12218,6 @@ xmlXPathOptimizeExpression(xmlXPathParserContextPtr pctxt,
             ((xmlXPathAxisVal) prevop->value ==
                 AXIS_DESCENDANT_OR_SELF) &&
             (prevop->ch2 == -1) &&
-            ((xmlXPathTestVal) prevop->value2 == NODE_TEST_TYPE) &&
             (prevop->value3 == TYPE_MASK_NODE))
         {
             /*
