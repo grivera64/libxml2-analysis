@@ -4997,6 +4997,8 @@ xmlXPathParserContextPtr
 xmlXPathNewParserContext(const xmlChar *str, xmlXPathContextPtr ctxt) {
     xmlXPathParserContextPtr ret;
 
+    xmlInitParser();
+
     ret = (xmlXPathParserContextPtr) xmlMalloc(sizeof(xmlXPathParserContext));
     if (ret == NULL) {
         xmlXPathErrMemory(ctxt);
@@ -12149,8 +12151,6 @@ xmlXPathCtxtCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
         return(comp);
 #endif
 
-    xmlInitParser();
-
     /*
      * We need an xmlXPathContext for the depth check.
      */
@@ -12250,7 +12250,6 @@ xmlXPathCompiledEvalInternal(xmlXPathCompExprPtr comp,
 
     if (comp == NULL)
 	return(-1);
-    xmlInitParser();
 
     xmlResetError(&ctxt->lastError);
 
@@ -12392,8 +12391,6 @@ xmlXPathEval(const xmlChar *str, xmlXPathContextPtr ctx) {
 
     if (ctx == NULL)
         return(NULL);
-
-    xmlInitParser();
 
     xmlResetError(&ctx->lastError);
 
