@@ -5258,10 +5258,6 @@ xmlXPathCompareNodeSetValue(xmlXPathParserContextPtr ctxt, int inf, int strict,
     xmlNodeSetPtr ns;
     double val2;
 
-    if ((arg1 == NULL) || (arg2 == NULL) ||
-	((arg1->type != XPATH_NODESET) && (arg1->type != XPATH_XSLT_TREE)))
-        goto error;
-
     val2 = xmlXPathCastToNumberInternal(ctxt, arg2);
     ns = arg1->nodesetval;
     if (ns != NULL) {
@@ -5284,9 +5280,6 @@ xmlXPathCompareNodeSetValue(xmlXPathParserContextPtr ctxt, int inf, int strict,
 	}
     }
 
-error:
-    xmlXPathReleaseObject(ctxt->context, arg1);
-    xmlXPathReleaseObject(ctxt->context, arg2);
     return(ret);
 }
 
@@ -5327,37 +5320,19 @@ xmlXPathCompareNodeSets(xmlXPathParserContextPtr ctxt, int inf, int strict,
     xmlNodeSetPtr ns1;
     xmlNodeSetPtr ns2;
 
-    if ((arg1 == NULL) ||
-	((arg1->type != XPATH_NODESET) && (arg1->type != XPATH_XSLT_TREE))) {
-	xmlXPathFreeObject(arg2);
-        return(0);
-    }
-    if ((arg2 == NULL) ||
-	((arg2->type != XPATH_NODESET) && (arg2->type != XPATH_XSLT_TREE))) {
-	xmlXPathFreeObject(arg1);
-	xmlXPathFreeObject(arg2);
-        return(0);
-    }
-
     ns1 = arg1->nodesetval;
     ns2 = arg2->nodesetval;
 
     if ((ns1 == NULL) || (ns1->nodeNr <= 0)) {
-	xmlXPathFreeObject(arg1);
-	xmlXPathFreeObject(arg2);
 	return(0);
     }
     if ((ns2 == NULL) || (ns2->nodeNr <= 0)) {
-	xmlXPathFreeObject(arg1);
-	xmlXPathFreeObject(arg2);
 	return(0);
     }
 
     values2 = (double *) xmlMalloc(ns2->nodeNr * sizeof(double));
     if (values2 == NULL) {
         xmlXPathPErrMemory(ctxt);
-	xmlXPathFreeObject(arg1);
-	xmlXPathFreeObject(arg2);
 	return(0);
     }
     for (i = 0;i < ns1->nodeNr;i++) {
@@ -5395,9 +5370,8 @@ xmlXPathCompareNodeSets(xmlXPathParserContextPtr ctxt, int inf, int strict,
 	    break;
 	init = 1;
     }
+
     xmlFree(values2);
-    xmlXPathFreeObject(arg1);
-    xmlXPathFreeObject(arg2);
     return(ret);
 }
 
@@ -5794,57 +5768,44 @@ int
 xmlXPathCompareValues(xmlXPathParserContextPtr ctxt, int inf, int strict) {
     int ret = 0;
     xmlXPathObjectPtr arg1, arg2;
-    double val1, val2;
 
-    if ((ctxt == NULL) || (ctxt->context == NULL)) return(0);
+    if ((ctxt == NULL) || (ctxt->context == NULL))
+        return(0);
+
     arg2 = valuePop(ctxt);
     arg1 = valuePop(ctxt);
     if ((arg1 == NULL) || (arg2 == NULL)) {
-	if (arg1 != NULL)
-	    xmlXPathReleaseObject(ctxt->context, arg1);
-	else
-	    xmlXPathReleaseObject(ctxt->context, arg2);
-	XP_ERROR0(XPATH_INVALID_OPERAND);
-    }
-
-    if ((arg2->type == XPATH_NODESET) || (arg2->type == XPATH_XSLT_TREE) ||
-      (arg1->type == XPATH_NODESET) || (arg1->type == XPATH_XSLT_TREE)) {
-	/*
-	 * If either argument is a XPATH_NODESET or XPATH_XSLT_TREE the two arguments
-	 * are not freed from within this routine; they will be freed from the
-	 * called routine, e.g. xmlXPathCompareNodeSets or xmlXPathCompareNodeSetValue
-	 */
-	if (((arg2->type == XPATH_NODESET) || (arg2->type == XPATH_XSLT_TREE)) &&
-	  ((arg1->type == XPATH_NODESET) || (arg1->type == XPATH_XSLT_TREE))){
-	    ret = xmlXPathCompareNodeSets(ctxt, inf, strict, arg1, arg2);
-	} else {
-	    if ((arg1->type == XPATH_NODESET) || (arg1->type == XPATH_XSLT_TREE)) {
-		ret = xmlXPathCompareNodeSetValue(ctxt, inf, strict,
-			                          arg1, arg2);
-	    } else {
-		ret = xmlXPathCompareNodeSetValue(ctxt, !inf, strict,
-			                          arg2, arg1);
-	    }
-	}
-	return(ret);
-    }
-
-    val1 = xmlXPathCastToNumberInternal(ctxt, arg1);
-    val2 = xmlXPathCastToNumberInternal(ctxt, arg2);
-    if (ctxt->error)
+        xmlXPathErr(ctxt, XPATH_INVALID_OPERAND);
         goto error;
-
-    if (inf) {
-        if (strict)
-            ret = (val1 < val2);
-        else
-            ret = (val1 <= val2);
-    } else {
-        if (strict)
-            ret = (val1 > val2);
-        else
-            ret = (val1 >= val2);
     }
+
+    if ((arg1->type == XPATH_NODESET) || (arg1->type == XPATH_XSLT_TREE)) {
+        if ((arg2->type == XPATH_NODESET) || (arg2->type == XPATH_XSLT_TREE)) {
+	    ret = xmlXPathCompareNodeSets(ctxt, inf, strict, arg1, arg2);
+        } else {
+            ret = xmlXPathCompareNodeSetValue(ctxt, inf, strict, arg1, arg2);
+        }
+    } else {
+        if ((arg2->type == XPATH_NODESET) || (arg2->type == XPATH_XSLT_TREE)) {
+            ret = xmlXPathCompareNodeSetValue(ctxt, !inf, strict, arg2, arg1);
+        } else {
+            double val1 = xmlXPathCastToNumberInternal(ctxt, arg1);
+            double val2 = xmlXPathCastToNumberInternal(ctxt, arg2);
+
+            if (inf) {
+                if (strict)
+                    ret = (val1 < val2);
+                else
+                    ret = (val1 <= val2);
+            } else {
+                if (strict)
+                    ret = (val1 > val2);
+                else
+                    ret = (val1 >= val2);
+            }
+        }
+    }
+
 error:
     xmlXPathReleaseObject(ctxt->context, arg1);
     xmlXPathReleaseObject(ctxt->context, arg2);
