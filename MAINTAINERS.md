@@ -116,3 +116,25 @@ Dockerfile in the .gitlab-ci directory:
         < .gitlab-ci/Dockerfile
     docker push registry.gitlab.gnome.org/gnome/libxml2
 
+## Profiling with perf
+
+Testing the XPath engine or libxslt can result in deeply nested call
+stacks which makes frame pointers the only viable mechanism to record the
+call graph and requires to increase sysctl.kernel.perf_event_max_stack:
+
+    sudo sysctl kernel.perf_event_max_stack=1023
+
+You'll also need a libc with frame pointers enabled. This is the default
+on newer Ubuntu and Fedora releases. Some other distros provide a
+libc6-prof package that must be enabled with LD_LIBRARY_PATH.
+
+Then you can compile libxml2 with options like
+
+    CFLAGS='-O2 -fno-omit-frame-pointer -fno-optimize-sibling-calls'
+
+and start profiling:
+
+    perf record -g ...
+    perf report
+    perf report --no-children --call-graph=fractal
+
