@@ -4808,7 +4808,7 @@ xmlXPathCastNumberToBoolean (double val) {
  */
 int
 xmlXPathCastStringToBoolean (const xmlChar *val) {
-    if ((val == NULL) || (xmlStrlen(val) == 0))
+    if ((val == NULL) || (val[0] == 0))
 	return(0);
     return(1);
 }
@@ -4837,33 +4837,30 @@ xmlXPathCastNodeSetToBoolean (xmlNodeSetPtr ns) {
  * Returns the boolean value
  */
 int
-xmlXPathCastToBoolean (xmlXPathObjectPtr val) {
+xmlXPathCastToBoolean(xmlXPathObjectPtr val) {
     int ret = 0;
 
     if (val == NULL)
 	return(0);
+
     switch (val->type) {
-    case XPATH_UNDEFINED:
-	ret = 0;
-	break;
     case XPATH_NODESET:
     case XPATH_XSLT_TREE:
-	ret = xmlXPathCastNodeSetToBoolean(val->nodesetval);
+	ret = ((val->nodesetval != NULL) && (val->nodesetval->nodeNr > 0));
 	break;
     case XPATH_STRING:
-	ret = xmlXPathCastStringToBoolean(val->stringval);
+	ret = ((val->stringval != NULL) && (val->stringval[0] != 0));
 	break;
     case XPATH_NUMBER:
-	ret = xmlXPathCastNumberToBoolean(val->floatval);
+	ret = (val->floatval != 0.0);;
 	break;
     case XPATH_BOOLEAN:
 	ret = val->boolval;
 	break;
-    case XPATH_USERS:
-	/* TODO */
-	ret = 0;
+    default:
 	break;
     }
+
     return(ret);
 }
 
@@ -5627,50 +5624,28 @@ xmlXPathEqualNodeSets(xmlXPathParserContextPtr ctxt, xmlXPathObjectPtr arg1,
 }
 
 static int
-xmlXPathEqualValuesCommon(xmlXPathParserContextPtr ctxt,
-  xmlXPathObjectPtr arg1, xmlXPathObjectPtr arg2) {
+xmlXPathEqualValuesInternal(xmlXPathParserContextPtr ctxt, int neq) {
+    xmlXPathObjectPtr arg1, arg2;
     int ret = 0;
-    /*
-     *At this point we are assured neither arg1 nor arg2
-     *is a nodeset, so we can just pick the appropriate routine.
-     */
+
+    arg2 = valuePop(ctxt);
+    arg1 = valuePop(ctxt);
+    if ((arg1 == NULL) || (arg2 == NULL)) {
+        xmlXPathErr(ctxt, XPATH_INVALID_OPERAND);
+        goto error;
+    }
+
     switch (arg1->type) {
-        case XPATH_UNDEFINED:
-	    break;
         case XPATH_BOOLEAN:
-	    switch (arg2->type) {
-	        case XPATH_UNDEFINED:
-		    break;
-		case XPATH_BOOLEAN:
-		    ret = (arg1->boolval == arg2->boolval);
-		    break;
-		case XPATH_NUMBER:
-		    ret = (arg1->boolval ==
-			   xmlXPathCastNumberToBoolean(arg2->floatval));
-		    break;
-		case XPATH_STRING:
-		    if ((arg2->stringval == NULL) ||
-			(arg2->stringval[0] == 0)) ret = 0;
-		    else
-			ret = 1;
-		    ret = (arg1->boolval == ret);
-		    break;
-		case XPATH_USERS:
-		    /* TODO */
-		    break;
-		case XPATH_NODESET:
-		case XPATH_XSLT_TREE:
-		    break;
-	    }
+            ret = (arg1->boolval == xmlXPathCastToBoolean(arg2));
 	    break;
         case XPATH_NUMBER:
 	    switch (arg2->type) {
-	        case XPATH_UNDEFINED:
+		case XPATH_BOOLEAN: {
+                    int bool1 = (arg1->floatval != 0.0);
+                    ret = (bool1 == arg2->boolval);
 		    break;
-		case XPATH_BOOLEAN:
-		    ret = (arg2->boolval==
-			   xmlXPathCastNumberToBoolean(arg1->floatval));
-		    break;
+                }
 		case XPATH_STRING: {
                     double val2 = xmlXPathStringEvalNumber(arg2->stringval);
 		    ret = (arg1->floatval == val2);
@@ -5679,25 +5654,24 @@ xmlXPathEqualValuesCommon(xmlXPathParserContextPtr ctxt,
 		case XPATH_NUMBER:
 		    ret = (arg1->floatval == arg2->floatval);
 		    break;
-		case XPATH_USERS:
-		    /* TODO */
-		    break;
-		case XPATH_NODESET:
-		case XPATH_XSLT_TREE:
+                case XPATH_NODESET:
+                case XPATH_XSLT_TREE:
+                    ret = xmlXPathEqualNodeSetFloat(ctxt, arg2, arg1->floatval,
+                                                    neq);
+                    neq = 0;
+                    break;
+                default:
 		    break;
 	    }
 	    break;
         case XPATH_STRING:
 	    switch (arg2->type) {
-	        case XPATH_UNDEFINED:
+		case XPATH_BOOLEAN: {
+                    int bool1 = ((arg1->stringval != NULL) &&
+                                 (arg1->stringval[0] != 0));
+                    ret = (bool1 == arg2->boolval);
 		    break;
-		case XPATH_BOOLEAN:
-		    if ((arg1->stringval == NULL) ||
-			(arg1->stringval[0] == 0)) ret = 0;
-		    else
-			ret = 1;
-		    ret = (arg2->boolval == ret);
-		    break;
+                }
 		case XPATH_STRING:
 		    ret = xmlStrEqual(arg1->stringval, arg2->stringval);
 		    break;
@@ -5706,21 +5680,52 @@ xmlXPathEqualValuesCommon(xmlXPathParserContextPtr ctxt,
 		    ret = (val1 == arg2->floatval);
                     break;
                 }
-		case XPATH_USERS:
-		    /* TODO */
-		    break;
-		case XPATH_NODESET:
-		case XPATH_XSLT_TREE:
+                case XPATH_NODESET:
+                case XPATH_XSLT_TREE:
+                    ret = xmlXPathEqualNodeSetString(ctxt, arg2,
+                                                     arg1->stringval, neq);
+                    neq = 0;
+                    break;
+                default:
 		    break;
 	    }
 	    break;
-        case XPATH_USERS:
-	    /* TODO */
+        case XPATH_NODESET:
+        case XPATH_XSLT_TREE:
+	    switch (arg2->type) {
+		case XPATH_BOOLEAN: {
+                    int bool1 = ((arg1->nodesetval != NULL) &&
+                                 (arg1->nodesetval->nodeNr > 0));
+                    ret = (bool1 == arg2->boolval);
+		    break;
+                }
+		case XPATH_STRING:
+                    ret = xmlXPathEqualNodeSetString(ctxt, arg1,
+                                                     arg2->stringval, neq);
+                    neq = 0;
+		    break;
+		case XPATH_NUMBER:
+                    ret = xmlXPathEqualNodeSetFloat(ctxt, arg1, arg2->floatval,
+                                                    neq);
+                    neq = 0;
+                    break;
+                case XPATH_NODESET:
+                case XPATH_XSLT_TREE:
+		    ret = xmlXPathEqualNodeSets(ctxt, arg1, arg2, neq);
+                    neq = 0;
+                    break;
+                default:
+		    break;
+	    }
 	    break;
-	case XPATH_NODESET:
-	case XPATH_XSLT_TREE:
+        default:
 	    break;
     }
+
+    if (neq)
+        ret = !ret;
+
+error:
     xmlXPathReleaseObject(ctxt->context, arg1);
     xmlXPathReleaseObject(ctxt->context, arg2);
     return(ret);
@@ -5736,144 +5741,27 @@ xmlXPathEqualValuesCommon(xmlXPathParserContextPtr ctxt,
  */
 int
 xmlXPathEqualValues(xmlXPathParserContextPtr ctxt) {
-    xmlXPathObjectPtr arg1, arg2, argtmp;
-    int ret = 0;
+    if ((ctxt == NULL) || (ctxt->context == NULL))
+        return(0);
 
-    if ((ctxt == NULL) || (ctxt->context == NULL)) return(0);
-    arg2 = valuePop(ctxt);
-    arg1 = valuePop(ctxt);
-    if ((arg1 == NULL) || (arg2 == NULL)) {
-	if (arg1 != NULL)
-	    xmlXPathReleaseObject(ctxt->context, arg1);
-	else
-	    xmlXPathReleaseObject(ctxt->context, arg2);
-	XP_ERROR0(XPATH_INVALID_OPERAND);
-    }
-
-    if (arg1 == arg2) {
-	xmlXPathFreeObject(arg1);
-        return(1);
-    }
-
-    /*
-     *If either argument is a nodeset, it's a 'special case'
-     */
-    if ((arg2->type == XPATH_NODESET) || (arg2->type == XPATH_XSLT_TREE) ||
-      (arg1->type == XPATH_NODESET) || (arg1->type == XPATH_XSLT_TREE)) {
-	/*
-	 *Hack it to assure arg1 is the nodeset
-	 */
-	if ((arg1->type != XPATH_NODESET) && (arg1->type != XPATH_XSLT_TREE)) {
-		argtmp = arg2;
-		arg2 = arg1;
-		arg1 = argtmp;
-	}
-	switch (arg2->type) {
-	    case XPATH_UNDEFINED:
-		break;
-	    case XPATH_NODESET:
-	    case XPATH_XSLT_TREE:
-		ret = xmlXPathEqualNodeSets(ctxt, arg1, arg2, 0);
-		break;
-	    case XPATH_BOOLEAN:
-		if ((arg1->nodesetval == NULL) ||
-		  (arg1->nodesetval->nodeNr == 0)) ret = 0;
-		else
-		    ret = 1;
-		ret = (ret == arg2->boolval);
-		break;
-	    case XPATH_NUMBER:
-		ret = xmlXPathEqualNodeSetFloat(ctxt, arg1, arg2->floatval, 0);
-		break;
-	    case XPATH_STRING:
-		ret = xmlXPathEqualNodeSetString(ctxt, arg1,
-                                                 arg2->stringval, 0);
-		break;
-	    case XPATH_USERS:
-		/* TODO */
-		break;
-	}
-	xmlXPathReleaseObject(ctxt->context, arg1);
-	xmlXPathReleaseObject(ctxt->context, arg2);
-	return(ret);
-    }
-
-    return (xmlXPathEqualValuesCommon(ctxt, arg1, arg2));
+    return(xmlXPathEqualValuesInternal(ctxt, 0));
 }
 
 /**
  * xmlXPathNotEqualValues:
  * @ctxt:  the XPath Parser context
  *
- * Implement the equal operation on XPath objects content: @arg1 == @arg2
+ * Implement the not-equal operation on XPath objects content:
+ * @arg1 != @arg2
  *
  * Returns 0 or 1 depending on the results of the test.
  */
 int
 xmlXPathNotEqualValues(xmlXPathParserContextPtr ctxt) {
-    xmlXPathObjectPtr arg1, arg2, argtmp;
-    int ret = 0;
-
-    if ((ctxt == NULL) || (ctxt->context == NULL)) return(0);
-    arg2 = valuePop(ctxt);
-    arg1 = valuePop(ctxt);
-    if ((arg1 == NULL) || (arg2 == NULL)) {
-	if (arg1 != NULL)
-	    xmlXPathReleaseObject(ctxt->context, arg1);
-	else
-	    xmlXPathReleaseObject(ctxt->context, arg2);
-	XP_ERROR0(XPATH_INVALID_OPERAND);
-    }
-
-    if (arg1 == arg2) {
-	xmlXPathReleaseObject(ctxt->context, arg1);
+    if ((ctxt == NULL) || (ctxt->context == NULL))
         return(0);
-    }
 
-    /*
-     *If either argument is a nodeset, it's a 'special case'
-     */
-    if ((arg2->type == XPATH_NODESET) || (arg2->type == XPATH_XSLT_TREE) ||
-      (arg1->type == XPATH_NODESET) || (arg1->type == XPATH_XSLT_TREE)) {
-	/*
-	 *Hack it to assure arg1 is the nodeset
-	 */
-	if ((arg1->type != XPATH_NODESET) && (arg1->type != XPATH_XSLT_TREE)) {
-		argtmp = arg2;
-		arg2 = arg1;
-		arg1 = argtmp;
-	}
-	switch (arg2->type) {
-	    case XPATH_UNDEFINED:
-		break;
-	    case XPATH_NODESET:
-	    case XPATH_XSLT_TREE:
-		ret = xmlXPathEqualNodeSets(ctxt, arg1, arg2, 1);
-		break;
-	    case XPATH_BOOLEAN:
-		if ((arg1->nodesetval == NULL) ||
-		  (arg1->nodesetval->nodeNr == 0)) ret = 0;
-		else
-		    ret = 1;
-		ret = (ret != arg2->boolval);
-		break;
-	    case XPATH_NUMBER:
-		ret = xmlXPathEqualNodeSetFloat(ctxt, arg1, arg2->floatval, 1);
-		break;
-	    case XPATH_STRING:
-		ret = xmlXPathEqualNodeSetString(ctxt, arg1,
-                                                 arg2->stringval, 1);
-		break;
-	    case XPATH_USERS:
-		/* TODO */
-		break;
-	}
-	xmlXPathReleaseObject(ctxt->context, arg1);
-	xmlXPathReleaseObject(ctxt->context, arg2);
-	return(ret);
-    }
-
-    return (!xmlXPathEqualValuesCommon(ctxt, arg1, arg2));
+    return(xmlXPathEqualValuesInternal(ctxt, 1));
 }
 
 /**
@@ -11246,10 +11134,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
 	    CHECK_ERROR0;
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
 	    CHECK_ERROR0;
-	    if (op->value)
-		equal = xmlXPathEqualValues(ctxt);
-	    else
-		equal = xmlXPathNotEqualValues(ctxt);
+	    equal = xmlXPathEqualValuesInternal(ctxt, !op->value);
 	    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, equal));
             break;
         case XPATH_OP_CMP:
