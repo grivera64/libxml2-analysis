@@ -7231,6 +7231,33 @@ xmlXPathIdFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     valuePush(ctxt, xmlXPathCacheWrapNodeSet(ctxt, ret));
 }
 
+static xmlNodePtr
+xmlXPathGetNodeArg(xmlXPathParserContextPtr ctxt, int nargs) {
+    xmlNodePtr node = NULL;
+
+    if (nargs == 0) {
+        node = ctxt->context->node;
+    } else if (nargs == 1) {
+        xmlXPathObjectPtr cur;
+
+        cur = valuePop(ctxt);
+        if ((cur == NULL) ||
+            ((cur->type != XPATH_NODESET) &&
+             (cur->type != XPATH_XSLT_TREE))) {
+            xmlXPathErr(ctxt, XPATH_INVALID_TYPE);
+        } else if ((cur->nodesetval != NULL) &&
+                   (cur->nodesetval->nodeNr > 0)) {
+            node = cur->nodesetval->nodeTab[0];
+        }
+
+        xmlXPathReleaseObject(ctxt->context, cur);
+    } else {
+        xmlXPathErr(ctxt, XPATH_INVALID_ARITY);
+    }
+
+    return(node);
+}
+
 /**
  * xmlXPathLocalNameFunction:
  * @ctxt:  the XPath Parser context
@@ -7245,46 +7272,38 @@ xmlXPathIdFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * defaults to the context node.
  */
 void
-xmlXPathLocalNameFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr cur;
+xmlXPathLocalNameFunction(xmlXPathParserContextPtr ctxt, int nargs)
+{
+    xmlNodePtr node;
+    const xmlChar *name = BAD_CAST "";
 
-    if (ctxt == NULL) return;
+    if ((ctxt == NULL) || (ctxt->context == NULL))
+        return;
 
-    if (nargs == 0) {
-	valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt, ctxt->context->node));
-	nargs = 1;
+    node = xmlXPathGetNodeArg(ctxt, nargs);
+    if (node == NULL)
+        goto error;
+
+    switch (node->type) {
+        case XML_ELEMENT_NODE:
+        case XML_ATTRIBUTE_NODE:
+            if (node->name[0] == ' ')
+                break;
+
+            name = node->name;
+            break;
+        case XML_PI_NODE:
+            name = node->name;
+            break;
+        case XML_NAMESPACE_DECL:
+            name = ((xmlNsPtr) node)->prefix;
+            break;
+        default:
+            break;
     }
 
-    CHECK_ARITY(1);
-    if ((ctxt->value == NULL) ||
-	((ctxt->value->type != XPATH_NODESET) &&
-	 (ctxt->value->type != XPATH_XSLT_TREE)))
-	XP_ERROR(XPATH_INVALID_TYPE);
-    cur = valuePop(ctxt);
-
-    if ((cur->nodesetval == NULL) || (cur->nodesetval->nodeNr == 0)) {
-	valuePush(ctxt, xmlXPathCacheNewCString(ctxt, ""));
-    } else {
-	int i = 0; /* Should be first in document order !!!!! */
-	switch (cur->nodesetval->nodeTab[i]->type) {
-	case XML_ELEMENT_NODE:
-	case XML_ATTRIBUTE_NODE:
-	case XML_PI_NODE:
-	    if (cur->nodesetval->nodeTab[i]->name[0] == ' ')
-		valuePush(ctxt, xmlXPathCacheNewCString(ctxt, ""));
-	    else
-		valuePush(ctxt, xmlXPathCacheNewString(ctxt,
-			cur->nodesetval->nodeTab[i]->name));
-	    break;
-	case XML_NAMESPACE_DECL:
-	    valuePush(ctxt, xmlXPathCacheNewString(ctxt,
-			((xmlNsPtr)cur->nodesetval->nodeTab[i])->prefix));
-	    break;
-	default:
-	    valuePush(ctxt, xmlXPathCacheNewCString(ctxt, ""));
-	}
-    }
-    xmlXPathReleaseObject(ctxt->context, cur);
+error:
+    valuePush(ctxt, xmlXPathCacheNewString(ctxt, name));
 }
 
 /**
@@ -7303,39 +7322,30 @@ xmlXPathLocalNameFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  */
 void
 xmlXPathNamespaceURIFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr cur;
+    xmlNodePtr node;
+    const xmlChar *uri = BAD_CAST "";
 
-    if (ctxt == NULL) return;
+    if ((ctxt == NULL) || (ctxt->context == NULL))
+        return;
 
-    if (nargs == 0) {
-	valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt, ctxt->context->node));
-	nargs = 1;
-    }
-    CHECK_ARITY(1);
-    if ((ctxt->value == NULL) ||
-	((ctxt->value->type != XPATH_NODESET) &&
-	 (ctxt->value->type != XPATH_XSLT_TREE)))
-	XP_ERROR(XPATH_INVALID_TYPE);
-    cur = valuePop(ctxt);
+    node = xmlXPathGetNodeArg(ctxt, nargs);
+    if (node == NULL)
+        goto error;
 
-    if ((cur->nodesetval == NULL) || (cur->nodesetval->nodeNr == 0)) {
-	valuePush(ctxt, xmlXPathCacheNewCString(ctxt, ""));
-    } else {
-	int i = 0; /* Should be first in document order !!!!! */
-	switch (cur->nodesetval->nodeTab[i]->type) {
+    switch (node->type) {
 	case XML_ELEMENT_NODE:
 	case XML_ATTRIBUTE_NODE:
-	    if (cur->nodesetval->nodeTab[i]->ns == NULL)
-		valuePush(ctxt, xmlXPathCacheNewCString(ctxt, ""));
-	    else
-		valuePush(ctxt, xmlXPathCacheNewString(ctxt,
-			  cur->nodesetval->nodeTab[i]->ns->href));
+	    if (node->ns == NULL)
+                break;
+
+	    uri = node->ns->href;
 	    break;
 	default:
-	    valuePush(ctxt, xmlXPathCacheNewCString(ctxt, ""));
-	}
+            break;
     }
-    xmlXPathReleaseObject(ctxt->context, cur);
+
+error:
+    valuePush(ctxt, xmlXPathCacheNewString(ctxt, uri));
 }
 
 /**
@@ -7363,55 +7373,51 @@ xmlXPathNamespaceURIFunction(xmlXPathParserContextPtr ctxt, int nargs) {
 static void
 xmlXPathNameFunction(xmlXPathParserContextPtr ctxt, int nargs)
 {
-    xmlXPathObjectPtr cur;
+    xmlXPathObjectPtr res = NULL;
+    xmlNodePtr node;
+    const xmlChar *name = BAD_CAST "";
 
-    if (nargs == 0) {
-	valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt, ctxt->context->node));
-        nargs = 1;
-    }
+    if ((ctxt == NULL) || (ctxt->context == NULL))
+        return;
 
-    CHECK_ARITY(1);
-    if ((ctxt->value == NULL) ||
-        ((ctxt->value->type != XPATH_NODESET) &&
-         (ctxt->value->type != XPATH_XSLT_TREE)))
-        XP_ERROR(XPATH_INVALID_TYPE);
-    cur = valuePop(ctxt);
+    node = xmlXPathGetNodeArg(ctxt, nargs);
+    if (node == NULL)
+        goto error;
 
-    if ((cur->nodesetval == NULL) || (cur->nodesetval->nodeNr == 0)) {
-        valuePush(ctxt, xmlXPathCacheNewCString(ctxt, ""));
-    } else {
-        int i = 0;              /* Should be first in document order !!!!! */
-
-        switch (cur->nodesetval->nodeTab[i]->type) {
-            case XML_ELEMENT_NODE:
-            case XML_ATTRIBUTE_NODE:
-		if (cur->nodesetval->nodeTab[i]->name[0] == ' ')
-		    valuePush(ctxt,
-			xmlXPathCacheNewCString(ctxt, ""));
-		else if ((cur->nodesetval->nodeTab[i]->ns == NULL) ||
-                         (cur->nodesetval->nodeTab[i]->ns->prefix == NULL)) {
-		    valuePush(ctxt, xmlXPathCacheNewString(ctxt,
-			    cur->nodesetval->nodeTab[i]->name));
-		} else {
-		    xmlChar *fullname;
-
-		    fullname = xmlBuildQName(cur->nodesetval->nodeTab[i]->name,
-				     cur->nodesetval->nodeTab[i]->ns->prefix,
-				     NULL, 0);
-		    if (fullname == cur->nodesetval->nodeTab[i]->name)
-			fullname = xmlStrdup(cur->nodesetval->nodeTab[i]->name);
-		    if (fullname == NULL)
-                        xmlXPathPErrMemory(ctxt);
-		    valuePush(ctxt, xmlXPathCacheWrapString(ctxt, fullname));
-                }
+    switch (node->type) {
+        case XML_ELEMENT_NODE:
+        case XML_ATTRIBUTE_NODE:
+            if (node->name[0] == ' ')
                 break;
-            default:
-		valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt,
-		    cur->nodesetval->nodeTab[i]));
-                xmlXPathLocalNameFunction(ctxt, 1);
-        }
+
+            if ((node->ns == NULL) || (node->ns->prefix == NULL)) {
+                name = node->name;
+            } else {
+                xmlChar *fullname;
+
+                fullname = xmlBuildQName(node->name, node->ns->prefix,
+                                     NULL, 0);
+                if (fullname == node->name)
+                    fullname = xmlStrdup(node->name);
+                if (fullname == NULL)
+                    xmlXPathPErrMemory(ctxt);
+                res = xmlXPathCacheWrapString(ctxt, fullname);
+            }
+            break;
+        case XML_PI_NODE:
+            name = node->name;
+            break;
+        case XML_NAMESPACE_DECL:
+            name = ((xmlNsPtr) node)->prefix;
+            break;
+        default:
+            break;
     }
-    xmlXPathReleaseObject(ctxt->context, cur);
+
+error:
+    if (res == NULL)
+        res = xmlXPathCacheNewString(ctxt, name);
+    valuePush(ctxt, res);
 }
 
 
