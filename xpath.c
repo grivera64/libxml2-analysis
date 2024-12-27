@@ -4098,16 +4098,6 @@ xmlXPathRegisterVariableLookup(xmlXPathContextPtr ctxt,
  */
 xmlXPathObjectPtr
 xmlXPathVariableLookup(xmlXPathContextPtr ctxt, const xmlChar *name) {
-    if (ctxt == NULL)
-	return(NULL);
-
-    if (ctxt->varLookupFunc != NULL) {
-	xmlXPathObjectPtr ret;
-
-	ret = ((xmlXPathVariableLookupFunc)ctxt->varLookupFunc)
-	        (ctxt->varLookupData, name, NULL);
-	return(ret);
-    }
     return(xmlXPathVariableLookupNS(ctxt, name, NULL));
 }
 
@@ -4131,8 +4121,7 @@ xmlXPathVariableLookupNS(xmlXPathContextPtr ctxt, const xmlChar *name,
     if (ctxt->varLookupFunc != NULL) {
 	xmlXPathObjectPtr ret;
 
-	ret = ((xmlXPathVariableLookupFunc)ctxt->varLookupFunc)
-	        (ctxt->varLookupData, name, ns_uri);
+	ret = ctxt->varLookupFunc(ctxt->varLookupData, name, ns_uri);
 	if (ret != NULL) return(ret);
     }
 
