@@ -9716,19 +9716,7 @@ xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter) {
     SKIP_BLANKS;
 
     ctxt->comp->last = -1;
-    /*
-    * This call to xmlXPathCompileExpr() will deactivate sorting
-    * of the predicate result.
-    * TODO: Sorting is still activated for filters, since I'm not
-    *  sure if needed. Normally sorting should not be needed, since
-    *  a filter can only diminish the number of items in a sequence,
-    *  but won't change its order; so if the initial sequence is sorted,
-    *  subsequent sorting is not needed.
-    */
-    if (! filter)
-	xmlXPathCompileExpr(ctxt, 0);
-    else
-	xmlXPathCompileExpr(ctxt, 1);
+    xmlXPathCompileExpr(ctxt, 0);
     CHECK_ERROR;
 
     if (CUR != ']') {
