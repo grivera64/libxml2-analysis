@@ -7534,6 +7534,11 @@ xmlXPathStringLengthFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, len));
 }
 
+typedef struct {
+    xmlChar *string;
+    int len;
+} xmlConcatRec;
+
 /**
  * xmlXPathConcatFunction:
  * @ctxt:  the XPath Parser context
@@ -7545,39 +7550,83 @@ xmlXPathStringLengthFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  */
 void
 xmlXPathConcatFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr cur, newobj;
-    xmlChar *tmp;
+    xmlConcatRec *recs;
+    xmlChar *res = NULL;
+    int totalSize = 0;
+    int i, j;
 
     if (ctxt == NULL) return;
     if (nargs < 2) {
 	CHECK_ARITY(2);
     }
 
-    CAST_TO_STRING;
-    cur = valuePop(ctxt);
-    if ((cur == NULL) || (cur->type != XPATH_STRING)) {
-	xmlXPathReleaseObject(ctxt->context, cur);
-	return;
+    recs = xmlMalloc(nargs * sizeof(recs[0]));
+    if (recs == NULL) {
+        xmlXPathPErrMemory(ctxt);
+        return;
     }
-    nargs--;
+    memset(recs, 0, nargs * sizeof(recs[0]));
 
-    while (nargs > 0) {
-	CAST_TO_STRING;
-	newobj = valuePop(ctxt);
-	if ((newobj == NULL) || (newobj->type != XPATH_STRING)) {
-	    xmlXPathReleaseObject(ctxt->context, newobj);
-	    xmlXPathReleaseObject(ctxt->context, cur);
-	    XP_ERROR(XPATH_INVALID_TYPE);
-	}
-	tmp = xmlStrcat(newobj->stringval, cur->stringval);
-        if (tmp == NULL)
-            xmlXPathPErrMemory(ctxt);
-	newobj->stringval = cur->stringval;
-	cur->stringval = tmp;
-	xmlXPathReleaseObject(ctxt->context, newobj);
-	nargs--;
+    for (i = 0; i < nargs; i++) {
+        xmlXPathObjectPtr obj = ctxt->valueTab[ctxt->valueNr - nargs + i];
+        xmlChar *string;
+        size_t len;
+
+        if (obj == NULL)
+            string = NULL;
+        else if (obj->type == XPATH_STRING)
+            string = obj->stringval;
+        else
+            string = xmlXPathCastToString(obj);
+
+        if (string == NULL) {
+            recs[i].string = NULL;
+            recs[i].len = 0;
+        } else {
+            recs[i].string = string;
+
+            len = strlen((char *) string);
+            if (len > (size_t) XML_MAX_ITEMS - totalSize) {
+                xmlXPathPErrMemory(ctxt);
+                goto error;
+            }
+            recs[i].len = len;
+
+            totalSize += len;
+        }
     }
-    valuePush(ctxt, cur);
+
+    res = xmlMalloc(totalSize + 1);
+    if (res == NULL) {
+        xmlXPathPErrMemory(ctxt);
+        goto error;
+    }
+
+    for (i = 0, j = 0; i < nargs; i++) {
+        xmlConcatRec *rec = &recs[i];
+
+        if (rec->string != NULL) {
+            memcpy(res + j, rec->string, rec->len);
+            j += rec->len;
+        }
+    }
+
+    res[j] = 0;
+
+error:
+    for (i = nargs - 1; i >= 0; i--) {
+        xmlXPathObjectPtr obj = valuePop(ctxt);
+
+        if ((obj != NULL) && (obj->type != XPATH_STRING))
+            xmlFree(recs[i].string);
+
+        xmlXPathReleaseObject(ctxt->context, obj);
+    }
+
+    if (res != NULL)
+        valuePush(ctxt, xmlXPathCacheWrapString(ctxt, res));
+
+    xmlFree(recs);
 }
 
 /**
