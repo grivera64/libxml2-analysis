@@ -9676,15 +9676,16 @@ xmlXPathCompileExpr(xmlXPathParserContextPtr ctxt, int sort) {
 
 	SKIP_BLANKS;
     }
-    if ((sort) && (ctxt->comp->steps[ctxt->comp->last].op != XPATH_OP_VALUE)) {
-	/* more ops could be optimized too */
-	/*
-	* This is the main place to eliminate sorting for
-	* operations which don't require a sorted node-set.
-	* E.g. count().
-	*/
-
-        xmlXPathCompAddUnary(ctxt, XPATH_OP_SORT);
+    if (sort) {
+        switch (ctxt->comp->steps[ctxt->comp->last].op) {
+            case XPATH_OP_UNION:
+            case XPATH_OP_COLLECT:
+            case XPATH_OP_FUNCTION:
+                xmlXPathCompAddUnary(ctxt, XPATH_OP_SORT);
+                break;
+            default:
+                break;
+        }
     }
 
 error:
