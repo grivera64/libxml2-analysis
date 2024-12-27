@@ -7459,29 +7459,29 @@ error:
  */
 void
 xmlXPathStringFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr cur;
-    xmlChar *stringval;
+    xmlChar *content;
 
-    if (ctxt == NULL) return;
+    if (ctxt == NULL)
+        return;
+
     if (nargs == 0) {
-        stringval = xmlXPathCastNodeToString(ctxt->context->node);
-        if (stringval == NULL)
-            xmlXPathPErrMemory(ctxt);
-        valuePush(ctxt, xmlXPathCacheWrapString(ctxt, stringval));
-	return;
+        if (ctxt->context == NULL)
+            return;
+        content = xmlNodeGetContent(ctxt->context->node);
+    } else {
+        xmlXPathObjectPtr cur;
+
+        if ((ctxt->value != NULL) && (ctxt->value->type == XPATH_STRING))
+            return;
+        cur = valuePop(ctxt);
+        content = xmlXPathCastToString(cur);
+        xmlXPathReleaseObject(ctxt->context, cur);
     }
 
-    CHECK_ARITY(1);
-    cur = valuePop(ctxt);
-    if (cur == NULL) XP_ERROR(XPATH_INVALID_OPERAND);
-    if (cur->type != XPATH_STRING) {
-        stringval = xmlXPathCastToString(cur);
-        if (stringval == NULL)
-            xmlXPathPErrMemory(ctxt);
-        xmlXPathReleaseObject(ctxt->context, cur);
-        cur = xmlXPathCacheWrapString(ctxt, stringval);
-    }
-    valuePush(ctxt, cur);
+    if (content == NULL)
+        xmlXPathPErrMemory(ctxt);
+
+    valuePush(ctxt, xmlXPathCacheWrapString(ctxt, content));
 }
 
 /**
@@ -7498,32 +7498,40 @@ xmlXPathStringFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  */
 void
 xmlXPathStringLengthFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr cur;
+    int len = 0;
 
     if (nargs == 0) {
-        if ((ctxt == NULL) || (ctxt->context == NULL))
-	    return;
-	if (ctxt->context->node == NULL) {
-	    valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, 0));
-	} else {
-	    xmlChar *content;
+        xmlChar *content;
 
-	    content = xmlXPathCastNodeToString(ctxt->context->node);
+        if ((ctxt == NULL) || (ctxt->context == NULL))
+            return;
+        content = xmlNodeGetContent(ctxt->context->node);
+        if (content == NULL)
+            xmlXPathPErrMemory(ctxt);
+        len = xmlUTF8Strlen(content);
+        xmlFree(content);
+    } else {
+        xmlXPathObjectPtr cur;
+
+        cur = valuePop(ctxt);
+        if (cur == NULL)
+            XP_ERROR(XPATH_STACK_ERROR);
+
+        if (cur->type == XPATH_STRING) {
+            len = xmlUTF8Strlen(cur->stringval);
+        } else {
+            xmlChar *content = xmlXPathCastToString(cur);
+
             if (content == NULL)
                 xmlXPathPErrMemory(ctxt);
-	    valuePush(ctxt, xmlXPathCacheNewFloat(ctxt,
-		xmlUTF8Strlen(content)));
-	    xmlFree(content);
-	}
-	return;
+            len = xmlUTF8Strlen(content);
+            xmlFree(content);
+        }
+
+        xmlXPathReleaseObject(ctxt->context, cur);
     }
-    CHECK_ARITY(1);
-    CAST_TO_STRING;
-    CHECK_TYPE(XPATH_STRING);
-    cur = valuePop(ctxt);
-    valuePush(ctxt, xmlXPathCacheNewFloat(ctxt,
-	xmlUTF8Strlen(cur->stringval)));
-    xmlXPathReleaseObject(ctxt->context, cur);
+
+    valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, len));
 }
 
 /**
