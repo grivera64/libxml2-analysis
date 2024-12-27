@@ -894,18 +894,38 @@ typedef enum {
     AXIS_SELF
 } xmlXPathAxisVal;
 
+typedef struct {
+    xmlChar *name;
+    union {
+        xmlChar *prefix;
+        const xmlChar *uri;
+    } ns;
+} xmlXPathOpQName;
+
 typedef struct _xmlXPathStepOp xmlXPathStepOp;
 typedef xmlXPathStepOp *xmlXPathStepOpPtr;
 struct _xmlXPathStepOp {
-    xmlXPathOp op;		/* The identifier of the operation */
-    int ch1;			/* First child */
-    int ch2;			/* Second child */
+    xmlXPathOp op;
+    int ch1; /* first child */
+    int ch2; /* second child */
+    /*
+     * Used as suboperation type for various binary ops and
+     * contains number of arguments for function calls.
+     */
     int value;
-    int value2;
-    void *value4;
-    void *value5;
-    xmlXPathFunction cache;
-    void *cacheURI;
+
+    xmlXPathOpQName qname; /* for name tests, variables and functions */
+
+    union {
+        xmlXPathObjectPtr obj; /* literal */
+
+        xmlXPathFunction func;
+
+        struct {
+            xmlXPathAxisVal axis;
+            int typeMask;
+        } step;
+    } as;
 };
 
 struct _xmlXPathCompExpr {
@@ -992,21 +1012,29 @@ xmlXPathFreeCompExpr(xmlXPathCompExprPtr comp)
 
         switch (op->op) {
             case XPATH_OP_VALUE:
-                xmlXPathFreeObject(op->value4);
+                xmlXPathFreeObject(op->as.obj);
                 break;
 
             case XPATH_OP_COLLECT:
             case XPATH_OP_VARIABLE:
+                if ((comp->dict == NULL) && (op->qname.name != NULL)) {
+                    xmlFree(op->qname.name);
+
+                    if ((comp->flags & XML_XPATH_COMPILE_NS) == 0)
+                        xmlFree(op->qname.ns.prefix);
+                }
+                break;
+
             case XPATH_OP_FUNCTION:
-                if (comp->dict == NULL) {
-                    int flags = XML_XPATH_COMPILE_NS;
+                if ((comp->dict == NULL) && (op->qname.name != NULL)) {
+                    xmlFree(op->qname.name);
 
-                    xmlFree(op->value4);
-
-                    if (op->op == XPATH_OP_FUNCTION)
-                        flags |= XML_XPATH_COMPILE_FUNC;
-                    if ((comp->flags & flags) == 0)
-                        xmlFree(op->value5);
+                    /*
+                     * The check for fptr is a bit tricky.
+                     */
+                    if (((comp->flags & XML_XPATH_COMPILE_NS) == 0) &&
+                        (op->as.func == NULL))
+                        xmlFree(op->qname.ns.prefix);
                 }
                 break;
 
@@ -1032,8 +1060,54 @@ xmlXPathFreeCompExpr(xmlXPathCompExprPtr comp)
     xmlFree(comp);
 }
 
+static int
+xmlXPathCompOpSetQName(xmlXPathParserContextPtr ctxt, xmlXPathOpQName *qname,
+                       xmlChar *name, xmlChar *prefix, const xmlChar *nsUri) {
+    xmlXPathCompExprPtr comp = ctxt->comp;
+
+    if (comp->dict == NULL) {
+        qname->name = name;
+
+        if (nsUri != NULL) {
+            qname->ns.uri = nsUri;
+            xmlFree(prefix);
+        } else {
+            qname->ns.prefix = prefix;
+        }
+    } else {
+        const xmlChar *dname;
+        const xmlChar *dprefix;
+
+        dname = xmlDictLookup(comp->dict, name, -1);
+        if (dname == NULL) {
+            xmlXPathPErrMemory(ctxt);
+            return(-1);
+        }
+
+        if (nsUri != NULL) {
+            qname->ns.uri = nsUri;
+        } else if (prefix != NULL) {
+            dprefix = xmlDictLookup(comp->dict, prefix, -1);
+            if (dprefix == NULL) {
+                xmlXPathPErrMemory(ctxt);
+                return(-1);
+            }
+            qname->ns.prefix = (xmlChar *) dprefix;
+        } else {
+            qname->ns.prefix = NULL;
+        }
+
+        qname->name = (xmlChar *) dname;
+
+        xmlFree(name);
+        xmlFree(prefix);
+    }
+
+    return(0);
+}
+
 /**
- * xmlXPathCompExprAdd:
+ * xmlXPathCompAdd:
  * @comp:  the compiled expression
  * @ch1: first child index
  * @ch2: second child index
@@ -1047,79 +1121,90 @@ xmlXPathFreeCompExpr(xmlXPathCompExprPtr comp)
  *
  * Returns -1 in case of failure, the index otherwise
  */
-static int
-xmlXPathCompExprAdd(xmlXPathParserContextPtr ctxt, int ch1, int ch2,
-   xmlXPathOp op, int value,
-   int value2, void *value4, void *value5) {
+static xmlXPathStepOp *
+xmlXPathCompAdd(xmlXPathParserContextPtr ctxt, xmlXPathOp opval) {
     xmlXPathCompExprPtr comp = ctxt->comp;
+    xmlXPathStepOpPtr op;
+
     if (comp->nbStep >= comp->maxStep) {
-	xmlXPathStepOp *real;
+	xmlXPathStepOp *tmp;
         int newSize;
 
-        newSize = xmlGrowCapacity(comp->maxStep, sizeof(real[0]),
+        newSize = xmlGrowCapacity(comp->maxStep, sizeof(tmp[0]),
                                   10, XPATH_MAX_STEPS);
         if (newSize < 0) {
 	    xmlXPathPErrMemory(ctxt);
-	    return(-1);
+	    return(NULL);
         }
-	real = xmlRealloc(comp->steps, newSize * sizeof(real[0]));
-	if (real == NULL) {
+	tmp = xmlRealloc(comp->steps, newSize * sizeof(tmp[0]));
+	if (tmp == NULL) {
 	    xmlXPathPErrMemory(ctxt);
-	    return(-1);
+	    return(NULL);
 	}
-	comp->steps = real;
+	comp->steps = tmp;
 	comp->maxStep = newSize;
     }
-    comp->last = comp->nbStep;
-    comp->steps[comp->nbStep].ch1 = ch1;
-    comp->steps[comp->nbStep].ch2 = ch2;
-    comp->steps[comp->nbStep].op = op;
-    comp->steps[comp->nbStep].value = value;
-    comp->steps[comp->nbStep].value2 = value2;
-    if ((comp->dict != NULL) &&
-        ((op == XPATH_OP_FUNCTION) || (op == XPATH_OP_VARIABLE) ||
-	 (op == XPATH_OP_COLLECT))) {
-        if (value4 != NULL) {
-	    comp->steps[comp->nbStep].value4 = (xmlChar *)
-	        (void *)xmlDictLookup(comp->dict, value4, -1);
-	    xmlFree(value4);
-	} else
-	    comp->steps[comp->nbStep].value4 = NULL;
-        if (value5 != NULL) {
-            int flags = XML_XPATH_COMPILE_NS;
 
-	    comp->steps[comp->nbStep].value5 = (xmlChar *)
-	        (void *)xmlDictLookup(comp->dict, value5, -1);
-            if (op == XPATH_OP_FUNCTION)
-                flags |= XML_XPATH_COMPILE_FUNC;
-            if ((comp->flags & flags) == 0)
-	        xmlFree(value5);
-	} else
-	    comp->steps[comp->nbStep].value5 = NULL;
-    } else {
-	comp->steps[comp->nbStep].value4 = value4;
-	comp->steps[comp->nbStep].value5 = value5;
-    }
-    comp->steps[comp->nbStep].cache = NULL;
-    return(comp->nbStep++);
+    comp->last = comp->nbStep;
+
+    op = &comp->steps[comp->nbStep++];
+    op->op = opval;
+    op->ch1 = -1;
+    op->ch2 = -1;
+    op->value = 0;
+
+    return(op);
 }
 
-#define PUSH_FULL_EXPR(op, op1, op2, val, val2, val4, val5)	\
-    xmlXPathCompExprAdd(ctxt, (op1), (op2),			\
-	                (op), (val), (val2), (val4), (val5))
-#define PUSH_LONG_EXPR(op, val, val2, val4, val5)			\
-    xmlXPathCompExprAdd(ctxt, ctxt->comp->last, -1,		\
-	                (op), (val), (val2), (val4), (val5))
+static xmlXPathStepOpPtr
+xmlXPathCompAddUnary(xmlXPathParserContextPtr ctxt, xmlXPathOp opval) {
+    xmlXPathStepOpPtr op;
+    int ch1 = ctxt->comp->last;
 
-#define PUSH_LEAVE_EXPR(op, val, val2)					\
-xmlXPathCompExprAdd(ctxt, -1, -1, (op), (val), (val2), NULL, NULL)
+    op = xmlXPathCompAdd(ctxt, opval);
+    if (op == NULL)
+        return(NULL);
 
-#define PUSH_UNARY_EXPR(op, ch, val, val2)				\
-xmlXPathCompExprAdd(ctxt, (ch), -1, (op), (val), (val2), NULL, NULL)
+    op->ch1 = ch1;
 
-#define PUSH_BINARY_EXPR(op, ch1, ch2, val, val2)			\
-xmlXPathCompExprAdd(ctxt, (ch1), (ch2), (op),			\
-			(val), (val2), NULL, NULL)
+    return(op);
+}
+
+static xmlXPathStepOpPtr
+xmlXPathCompAddBinary(xmlXPathParserContextPtr ctxt, xmlXPathOp opval,
+                      int ch1) {
+    xmlXPathStepOpPtr op;
+    int ch2 = ctxt->comp->last;
+
+    op = xmlXPathCompAdd(ctxt, opval);
+    if (op == NULL)
+        return(NULL);
+
+    op->ch1 = ch1;
+    op->ch2 = ch2;
+
+    return(op);
+}
+
+static xmlXPathStepOpPtr
+xmlXPathCompAddStep(xmlXPathParserContextPtr ctxt,
+                    int chNodeset, int chPredicate,
+                    xmlXPathAxisVal axis, int typeMask) {
+    xmlXPathStepOpPtr op;
+
+    op = xmlXPathCompAdd(ctxt, XPATH_OP_COLLECT);
+    if (op == NULL)
+        return(NULL);
+
+    op->ch1 = chNodeset;
+    op->ch2 = chPredicate;
+    op->as.step.axis = axis;
+    op->as.step.typeMask = typeMask;
+    op->qname.name = NULL;
+    op->qname.ns.prefix = NULL;
+
+    return(op);
+}
 
 /************************************************************************
  *									*
@@ -1343,11 +1428,11 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 		 fprintf(output, "EQUAL !=");
 	     break;
         case XPATH_OP_CMP:
-	     if (op->value)
+	     if (op->value & 1)
 		 fprintf(output, "CMP <");
 	     else
 		 fprintf(output, "CMP >");
-	     if (!op->value2)
+	     if ((op->value & 2) == 0)
 		 fprintf(output, "=");
 	     break;
         case XPATH_OP_PLUS:
@@ -1377,10 +1462,10 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
         case XPATH_OP_SORT:
 	     fprintf(output, "SORT"); break;
         case XPATH_OP_COLLECT: {
-	    xmlXPathAxisVal axis = (xmlXPathAxisVal)op->value;
-	    int type = op->value2;
-	    const xmlChar *prefix = op->value5;
-	    const xmlChar *name = op->value4;
+	    xmlXPathAxisVal axis = op->as.step.axis;
+	    int type = op->as.step.typeMask;
+	    const xmlChar *prefix = op->qname.ns.prefix;
+	    const xmlChar *name = op->qname.name;
 
 	    fprintf(output, "COLLECT ");
 	    switch (axis) {
@@ -1420,15 +1505,15 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 
         }
 	case XPATH_OP_VALUE: {
-	    xmlXPathObjectPtr object = (xmlXPathObjectPtr) op->value4;
+	    xmlXPathObjectPtr object = op->as.obj;
 
 	    fprintf(output, "ELEM ");
 	    xmlXPathDebugDumpObject(output, object, 0);
 	    goto finish;
 	}
 	case XPATH_OP_VARIABLE: {
-	    const xmlChar *prefix = op->value5;
-	    const xmlChar *name = op->value4;
+	    const xmlChar *prefix = op->qname.ns.prefix;
+	    const xmlChar *name = op->qname.name;
 
 	    if (prefix != NULL)
 		fprintf(output, "VARIABLE %s:%s", prefix, name);
@@ -1438,12 +1523,10 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	}
 	case XPATH_OP_FUNCTION: {
 	    int nbargs = op->value;
-	    const xmlChar *prefix = op->value5;
-	    const xmlChar *name = op->value4;
+	    const xmlChar *prefix = op->qname.ns.prefix;
+	    const xmlChar *name = op->qname.name;
 
-            if (comp->flags & XML_XPATH_COMPILE_FUNC)
-		fprintf(output, "FUNCTION [compiled](%d args)", nbargs);
-            else if (prefix != NULL)
+            if (prefix != NULL)
 		fprintf(output, "FUNCTION %s:%s(%d args)",
 			prefix, name, nbargs);
 	    else
@@ -8654,6 +8737,7 @@ xmlXPathStringEvalNumber(const xmlChar *str) {
 static void
 xmlXPathCompNumber(xmlXPathParserContextPtr ctxt)
 {
+    xmlXPathStepOpPtr op;
     double ret = 0.0;
     int ok = 0;
     int exponent = 0;
@@ -8734,10 +8818,14 @@ xmlXPathCompNumber(xmlXPathParserContextPtr ctxt)
     num = xmlXPathCacheNewFloat(ctxt, ret);
     if (num == NULL) {
 	ctxt->error = XPATH_MEMORY_ERROR;
-    } else if (PUSH_LONG_EXPR(XPATH_OP_VALUE, XPATH_NUMBER, 0, num,
-                              NULL) == -1) {
-        xmlXPathReleaseObject(ctxt->context, num);
+        return;
     }
+    op = xmlXPathCompAdd(ctxt, XPATH_OP_VALUE);
+    if (op == NULL) {
+        xmlXPathReleaseObject(ctxt->context, num);
+        return;
+    }
+    op->as.obj = num;
 }
 
 /**
@@ -8798,6 +8886,7 @@ xmlXPathParseLiteral(xmlXPathParserContextPtr ctxt) {
  */
 static void
 xmlXPathCompLiteral(xmlXPathParserContextPtr ctxt) {
+    xmlXPathStepOpPtr op;
     xmlChar *ret = NULL;
     xmlXPathObjectPtr lit;
 
@@ -8805,13 +8894,17 @@ xmlXPathCompLiteral(xmlXPathParserContextPtr ctxt) {
     if (ret == NULL)
         return;
     lit = xmlXPathCacheNewString(ctxt, ret);
+    xmlFree(ret);
     if (lit == NULL) {
         ctxt->error = XPATH_MEMORY_ERROR;
-    } else if (PUSH_LONG_EXPR(XPATH_OP_VALUE, XPATH_STRING, 0, lit,
-                              NULL) == -1) {
-        xmlXPathReleaseObject(ctxt->context, lit);
+        return;
     }
-    xmlFree(ret);
+    op = xmlXPathCompAdd(ctxt, XPATH_OP_VALUE);
+    if (op == NULL) {
+        xmlXPathReleaseObject(ctxt->context, lit);
+        return;
+    }
+    op->as.obj = lit;
 }
 
 /**
@@ -8833,9 +8926,14 @@ xmlXPathCompLiteral(xmlXPathParserContextPtr ctxt) {
  */
 static void
 xmlXPathCompVariableReference(xmlXPathParserContextPtr ctxt) {
+    xmlXPathStepOpPtr op;
     xmlChar *name;
     xmlChar *prefix;
-    xmlChar *value5;
+    const xmlChar *nsUri = NULL;
+
+    if (ctxt->comp->flags & XML_XPATH_NOVAR) {
+	XP_ERROR(XPATH_FORBID_VARIABLE_ERROR);
+    }
 
     SKIP_BLANKS;
     if (CUR != '$') {
@@ -8848,34 +8946,35 @@ xmlXPathCompVariableReference(xmlXPathParserContextPtr ctxt) {
 	XP_ERROR(XPATH_VARIABLE_REF_ERROR);
     }
 
-    value5 = prefix;
-
     if ((prefix != NULL) &&
         ((ctxt->comp->flags & XML_XPATH_CHECKNS) ||
          (ctxt->comp->flags & XML_XPATH_COMPILE_NS))) {
-        const xmlChar *nsUri;
-
         nsUri = xmlXPathNsLookup(ctxt->context, prefix);
         if (nsUri == NULL) {
             xmlXPathErr(ctxt, XPATH_UNDEF_PREFIX_ERROR);
         }
 
-        if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
-            value5 = (xmlChar *) nsUri;
-            xmlFree(prefix);
-            prefix = NULL;
-        }
+        if (ctxt->comp->flags & XML_XPATH_CHECKNS)
+            nsUri = NULL;
     }
 
     ctxt->comp->last = -1;
-    if (PUSH_LONG_EXPR(XPATH_OP_VARIABLE, 0, 0, name, value5) == -1) {
-        xmlFree(prefix);
-        xmlFree(name);
+    op = xmlXPathCompAdd(ctxt, XPATH_OP_VARIABLE);
+    if (op == NULL)
+        goto error;
+
+    if (xmlXPathCompOpSetQName(ctxt, &op->qname, name, prefix, nsUri) == 0) {
+        name = NULL;
+        prefix = NULL;
     }
+
     SKIP_BLANKS;
-    if (ctxt->comp->flags & XML_XPATH_NOVAR) {
-	XP_ERROR(XPATH_FORBID_VARIABLE_ERROR);
-    }
+
+error:
+    if (name != NULL)
+        xmlFree(name);
+    if (prefix != NULL)
+        xmlFree(prefix);
 }
 
 /**
@@ -8919,9 +9018,11 @@ xmlXPathIsNodeType(const xmlChar *name) {
  */
 static void
 xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
+    xmlXPathStepOpPtr op;
     xmlChar *name;
     xmlChar *prefix;
-    void *value5;
+    const xmlChar *nsUri = NULL;
+    xmlXPathFunction func = NULL;
     int nbargs = 0;
     int sort = 1;
 
@@ -8949,70 +9050,78 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
 	sort = 0;
     }
 
-    value5 = prefix;
-
     if ((prefix != NULL) &&
         ((ctxt->comp->flags & XML_XPATH_CHECKNS) ||
          (ctxt->comp->flags & XML_XPATH_COMPILE_NS) ||
          (ctxt->comp->flags & XML_XPATH_COMPILE_FUNC))) {
-        const xmlChar *nsUri;
-
         nsUri = xmlXPathNsLookup(ctxt->context, prefix);
         if (nsUri == NULL) {
             xmlXPathErr(ctxt, XPATH_UNDEF_PREFIX_ERROR);
         }
 
         if (ctxt->comp->flags & XML_XPATH_COMPILE_FUNC) {
-            value5 = (void *) xmlXPathFunctionLookupNS(ctxt->context,
-                                                       name, nsUri);
-            if (value5 == NULL)
+            func = xmlXPathFunctionLookupNS(ctxt->context, name, nsUri);
+            if (func == NULL)
                 xmlXPathErr(ctxt, XPATH_UNKNOWN_FUNC_ERROR);
-            xmlFree(prefix);
-            xmlFree(name);
-            prefix = NULL;
-            name = NULL;
-        } else if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
-            value5 = (xmlChar *) nsUri;
-            xmlFree(prefix);
-            prefix = NULL;
         }
+
+        if (ctxt->comp->flags & XML_XPATH_CHECKNS)
+            nsUri = NULL;
     } else if (ctxt->comp->flags & XML_XPATH_COMPILE_FUNC) {
-        value5 = (void *) xmlXPathFunctionLookupNS(ctxt->context, name, NULL);
-        if (value5 == NULL)
+        func = xmlXPathFunctionLookupNS(ctxt->context, name, NULL);
+        if (func == NULL)
             xmlXPathErr(ctxt, XPATH_UNKNOWN_FUNC_ERROR);
-        xmlFree(name);
-        name = NULL;
     }
 
-    ctxt->comp->last = -1;
-    if (CUR != ')') {
-	while (CUR != 0) {
-	    int op1 = ctxt->comp->last;
-	    ctxt->comp->last = -1;
+    if (CUR == ')') {
+        op = xmlXPathCompAdd(ctxt, XPATH_OP_FUNCTION);
+    } else {
+        int ch1 = -1;
+
+	while (1) {
 	    xmlXPathCompileExpr(ctxt, sort);
-	    if (ctxt->error != XPATH_EXPRESSION_OK) {
-		xmlFree(name);
-		xmlFree(prefix);
-		return;
-	    }
-	    PUSH_BINARY_EXPR(XPATH_OP_ARG, op1, ctxt->comp->last, 0, 0);
+	    if (ctxt->error != XPATH_EXPRESSION_OK)
+                goto error;
+
+            op = xmlXPathCompAddBinary(ctxt, XPATH_OP_ARG, ch1);
+
+            if (op == NULL)
+                goto error;
+            ch1 = ctxt->comp->last;
+
 	    nbargs++;
 	    if (CUR == ')') break;
 	    if (CUR != ',') {
-		xmlFree(name);
-		xmlFree(prefix);
-		XP_ERROR(XPATH_EXPR_ERROR);
+                xmlXPathErr(ctxt, XPATH_EXPR_ERROR);
+                goto error;
 	    }
 	    NEXT;
 	    SKIP_BLANKS;
 	}
+
+        op = xmlXPathCompAddUnary(ctxt, XPATH_OP_FUNCTION);
     }
-    if (PUSH_LONG_EXPR(XPATH_OP_FUNCTION, nbargs, 0, name, value5) == -1) {
-        xmlFree(prefix);
-        xmlFree(name);
+
+    if (op == NULL)
+        goto error;
+
+    op->as.func = func;
+    op->value = nbargs;
+
+    if (xmlXPathCompOpSetQName(ctxt, &op->qname, name, prefix, nsUri) == 0) {
+        name = NULL;
+        prefix = NULL;
     }
+
     NEXT;
     SKIP_BLANKS;
+
+error:
+    if (name != NULL)
+        xmlFree(name);
+    if (prefix != NULL)
+        xmlFree(prefix);
+    return;
 }
 
 /**
@@ -9237,20 +9346,24 @@ xmlXPathCompPathExpr(xmlXPathParserContextPtr ctxt) {
 
     if (lc) {
 	if (CUR == '/') {
-	    PUSH_LEAVE_EXPR(XPATH_OP_ROOT, 0, 0);
+	    xmlXPathCompAdd(ctxt, XPATH_OP_ROOT);
 	} else {
-	    PUSH_LEAVE_EXPR(XPATH_OP_NODE, 0, 0);
+	    xmlXPathCompAdd(ctxt, XPATH_OP_NODE);
 	}
 	xmlXPathCompLocationPath(ctxt);
     } else {
 	xmlXPathCompFilterExpr(ctxt);
 	CHECK_ERROR;
 	if ((CUR == '/') && (NXT(1) == '/')) {
+            xmlXPathStepOpPtr op;
+
 	    SKIP(2);
 	    SKIP_BLANKS;
 
-	    PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_DESCENDANT_OR_SELF,
-                           TYPE_MASK_NODE, NULL, NULL);
+            op = xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
+                                     AXIS_DESCENDANT_OR_SELF, TYPE_MASK_NODE);
+            if (op == NULL)
+                return;
 
 	    xmlXPathCompRelativeLocationPath(ctxt);
 	} else if (CUR == '/') {
@@ -9276,14 +9389,13 @@ xmlXPathCompUnionExpr(xmlXPathParserContextPtr ctxt) {
     CHECK_ERROR;
     SKIP_BLANKS;
     while (CUR == '|') {
-	int op1 = ctxt->comp->last;
-	PUSH_LEAVE_EXPR(XPATH_OP_NODE, 0, 0);
+	int ch1 = ctxt->comp->last;
 
 	NEXT;
 	SKIP_BLANKS;
 	xmlXPathCompPathExpr(ctxt);
 
-	PUSH_BINARY_EXPR(XPATH_OP_UNION, op1, ctxt->comp->last, 0, 0);
+        xmlXPathCompAddBinary(ctxt, XPATH_OP_UNION, ch1);
 
 	SKIP_BLANKS;
     }
@@ -9315,10 +9427,16 @@ xmlXPathCompUnaryExpr(xmlXPathParserContextPtr ctxt) {
     xmlXPathCompUnionExpr(ctxt);
     CHECK_ERROR;
     if (found) {
+        xmlXPathStepOpPtr op;
+
+        op = xmlXPathCompAddUnary(ctxt, XPATH_OP_PLUS);
+        if (op == NULL)
+            return;
+
 	if (minus)
-	    PUSH_UNARY_EXPR(XPATH_OP_PLUS, ctxt->comp->last, 2, 0);
+            op->value = 2;
 	else
-	    PUSH_UNARY_EXPR(XPATH_OP_PLUS, ctxt->comp->last, 3, 0);
+            op->value = 3;
     }
 }
 
@@ -9343,23 +9461,29 @@ xmlXPathCompMultiplicativeExpr(xmlXPathParserContextPtr ctxt) {
     while ((CUR == '*') ||
            ((CUR == 'd') && (NXT(1) == 'i') && (NXT(2) == 'v')) ||
            ((CUR == 'm') && (NXT(1) == 'o') && (NXT(2) == 'd'))) {
-	int op = -1;
-	int op1 = ctxt->comp->last;
+        xmlXPathStepOpPtr op;
+	int kind = -1;
+	int ch1 = ctxt->comp->last;
 
         if (CUR == '*') {
-	    op = 0;
+	    kind = 0;
 	    NEXT;
 	} else if (CUR == 'd') {
-	    op = 1;
+	    kind = 1;
 	    SKIP(3);
 	} else if (CUR == 'm') {
-	    op = 2;
+	    kind = 2;
 	    SKIP(3);
 	}
 	SKIP_BLANKS;
         xmlXPathCompUnaryExpr(ctxt);
 	CHECK_ERROR;
-	PUSH_BINARY_EXPR(XPATH_OP_MULT, op1, ctxt->comp->last, op, 0);
+
+        op = xmlXPathCompAddBinary(ctxt, XPATH_OP_MULT, ch1);
+        if (op == NULL)
+            return;
+        op->value = kind;
+
 	SKIP_BLANKS;
     }
 }
@@ -9382,8 +9506,9 @@ xmlXPathCompAdditiveExpr(xmlXPathParserContextPtr ctxt) {
     CHECK_ERROR;
     SKIP_BLANKS;
     while ((CUR == '+') || (CUR == '-')) {
+        xmlXPathStepOpPtr op;
 	int plus;
-	int op1 = ctxt->comp->last;
+	int ch1 = ctxt->comp->last;
 
         if (CUR == '+') plus = 1;
 	else plus = 0;
@@ -9391,7 +9516,12 @@ xmlXPathCompAdditiveExpr(xmlXPathParserContextPtr ctxt) {
 	SKIP_BLANKS;
         xmlXPathCompMultiplicativeExpr(ctxt);
 	CHECK_ERROR;
-	PUSH_BINARY_EXPR(XPATH_OP_PLUS, op1, ctxt->comp->last, plus, 0);
+
+        op = xmlXPathCompAddBinary(ctxt, XPATH_OP_PLUS, ch1);
+        if (op == NULL)
+            return;
+        op->value = plus;
+
 	SKIP_BLANKS;
     }
 }
@@ -9420,8 +9550,9 @@ xmlXPathCompRelationalExpr(xmlXPathParserContextPtr ctxt) {
     CHECK_ERROR;
     SKIP_BLANKS;
     while ((CUR == '<') || (CUR == '>')) {
+        xmlXPathStepOpPtr op;
 	int inf, strict;
-	int op1 = ctxt->comp->last;
+	int ch1 = ctxt->comp->last;
 
         if (CUR == '<') inf = 1;
 	else inf = 0;
@@ -9432,7 +9563,12 @@ xmlXPathCompRelationalExpr(xmlXPathParserContextPtr ctxt) {
 	SKIP_BLANKS;
         xmlXPathCompAdditiveExpr(ctxt);
 	CHECK_ERROR;
-	PUSH_BINARY_EXPR(XPATH_OP_CMP, op1, ctxt->comp->last, inf, strict);
+
+        op = xmlXPathCompAddBinary(ctxt, XPATH_OP_CMP, ch1);
+        if (op == NULL)
+            return;
+        op->value = inf | (strict << 1);
+
 	SKIP_BLANKS;
     }
 }
@@ -9459,8 +9595,9 @@ xmlXPathCompEqualityExpr(xmlXPathParserContextPtr ctxt) {
     CHECK_ERROR;
     SKIP_BLANKS;
     while ((CUR == '=') || ((CUR == '!') && (NXT(1) == '='))) {
+        xmlXPathStepOpPtr op;
 	int eq;
-	int op1 = ctxt->comp->last;
+	int ch1 = ctxt->comp->last;
 
         if (CUR == '=') eq = 1;
 	else eq = 0;
@@ -9469,7 +9606,12 @@ xmlXPathCompEqualityExpr(xmlXPathParserContextPtr ctxt) {
 	SKIP_BLANKS;
         xmlXPathCompRelationalExpr(ctxt);
 	CHECK_ERROR;
-	PUSH_BINARY_EXPR(XPATH_OP_EQUAL, op1, ctxt->comp->last, eq, 0);
+
+        op = xmlXPathCompAddBinary(ctxt, XPATH_OP_EQUAL, ch1);
+        if (op == NULL)
+            return;
+        op->value = eq;
+
 	SKIP_BLANKS;
     }
 }
@@ -9490,12 +9632,15 @@ xmlXPathCompAndExpr(xmlXPathParserContextPtr ctxt) {
     CHECK_ERROR;
     SKIP_BLANKS;
     while ((CUR == 'a') && (NXT(1) == 'n') && (NXT(2) == 'd')) {
-	int op1 = ctxt->comp->last;
+	int ch1 = ctxt->comp->last;
+
         SKIP(3);
 	SKIP_BLANKS;
         xmlXPathCompEqualityExpr(ctxt);
 	CHECK_ERROR;
-	PUSH_BINARY_EXPR(XPATH_OP_AND, op1, ctxt->comp->last, 0, 0);
+
+        xmlXPathCompAddBinary(ctxt, XPATH_OP_AND, ch1);
+
 	SKIP_BLANKS;
     }
 }
@@ -9528,12 +9673,18 @@ xmlXPathCompileExpr(xmlXPathParserContextPtr ctxt, int sort) {
     CHECK_ERROR;
     SKIP_BLANKS;
     while ((CUR == 'o') && (NXT(1) == 'r')) {
-	int op1 = ctxt->comp->last;
+        xmlXPathStepOpPtr op;
+	int ch1 = ctxt->comp->last;
+
         SKIP(2);
 	SKIP_BLANKS;
         xmlXPathCompAndExpr(ctxt);
 	CHECK_ERROR;
-	PUSH_BINARY_EXPR(XPATH_OP_OR, op1, ctxt->comp->last, 0, 0);
+
+        op = xmlXPathCompAddBinary(ctxt, XPATH_OP_OR, ch1);
+        if (op == NULL)
+            goto error;
+
 	SKIP_BLANKS;
     }
     if ((sort) && (ctxt->comp->steps[ctxt->comp->last].op != XPATH_OP_VALUE)) {
@@ -9543,9 +9694,11 @@ xmlXPathCompileExpr(xmlXPathParserContextPtr ctxt, int sort) {
 	* operations which don't require a sorted node-set.
 	* E.g. count().
 	*/
-	PUSH_UNARY_EXPR(XPATH_OP_SORT, ctxt->comp->last , 0, 0);
+
+        xmlXPathCompAddUnary(ctxt, XPATH_OP_SORT);
     }
 
+error:
     if (xpctxt != NULL)
         xpctxt->depth -= 10;
 }
@@ -9562,7 +9715,8 @@ xmlXPathCompileExpr(xmlXPathParserContextPtr ctxt, int sort) {
  */
 static void
 xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter) {
-    int op1 = ctxt->comp->last;
+    xmlXPathOp opval;
+    int ch1 = ctxt->comp->last;
 
     SKIP_BLANKS;
     if (CUR != '[') {
@@ -9592,9 +9746,11 @@ xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter) {
     }
 
     if (filter)
-	PUSH_BINARY_EXPR(XPATH_OP_FILTER, op1, ctxt->comp->last, 0, 0);
+        opval = XPATH_OP_FILTER;
     else
-	PUSH_BINARY_EXPR(XPATH_OP_PREDICATE, op1, ctxt->comp->last, 0, 0);
+        opval = XPATH_OP_PREDICATE;
+
+    xmlXPathCompAddBinary(ctxt, opval, ch1);
 
     NEXT;
     SKIP_BLANKS;
@@ -9823,18 +9979,19 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
     if ((CUR == '.') && (NXT(1) == '.')) {
 	SKIP(2);
 	SKIP_BLANKS;
-	PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_PARENT,
-                       TYPE_MASK_NODE, NULL, NULL);
+	xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
+                            AXIS_PARENT, TYPE_MASK_NODE);
     } else if (CUR == '.') {
 	NEXT;
 	SKIP_BLANKS;
     } else {
+        xmlXPathStepOpPtr op;
 	xmlChar *name = NULL;
 	xmlChar *prefix = NULL;
-        xmlChar *value5;
+        const xmlChar *nsUri = NULL;
 	xmlXPathAxisVal axis = (xmlXPathAxisVal) 0;
 	int type = 0;
-	int op1;
+	int ch1 = ctxt->comp->last;
 
 	if (CUR == '*') {
 	    axis = AXIS_CHILD;
@@ -9864,13 +10021,12 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 	    }
 	}
 
-        if (ctxt->error != XPATH_EXPRESSION_OK) {
-            xmlFree(name);
-            return;
-        }
+        if (ctxt->error != XPATH_EXPRESSION_OK)
+            goto error;
 
 	xmlXPathCompNodeTest(ctxt, &type, &prefix, &name);
-        CHECK_ERROR;
+        if (ctxt->error != XPATH_EXPRESSION_OK)
+            goto error;
 
         if (type == 0) {
             /* principal node type */
@@ -9883,26 +10039,18 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
                 type = TYPE_MASK_ELEM;
         }
 
-        value5 = prefix;
-
         if ((prefix != NULL) &&
 	    ((ctxt->comp->flags & XML_XPATH_CHECKNS) ||
              (ctxt->comp->flags & XML_XPATH_COMPILE_NS))) {
-            const xmlChar *nsUri;
-
 	    nsUri = xmlXPathNsLookup(ctxt->context, prefix);
             if (nsUri == NULL) {
 		xmlXPathErr(ctxt, XPATH_UNDEF_PREFIX_ERROR);
 	    }
 
-            if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
-                value5 = (xmlChar *) nsUri;
-                xmlFree(prefix);
-                prefix = NULL;
-            }
+            if (ctxt->comp->flags & XML_XPATH_CHECKNS)
+                nsUri = NULL;
 	}
 
-	op1 = ctxt->comp->last;
 	ctxt->comp->last = -1;
 
 	SKIP_BLANKS;
@@ -9910,11 +10058,19 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 	    xmlXPathCompPredicate(ctxt, 0);
 	}
 
-        if (PUSH_FULL_EXPR(XPATH_OP_COLLECT, op1, ctxt->comp->last, axis,
-                           type, name, value5) == -1) {
-            xmlFree(prefix);
-            xmlFree(name);
+        op = xmlXPathCompAddStep(ctxt, ch1, ctxt->comp->last, axis, type);
+        if (op == NULL)
+            goto error;
+        if ((name != NULL) &&
+            (xmlXPathCompOpSetQName(ctxt, &op->qname,
+                                   name, prefix, nsUri) == 0)) {
+            prefix = NULL;
+            name = NULL;
         }
+
+error:
+        xmlFree(prefix);
+        xmlFree(name);
     }
 }
 
@@ -9934,10 +10090,14 @@ xmlXPathCompRelativeLocationPath
 (xmlXPathParserContextPtr ctxt) {
     SKIP_BLANKS;
     if ((CUR == '/') && (NXT(1) == '/')) {
+        xmlXPathStepOpPtr op;
+
 	SKIP(2);
 	SKIP_BLANKS;
-	PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_DESCENDANT_OR_SELF,
-                       TYPE_MASK_NODE, NULL, NULL);
+	op = xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
+                                 AXIS_DESCENDANT_OR_SELF, TYPE_MASK_NODE);
+        if (op == NULL)
+            return;
     } else if (CUR == '/') {
 	    NEXT;
 	SKIP_BLANKS;
@@ -9947,10 +10107,16 @@ xmlXPathCompRelativeLocationPath
     SKIP_BLANKS;
     while (CUR == '/') {
 	if ((CUR == '/') && (NXT(1) == '/')) {
+            xmlXPathStepOpPtr op;
+
 	    SKIP(2);
 	    SKIP_BLANKS;
-	    PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_DESCENDANT_OR_SELF,
-                           TYPE_MASK_NODE, NULL, NULL);
+
+            op = xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
+                                     AXIS_DESCENDANT_OR_SELF, TYPE_MASK_NODE);
+            if (op == NULL)
+                return;
+
 	    xmlXPathCompStep(ctxt);
 	} else if (CUR == '/') {
 	    NEXT;
@@ -9990,10 +10156,17 @@ xmlXPathCompLocationPath(xmlXPathParserContextPtr ctxt) {
     } else {
 	while (CUR == '/') {
 	    if ((CUR == '/') && (NXT(1) == '/')) {
+                xmlXPathStepOpPtr op;
+
 		SKIP(2);
 		SKIP_BLANKS;
-		PUSH_LONG_EXPR(XPATH_OP_COLLECT, AXIS_DESCENDANT_OR_SELF,
-                               TYPE_MASK_NODE, NULL, NULL);
+
+                op = xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
+                                         AXIS_DESCENDANT_OR_SELF,
+                                         TYPE_MASK_NODE);
+                if (op == NULL)
+                    return;
+
 		xmlXPathCompRelativeLocationPath(ctxt);
 	    } else if (CUR == '/') {
 		NEXT;
@@ -10223,10 +10396,10 @@ xmlXPathIsPositionalPredicate(xmlXPathParserContextPtr ctxt,
 
     if ((exprOp != NULL) &&
 	(exprOp->op == XPATH_OP_VALUE) &&
-	(exprOp->value4 != NULL) &&
-	(((xmlXPathObjectPtr) exprOp->value4)->type == XPATH_NUMBER))
+	(exprOp->as.obj != NULL) &&
+	(exprOp->as.obj->type == XPATH_NUMBER))
     {
-        double floatval = ((xmlXPathObjectPtr) exprOp->value4)->floatval;
+        double floatval = exprOp->as.obj->floatval;
 
 	/*
 	* We have a "[n]" predicate here.
@@ -10254,10 +10427,9 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 			   xmlNodePtr * first, xmlNodePtr * last,
 			   int toBool)
 {
-    xmlXPathAxisVal axis = (xmlXPathAxisVal) op->value;
-    int typeMask = op->value2;
-    const xmlChar *value5 = op->value5;
-    const xmlChar *name = op->value4;
+    xmlXPathAxisVal axis = op->as.step.axis;
+    int typeMask = op->as.step.typeMask;
+    const xmlChar *name = op->qname.name;
     const xmlChar *URI = NULL;
 
     int total = 0, hasNsNodes = 0;
@@ -10292,11 +10464,11 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
     /*
     * Setup namespaces.
     */
-    if (value5 != NULL) {
+    if (name != NULL) {
         if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
-            URI = value5;
-        } else {
-            URI = xmlXPathNsLookup(xpctxt, value5);
+            URI = op->qname.ns.uri;
+        } else if (op->qname.ns.prefix != NULL) {
+            URI = xmlXPathNsLookup(xpctxt, op->qname.ns.prefix);
             if (URI == NULL) {
                 xmlXPathReleaseObject(xpctxt, obj);
                 XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
@@ -10793,7 +10965,7 @@ xmlXPathCompOpEvalFirst(xmlXPathParserContextPtr ctxt,
                 break;
             }
         case XPATH_OP_VALUE:
-            valuePush(ctxt, xmlXPathCacheObjectCopy(ctxt, op->value4));
+            valuePush(ctxt, xmlXPathCacheObjectCopy(ctxt, op->as.obj));
             break;
         case XPATH_OP_SORT:
             if (op->ch1 != -1)
@@ -10932,7 +11104,7 @@ xmlXPathCompOpEvalLast(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op,
                 break;
             }
         case XPATH_OP_VALUE:
-            valuePush(ctxt, xmlXPathCacheObjectCopy(ctxt, op->value4));
+            valuePush(ctxt, xmlXPathCacheObjectCopy(ctxt, op->as.obj));
             break;
         case XPATH_OP_SORT:
             if (op->ch1 != -1)
@@ -10977,11 +11149,11 @@ xmlXPathCompOpEvalFilterFirst(xmlXPathParserContextPtr ctxt,
 
 	if ((f != -1) &&
 	    (comp->steps[f].op == XPATH_OP_FUNCTION) &&
-	    (comp->steps[f].value5 == NULL) &&
 	    (comp->steps[f].value == 0) &&
-	    (comp->steps[f].value4 != NULL) &&
+	    (comp->steps[f].qname.ns.prefix == NULL) &&
+	    (comp->steps[f].qname.name != NULL) &&
 	    (xmlStrEqual
-	    (comp->steps[f].value4, BAD_CAST "last"))) {
+	    (comp->steps[f].qname.name, BAD_CAST "last"))) {
 	    xmlNodePtr last = NULL;
 
 	    total +=
@@ -11105,7 +11277,8 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
 	    CHECK_ERROR0;
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
 	    CHECK_ERROR0;
-            ret = xmlXPathCompareValues(ctxt, op->value, op->value2);
+            ret = xmlXPathCompareValues(ctxt, op->value & 1,
+                                        (op->value >> 1) & 1);
 	    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, ret));
             break;
         case XPATH_OP_PLUS:
@@ -11200,7 +11373,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                 break;
             }
         case XPATH_OP_VALUE:
-            valuePush(ctxt, xmlXPathCacheObjectCopy(ctxt, op->value4));
+            valuePush(ctxt, xmlXPathCacheObjectCopy(ctxt, op->as.obj));
             break;
         case XPATH_OP_VARIABLE:{
 		xmlXPathObjectPtr val;
@@ -11210,29 +11383,29 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                     total +=
                         xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
 
-                if (op->value5 != NULL) {
-                    if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
-                        URI = op->value5;
-                    } else {
-                        URI = xmlXPathNsLookup(ctxt->context, op->value5);
-                        if (URI == NULL) {
-                            XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
-                            break;
-                        }
+                if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
+                    URI = op->qname.ns.uri;
+                } else if (op->qname.ns.prefix != NULL) {
+                    URI = xmlXPathNsLookup(ctxt->context, op->qname.ns.prefix);
+                    if (URI == NULL) {
+                        XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
+                        break;
                     }
                 }
                 val = xmlXPathVariableLookupNS(ctxt->context,
-                                                   op->value4, URI);
+                                               op->qname.name, URI);
                 if (val == NULL)
                     XP_ERROR0(XPATH_UNDEF_VARIABLE_ERROR);
                 valuePush(ctxt, val);
                 break;
             }
         case XPATH_OP_FUNCTION:{
-                xmlXPathFunction func;
+                xmlXPathFunction func = NULL;
                 const xmlChar *oldFunc, *oldFuncURI;
 		int i;
                 int frame;
+                int nbArgs = op->value;
+                int flags = ctxt->comp->flags;
 
                 frame = ctxt->valueNr;
                 if (op->ch1 != -1) {
@@ -11241,45 +11414,50 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                     if (ctxt->error != XPATH_EXPRESSION_OK)
                         break;
                 }
-		if (ctxt->valueNr < frame + op->value)
+		if (ctxt->valueNr < frame + nbArgs)
 		    XP_ERROR0(XPATH_INVALID_OPERAND);
-		for (i = 0; i < op->value; i++) {
+		for (i = 0; i < nbArgs; i++) {
 		    if (ctxt->valueTab[(ctxt->valueNr - 1) - i] == NULL)
 			XP_ERROR0(XPATH_INVALID_OPERAND);
                 }
-                if (op->cache != NULL) {
-                    func = op->cache;
-                } else if (ctxt->comp->flags & XML_XPATH_COMPILE_FUNC) {
-                    func = (xmlXPathFunction) op->value5;
-                    if (func == NULL)
-                        XP_ERROR0(XPATH_UNKNOWN_FUNC_ERROR);
+                if (op->as.func != NULL) {
+                    func = op->as.func;
                 } else {
                     const xmlChar *URI = NULL;
 
-                    if (op->value5 != NULL) {
-                        if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
-                            URI = op->value5;
-                        } else {
-                            URI = xmlXPathNsLookup(ctxt->context, op->value5);
-                            if (URI == NULL)
-                                XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
-                        }
+                    if (flags & XML_XPATH_COMPILE_NS) {
+                        URI = op->qname.ns.uri;
+                    } else if (op->qname.ns.prefix != NULL) {
+                        URI = xmlXPathNsLookup(ctxt->context,
+                                               op->qname.ns.prefix);
+                        if (URI == NULL)
+                            XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
                     }
                     func = xmlXPathFunctionLookupNS(ctxt->context,
-                                                    op->value4, URI);
+                                                    op->qname.name, URI);
                     if (func == NULL)
                         XP_ERROR0(XPATH_UNKNOWN_FUNC_ERROR);
+
                     /*
                      * This modifies the compiled expression and isn't
                      * thread-safe.
                      */
-                    ((xmlXPathStepOpPtr) op)->cache = func;
-                    ((xmlXPathStepOpPtr) op)->cacheURI = (void *) URI;
+                    if (func != NULL) {
+                        xmlXPathStepOpPtr mutOp = (xmlXPathStepOpPtr) op;
+
+                        if ((comp->dict == NULL) &&
+                            ((flags & XML_XPATH_COMPILE_NS) == 0) &&
+                            (mutOp->qname.ns.prefix != NULL)) {
+                            xmlFree(mutOp->qname.ns.prefix);
+                        }
+                        mutOp->qname.ns.uri = URI;
+                        mutOp->as.func = func;
+                     }
                 }
                 oldFunc = ctxt->context->function;
                 oldFuncURI = ctxt->context->functionURI;
-                ctxt->context->function = op->value4;
-                ctxt->context->functionURI = op->cacheURI;
+                ctxt->context->function = op->qname.name;
+                ctxt->context->functionURI = op->qname.ns.uri;
                 func(ctxt, op->value);
                 ctxt->context->function = oldFunc;
                 ctxt->context->functionURI = oldFuncURI;
@@ -11325,7 +11503,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                     (comp->steps[op->ch2].op == XPATH_OP_VALUE)) { /* 12 */
                     xmlXPathObjectPtr val;
 
-                    val = comp->steps[op->ch2].value4;
+                    val = comp->steps[op->ch2].as.obj;
                     if ((val != NULL) && (val->type == XPATH_NUMBER) &&
                         (val->floatval == 1.0)) {
                         xmlNodePtr first = NULL;
@@ -11358,11 +11536,11 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
 
                     if ((f != -1) &&
                         (comp->steps[f].op == XPATH_OP_FUNCTION) &&
-                        (comp->steps[f].value5 == NULL) &&
                         (comp->steps[f].value == 0) &&
-                        (comp->steps[f].value4 != NULL) &&
+                        (comp->steps[f].qname.ns.prefix == NULL) &&
+                        (comp->steps[f].qname.name != NULL) &&
                         (xmlStrEqual
-                         (comp->steps[f].value4, BAD_CAST "last"))) {
+                         (comp->steps[f].qname.name, BAD_CAST "last"))) {
                         xmlNodePtr last = NULL;
 
                         total +=
@@ -11462,7 +11640,7 @@ start:
         case XPATH_OP_END:
             return (0);
 	case XPATH_OP_VALUE:
-	    resObj = (xmlXPathObjectPtr) op->value4;
+	    resObj = op->as.obj;
 	    if (isPredicate)
 		return(xmlXPathEvaluatePredicateResult(ctxt, resObj));
 	    return(xmlXPathCastToBoolean(resObj));
@@ -12033,17 +12211,16 @@ xmlXPathOptimizeExpression(xmlXPathParserContextPtr pctxt,
         xmlXPathStepOpPtr prevop = &comp->steps[op->ch1];
 
         if ((prevop->op == XPATH_OP_COLLECT /* 11 */) &&
-            ((xmlXPathAxisVal) prevop->value ==
-                AXIS_DESCENDANT_OR_SELF) &&
-            (prevop->ch2 == -1) &&
-            (prevop->value2 == TYPE_MASK_NODE))
+            (prevop->as.step.axis == AXIS_DESCENDANT_OR_SELF) &&
+            (prevop->as.step.typeMask == TYPE_MASK_NODE) &&
+            (prevop->ch2 == -1))
         {
             /*
             * This is a "descendant-or-self::node()" without predicates.
             * Try to eliminate it.
             */
 
-            switch ((xmlXPathAxisVal) op->value) {
+            switch (op->as.step.axis) {
                 case AXIS_CHILD:
                 case AXIS_DESCENDANT:
                     /*
@@ -12051,8 +12228,8 @@ xmlXPathOptimizeExpression(xmlXPathParserContextPtr pctxt,
                     * "descendant-or-self::node()/descendant::" to
                     * "descendant::"
                     */
-                    op->ch1   = prevop->ch1;
-                    op->value = AXIS_DESCENDANT;
+                    op->ch1 = prevop->ch1;
+                    op->as.step.axis = AXIS_DESCENDANT;
                     break;
                 case AXIS_SELF:
                 case AXIS_DESCENDANT_OR_SELF:
@@ -12061,8 +12238,8 @@ xmlXPathOptimizeExpression(xmlXPathParserContextPtr pctxt,
                     * "descendant-or-self::node()/descendant-or-self::" to
                     * to "descendant-or-self::"
                     */
-                    op->ch1   = prevop->ch1;
-                    op->value = AXIS_DESCENDANT_OR_SELF;
+                    op->ch1 = prevop->ch1;
+                    op->as.step.axis = AXIS_DESCENDANT_OR_SELF;
                     break;
                 default:
                     break;
