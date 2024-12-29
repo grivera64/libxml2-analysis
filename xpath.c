@@ -11737,7 +11737,6 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
             CHECK_ERROR0;
             break;
 
-        case XPATH_OP_PREDICATE:
         case XPATH_OP_FILTER: {
             xmlXPathObjectPtr obj;
             xmlNodeSetPtr set;
