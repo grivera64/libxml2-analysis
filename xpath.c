@@ -180,7 +180,11 @@ typedef enum {
     XPATH_OP_ARG,
     XPATH_OP_PREDICATE,
     XPATH_OP_FILTER,
-    XPATH_OP_SORT
+    XPATH_OP_SORT,
+
+    /* Compiled to XPATH_OP_VAR */
+    XPATH_OP_TRUE,
+    XPATH_OP_FALSE
 } xmlXPathOp;
 
 typedef struct _xmlXPathStandardFunction xmlXPathStandardFunction;
@@ -210,7 +214,8 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
     { "concat", xmlXPathConcatFunction, NULL, 0 },
     { "contains", xmlXPathContainsFunction, NULL, 0 },
     { "id", xmlXPathIdFunction, NULL, 0 },
-    { "false", xmlXPathFalseFunction, NULL, 0 },
+    { "false", xmlXPathFalseFunction,
+        xmlXPathTrueCompiler, XPATH_OP_FALSE },
     { "floor", xmlXPathFloorFunction, NULL, 0 },
     { "last", xmlXPathLastFunction, NULL, 0 },
     { "lang", xmlXPathLangFunction, NULL, 0 },
@@ -229,7 +234,8 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
     { "substring-before", xmlXPathSubstringBeforeFunction, NULL, 0 },
     { "substring-after", xmlXPathSubstringAfterFunction, NULL, 0 },
     { "sum", xmlXPathSumFunction, NULL, 0 },
-    { "true", xmlXPathTrueFunction, NULL, 0 },
+    { "true", xmlXPathTrueFunction,
+        xmlXPathTrueCompiler, XPATH_OP_TRUE },
     { "translate", xmlXPathTranslateFunction, NULL, 0 }
 };
 
@@ -9115,6 +9121,28 @@ xmlXPathIsNodeType(const xmlChar *name) {
     if (xmlStrEqual(name, BAD_CAST "processing-instruction"))
 	return(1);
     return(0);
+}
+
+static void
+xmlXPathTrueCompiler(xmlXPathParserContextPtr ctxt,
+                     const xmlXPathStandardFunction *sfunc, int nargs) {
+    xmlXPathStepOpPtr op;
+    xmlXPathObjectPtr lit;
+
+    if (nargs != 0)
+        XP_ERROR(XPATH_INVALID_ARITY);
+
+    lit = xmlXPathNewBoolean(sfunc->op == XPATH_OP_TRUE);
+    if (lit == NULL) {
+        xmlXPathPErrMemory(ctxt);
+        return;
+    }
+    op = xmlXPathCompAdd(ctxt, XPATH_OP_VALUE);
+    if (op == NULL) {
+        xmlXPathFreeObject(lit);
+        return;
+    }
+    op->as.obj = lit;
 }
 
 /**
