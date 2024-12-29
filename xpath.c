@@ -8067,6 +8067,17 @@ error:
     xmlXPathReleaseObject(ctxt->context, to);
 }
 
+static void
+xmlXPathBooleanFuncInternal(xmlXPathParserContextPtr ctxt) {
+    xmlXPathObjectPtr cur;
+    int boolval;
+
+    cur = valuePop(ctxt);
+    boolval = xmlXPathCastToBoolean(cur);
+    xmlXPathReleaseObject(ctxt->context, cur);
+    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, boolval));
+}
+
 /**
  * xmlXPathBooleanFunction:
  * @ctxt:  the XPath Parser context
@@ -8082,18 +8093,11 @@ error:
  */
 void
 xmlXPathBooleanFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr cur;
-
     CHECK_ARITY(1);
-    cur = valuePop(ctxt);
-    if (cur == NULL) XP_ERROR(XPATH_INVALID_OPERAND);
-    if (cur->type != XPATH_BOOLEAN) {
-        int boolval = xmlXPathCastToBoolean(cur);
-
-        xmlXPathReleaseObject(ctxt->context, cur);
-        cur = xmlXPathCacheNewBoolean(ctxt, boolval);
-    }
-    valuePush(ctxt, cur);
+    if (ctxt->value == NULL)
+        XP_ERROR(XPATH_STACK_ERROR);
+    if (ctxt->value->type != XPATH_BOOLEAN)
+        xmlXPathBooleanFuncInternal(ctxt);
 }
 
 /**
@@ -8109,9 +8113,14 @@ xmlXPathBooleanFunction(xmlXPathParserContextPtr ctxt, int nargs) {
 void
 xmlXPathNotFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     CHECK_ARITY(1);
-    CAST_TO_BOOLEAN;
-    CHECK_TYPE(XPATH_BOOLEAN);
-    ctxt->value->boolval = ! ctxt->value->boolval;
+    if (ctxt->value == NULL)
+        XP_ERROR(XPATH_STACK_ERROR);
+    if (ctxt->value->type != XPATH_BOOLEAN) {
+        xmlXPathBooleanFuncInternal(ctxt);
+        CHECK_ERROR;
+    }
+    if (ctxt->value != NULL)
+        ctxt->value->boolval = !ctxt->value->boolval;
 }
 
 /**
@@ -11277,40 +11286,43 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
     switch (op->op) {
         case XPATH_OP_END:
             break;
+
         case XPATH_OP_AND:
+        case XPATH_OP_OR: {
+            int breakVal = (op->op == XPATH_OP_OR);
+
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-	    CHECK_ERROR0;
-            xmlXPathBooleanFunction(ctxt, 1);
-            if ((ctxt->value == NULL) || (ctxt->value->boolval == 0))
-                break;
-            arg2 = valuePop(ctxt);
+            CHECK_ERROR0;
+            if (ctxt->value == NULL)
+                XP_ERROR0(XPATH_STACK_ERROR);
+            if (ctxt->value->type == XPATH_BOOLEAN) {
+                if (ctxt->value->boolval == breakVal)
+                    break;
+
+                arg2 = valuePop(ctxt);
+                xmlXPathReleaseObject(ctxt->context, arg2);
+            } else {
+                int boolval;
+
+                arg2 = valuePop(ctxt);
+                boolval = xmlXPathCastToBoolean(arg2);
+                xmlXPathReleaseObject(ctxt->context, arg2);
+
+                if (boolval == breakVal) {
+                    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, breakVal));
+                    break;
+                }
+            }
+
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
-	    if (ctxt->error) {
-		xmlXPathFreeObject(arg2);
-		break;
-	    }
-            xmlXPathBooleanFunction(ctxt, 1);
-            if (ctxt->value != NULL)
-                ctxt->value->boolval &= arg2->boolval;
-	    xmlXPathReleaseObject(ctxt->context, arg2);
+            CHECK_ERROR0;
+            if (ctxt->value == NULL)
+                XP_ERROR0(XPATH_STACK_ERROR);
+            if (ctxt->value->type != XPATH_BOOLEAN)
+                xmlXPathBooleanFuncInternal(ctxt);
             break;
-        case XPATH_OP_OR:
-            total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-	    CHECK_ERROR0;
-            xmlXPathBooleanFunction(ctxt, 1);
-            if ((ctxt->value == NULL) || (ctxt->value->boolval == 1))
-                break;
-            arg2 = valuePop(ctxt);
-            total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
-	    if (ctxt->error) {
-		xmlXPathFreeObject(arg2);
-		break;
-	    }
-            xmlXPathBooleanFunction(ctxt, 1);
-            if (ctxt->value != NULL)
-                ctxt->value->boolval |= arg2->boolval;
-	    xmlXPathReleaseObject(ctxt->context, arg2);
-            break;
+        }
+
         case XPATH_OP_EQUAL:
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
 	    CHECK_ERROR0;
