@@ -813,6 +813,8 @@ xmlXPathErr(xmlXPathParserContextPtr ctxt, int code)
  * @line:  the line number
  * @no:  the error number
  *
+ * DEPRECATED: Use xmlXPathErr.
+ *
  * Formats an error message.
  */
 void
@@ -12371,7 +12373,7 @@ xmlXPathCtxtCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
 	 * However, we are not sure that all error messages are printed
 	 * out in other places. It's not critical so we leave it as-is for now
 	 */
-	xmlXPatherror(pctxt, __FILE__, __LINE__, XPATH_EXPR_ERROR);
+	xmlXPathErr(pctxt, XPATH_EXPR_ERROR);
 	comp = NULL;
     } else {
 	comp = pctxt->comp;

@@ -39,9 +39,7 @@ extern "C" {
  *
  * Raises an error.
  */
-#define xmlXPathSetError(ctxt, err)					\
-    { xmlXPatherror((ctxt), __FILE__, __LINE__, (err));			\
-      if ((ctxt) != NULL) (ctxt)->error = (err); }
+#define xmlXPathSetError(ctxt, err) xmlXPathErr(ctxt, err);
 
 /**
  * xmlXPathSetArityError:
