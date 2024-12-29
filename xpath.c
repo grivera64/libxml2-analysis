@@ -11634,23 +11634,15 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
         case XPATH_OP_FUNCTION: {
             xmlXPathFunction func = NULL;
             const xmlChar *oldFunc, *oldFuncURI;
-            int i;
             int frame;
-            int nbArgs = op->nbArgs;
             int flags = ctxt->comp->flags;
 
             frame = ctxt->valueNr;
             if (op->ch1 != -1) {
                 total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-                if (ctxt->error != XPATH_EXPRESSION_OK)
-                    break;
+                CHECK_ERROR0;
             }
-            if (ctxt->valueNr < frame + nbArgs)
-                XP_ERROR0(XPATH_INVALID_OPERAND);
-            for (i = 0; i < nbArgs; i++) {
-                if (ctxt->valueTab[(ctxt->valueNr - 1) - i] == NULL)
-                    XP_ERROR0(XPATH_INVALID_OPERAND);
-            }
+
             if (op->as.func != NULL) {
                 func = op->as.func;
             } else {
@@ -11684,6 +11676,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                     mutOp->as.func = func;
                  }
             }
+
             oldFunc = ctxt->context->function;
             oldFuncURI = ctxt->context->functionURI;
             ctxt->context->function = op->qname.name;
@@ -11691,9 +11684,11 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
             func(ctxt, op->nbArgs);
             ctxt->context->function = oldFunc;
             ctxt->context->functionURI = oldFuncURI;
+
             if ((ctxt->error == XPATH_EXPRESSION_OK) &&
                 (ctxt->valueNr != frame + 1))
                 XP_ERROR0(XPATH_STACK_ERROR);
+
             break;
         }
 
