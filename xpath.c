@@ -866,18 +866,23 @@ typedef enum {
     XPATH_OP_EQUAL,
     XPATH_OP_CMP,
     XPATH_OP_PLUS,
+    XPATH_OP_NEG,
+    XPATH_OP_ADD,
+    XPATH_OP_SUB,
     XPATH_OP_MULT,
+    XPATH_OP_DIV,
+    XPATH_OP_MOD,
     XPATH_OP_UNION,
     XPATH_OP_ROOT,
     XPATH_OP_NODE,
     XPATH_OP_COLLECT,
-    XPATH_OP_VALUE, /* 11 */
+    XPATH_OP_VALUE,
     XPATH_OP_VARIABLE,
     XPATH_OP_FUNCTION,
     XPATH_OP_ARG,
     XPATH_OP_PREDICATE,
-    XPATH_OP_FILTER, /* 16 */
-    XPATH_OP_SORT /* 17 */
+    XPATH_OP_FILTER,
+    XPATH_OP_SORT
 } xmlXPathOp;
 
 typedef enum {
@@ -1438,23 +1443,26 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 		 fprintf(output, "=");
 	     break;
         case XPATH_OP_PLUS:
-	     if (op->value == 0)
-		 fprintf(output, "PLUS -");
-	     else if (op->value == 1)
-		 fprintf(output, "PLUS +");
-	     else if (op->value == 2)
-		 fprintf(output, "PLUS unary -");
-	     else if (op->value == 3)
-		 fprintf(output, "PLUS unary - -");
-	     break;
+	    fprintf(output, "PLUS");
+	    break;
+        case XPATH_OP_NEG:
+	    fprintf(output, "NEG");
+	    break;
+        case XPATH_OP_ADD:
+	    fprintf(output, "ADD");
+	    break;
+        case XPATH_OP_SUB:
+	    fprintf(output, "SUB");
+	    break;
         case XPATH_OP_MULT:
-	     if (op->value == 0)
-		 fprintf(output, "MULT *");
-	     else if (op->value == 1)
-		 fprintf(output, "MULT div");
-	     else
-		 fprintf(output, "MULT mod");
-	     break;
+	    fprintf(output, "MULT");
+	    break;
+        case XPATH_OP_DIV:
+	    fprintf(output, "DIV");
+	    break;
+        case XPATH_OP_MOD:
+	    fprintf(output, "MOD");
+	    break;
         case XPATH_OP_UNION:
 	     fprintf(output, "UNION"); break;
         case XPATH_OP_ROOT:
@@ -9503,15 +9511,16 @@ xmlXPathCompUnaryExpr(xmlXPathParserContextPtr ctxt) {
     CHECK_ERROR;
     if (found) {
         xmlXPathStepOpPtr op;
+        xmlXPathOp opval;
 
-        op = xmlXPathCompAddUnary(ctxt, XPATH_OP_PLUS);
+        if (minus)
+            opval = XPATH_OP_NEG;
+        else
+            opval = XPATH_OP_PLUS;
+
+        op = xmlXPathCompAddUnary(ctxt, opval);
         if (op == NULL)
             return;
-
-	if (minus)
-            op->value = 2;
-	else
-            op->value = 3;
     }
 }
 
@@ -9537,27 +9546,26 @@ xmlXPathCompMultiplicativeExpr(xmlXPathParserContextPtr ctxt) {
            ((CUR == 'd') && (NXT(1) == 'i') && (NXT(2) == 'v')) ||
            ((CUR == 'm') && (NXT(1) == 'o') && (NXT(2) == 'd'))) {
         xmlXPathStepOpPtr op;
-	int kind = -1;
+        xmlXPathOp opval;
 	int ch1 = ctxt->comp->last;
 
         if (CUR == '*') {
-	    kind = 0;
+	    opval = XPATH_OP_MULT;
 	    NEXT;
 	} else if (CUR == 'd') {
-	    kind = 1;
+	    opval = XPATH_OP_DIV;
 	    SKIP(3);
-	} else if (CUR == 'm') {
-	    kind = 2;
+	} else {
+	    opval = XPATH_OP_MOD;
 	    SKIP(3);
 	}
 	SKIP_BLANKS;
         xmlXPathCompUnaryExpr(ctxt);
 	CHECK_ERROR;
 
-        op = xmlXPathCompAddBinary(ctxt, XPATH_OP_MULT, ch1);
+        op = xmlXPathCompAddBinary(ctxt, opval, ch1);
         if (op == NULL)
             return;
-        op->value = kind;
 
 	SKIP_BLANKS;
     }
@@ -9582,20 +9590,19 @@ xmlXPathCompAdditiveExpr(xmlXPathParserContextPtr ctxt) {
     SKIP_BLANKS;
     while ((CUR == '+') || (CUR == '-')) {
         xmlXPathStepOpPtr op;
-	int plus;
+        xmlXPathOp opval;
 	int ch1 = ctxt->comp->last;
 
-        if (CUR == '+') plus = 1;
-	else plus = 0;
+        if (CUR == '+') opval = XPATH_OP_ADD;
+	else opval = XPATH_OP_SUB;
 	NEXT;
 	SKIP_BLANKS;
         xmlXPathCompMultiplicativeExpr(ctxt);
 	CHECK_ERROR;
 
-        op = xmlXPathCompAddBinary(ctxt, XPATH_OP_PLUS, ch1);
+        op = xmlXPathCompAddBinary(ctxt, opval, ch1);
         if (op == NULL)
             return;
-        op->value = plus;
 
 	SKIP_BLANKS;
     }
@@ -11348,36 +11355,66 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                                         (op->value >> 1) & 1);
 	    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, ret));
             break;
+
         case XPATH_OP_PLUS:
+        case XPATH_OP_NEG:
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-	    CHECK_ERROR0;
-            if (op->ch2 != -1) {
-                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
-	    }
-	    CHECK_ERROR0;
-            if (op->value == 0)
-                xmlXPathSubValues(ctxt);
-            else if (op->value == 1)
-                xmlXPathAddValues(ctxt);
-            else if (op->value == 2)
-                xmlXPathValueFlipSign(ctxt);
-            else if (op->value == 3) {
-                CAST_TO_NUMBER;
-                CHECK_TYPE0(XPATH_NUMBER);
-            }
+            CHECK_ERROR0;
+
+            /* Convert arg 1 to number */
+            if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER))
+                xmlXPathNumberFuncInternal(ctxt);
+            CHECK_ERROR0;
+
+            if (op->op == XPATH_OP_NEG)
+                ctxt->value->floatval = -ctxt->value->floatval;
+
             break;
+
+        case XPATH_OP_ADD:
+        case XPATH_OP_SUB:
         case XPATH_OP_MULT:
+        case XPATH_OP_DIV:
+        case XPATH_OP_MOD: {
+            double val2 = 0.0;
+
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-	    CHECK_ERROR0;
+            CHECK_ERROR0;
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
-	    CHECK_ERROR0;
-            if (op->value == 0)
-                xmlXPathMultValues(ctxt);
-            else if (op->value == 1)
-                xmlXPathDivValues(ctxt);
-            else if (op->value == 2)
-                xmlXPathModValues(ctxt);
+            CHECK_ERROR0;
+
+            /* Pop arg 2 */
+            val2 = xmlXPathPopNumber(ctxt);
+            /* Convert arg 1 to number */
+            if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER))
+                xmlXPathNumberFuncInternal(ctxt);
+            CHECK_ERROR0;
+
+            arg1 = ctxt->value;
+
+            switch (op->op) {
+                case XPATH_OP_ADD:
+                    arg1->floatval += val2;
+                    break;
+                case XPATH_OP_SUB:
+                    arg1->floatval -= val2;
+                    break;
+                case XPATH_OP_MULT:
+                    arg1->floatval *= val2;
+                    break;
+                case XPATH_OP_DIV:
+                    arg1->floatval /= val2;
+                    break;
+                case XPATH_OP_MOD:
+                    arg1->floatval = fmod(arg1->floatval, val2);
+                    break;
+                default:
+                    break;
+            }
+
             break;
+        }
+
         case XPATH_OP_UNION:
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
 	    CHECK_ERROR0;
