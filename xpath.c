@@ -11130,24 +11130,18 @@ xmlXPathCompOpEvalFirst(xmlXPathParserContextPtr ctxt,
 	    valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt,
                     ctxt->context->node));
             break;
-        case XPATH_OP_COLLECT:{
-                if (op->ch1 == -1)
-                    break;
+        case XPATH_OP_COLLECT:
+            total = xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
+            CHECK_ERROR0;
 
-                total = xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-		CHECK_ERROR0;
-
-                total += xmlXPathNodeCollectAndTest(ctxt, op, first, NULL, 0);
-                break;
-            }
+            total += xmlXPathNodeCollectAndTest(ctxt, op, first, NULL, 0);
+            break;
         case XPATH_OP_VALUE:
             valuePush(ctxt, xmlXPathCacheObjectCopy(ctxt, op->as.obj));
             break;
         case XPATH_OP_SORT:
-            if (op->ch1 != -1)
-                total +=
-                    xmlXPathCompOpEvalFirst(ctxt, &comp->steps[op->ch1],
-                                            first);
+            total += xmlXPathCompOpEvalFirst(ctxt, &comp->steps[op->ch1],
+                                             first);
 	    CHECK_ERROR0;
             if ((ctxt->value != NULL)
                 && (ctxt->value->type == XPATH_NODESET)
@@ -11264,24 +11258,18 @@ xmlXPathCompOpEvalLast(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op,
 	    valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt,
                     ctxt->context->node));
             break;
-        case XPATH_OP_COLLECT:{
-                if (op->ch1 == -1)
-                    break;
+        case XPATH_OP_COLLECT:
+            total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
+            CHECK_ERROR0;
 
-                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-		CHECK_ERROR0;
-
-                total += xmlXPathNodeCollectAndTest(ctxt, op, NULL, last, 0);
-                break;
-            }
+            total += xmlXPathNodeCollectAndTest(ctxt, op, NULL, last, 0);
+            break;
         case XPATH_OP_VALUE:
             valuePush(ctxt, xmlXPathCacheObjectCopy(ctxt, op->as.obj));
             break;
         case XPATH_OP_SORT:
-            if (op->ch1 != -1)
-                total +=
-                    xmlXPathCompOpEvalLast(ctxt, &comp->steps[op->ch1],
-                                           last);
+            total += xmlXPathCompOpEvalLast(ctxt, &comp->steps[op->ch1],
+                                            last);
 	    CHECK_ERROR0;
             if ((ctxt->value != NULL)
                 && (ctxt->value->type == XPATH_NODESET)
@@ -11607,26 +11595,19 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                     ctxt->context->node));
             break;
 
-        case XPATH_OP_COLLECT:{
-                if (op->ch1 == -1)
-                    break;
+        case XPATH_OP_COLLECT:
+            total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
+            CHECK_ERROR0;
 
-                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-		CHECK_ERROR0;
+            total += xmlXPathNodeCollectAndTest(ctxt, op, NULL, NULL, 0);
+            break;
 
-                total += xmlXPathNodeCollectAndTest(ctxt, op, NULL, NULL, 0);
-                break;
-            }
         case XPATH_OP_VALUE:
             valuePush(ctxt, xmlXPathCacheObjectCopy(ctxt, op->as.obj));
             break;
         case XPATH_OP_VARIABLE:{
 		xmlXPathObjectPtr val;
                 const xmlChar *URI = NULL;
-
-                if (op->ch1 != -1)
-                    total +=
-                        xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
 
                 if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
                     URI = op->qname.ns.uri;
@@ -11713,13 +11694,13 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
             }
         case XPATH_OP_ARG:
             if (op->ch1 != -1) {
+                /* next arg */
                 total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
 	        CHECK_ERROR0;
             }
-            if (op->ch2 != -1) {
-                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
-	        CHECK_ERROR0;
-	    }
+            /* arg */
+            total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
+            CHECK_ERROR0;
             break;
         case XPATH_OP_PREDICATE:
         case XPATH_OP_FILTER:{
@@ -11729,7 +11710,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                 /*
                  * Optimization for ()[1] selection i.e. the first elem
                  */
-                if ((op->ch1 != -1) && (op->ch2 != -1) &&
+                if (
 #ifdef XP_OPTIMIZED_FILTER_FIRST
 		    /*
 		    * FILTER TODO: Can we assume that the inner processing
@@ -11774,8 +11755,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                 /*
                  * Optimization for ()[last()] selection i.e. the last elem
                  */
-                if ((op->ch1 != -1) && (op->ch2 != -1) &&
-                    (comp->steps[op->ch1].op == XPATH_OP_SORT) &&
+                if ((comp->steps[op->ch1].op == XPATH_OP_SORT) &&
                     (comp->steps[op->ch2].op == XPATH_OP_SORT)) {
                     int f = comp->steps[op->ch2].ch1;
 
@@ -11817,12 +11797,8 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
 		*           NODE
 		*     ELEM Object is a number : 1
 		*/
-                if (op->ch1 != -1)
-                    total +=
-                        xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
+                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
 		CHECK_ERROR0;
-                if (op->ch2 == -1)
-                    break;
                 if (ctxt->value == NULL)
                     break;
 
@@ -11842,8 +11818,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                 break;
             }
         case XPATH_OP_SORT:
-            if (op->ch1 != -1)
-                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
+            total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
 	    CHECK_ERROR0;
             if ((ctxt->value != NULL) &&
                 (ctxt->value->type == XPATH_NODESET) &&
@@ -11893,15 +11868,9 @@ start:
 	    /*
 	    * We don't need sorting for boolean results. Skip this one.
 	    */
-            if (op->ch1 != -1) {
-		op = &ctxt->comp->steps[op->ch1];
-		goto start;
-	    }
-	    return(0);
+            op = &ctxt->comp->steps[op->ch1];
+            goto start;
 	case XPATH_OP_COLLECT:
-	    if (op->ch1 == -1)
-		return(0);
-
             xmlXPathCompOpEval(ctxt, &ctxt->comp->steps[op->ch1]);
 	    if (ctxt->error != XPATH_EXPRESSION_OK)
 		return(-1);
