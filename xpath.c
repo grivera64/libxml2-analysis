@@ -5176,6 +5176,28 @@ xmlXPathFreeParserContext(xmlXPathParserContextPtr ctxt) {
  *									*
  ************************************************************************/
 
+static void
+xmlXPathBooleanFuncInternal(xmlXPathParserContextPtr ctxt) {
+    xmlXPathObjectPtr cur;
+    int boolval;
+
+    cur = valuePop(ctxt);
+    boolval = xmlXPathCastToBoolean(cur);
+    xmlXPathReleaseObject(ctxt->context, cur);
+    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, boolval));
+}
+
+static void
+xmlXPathNumberFuncInternal(xmlXPathParserContextPtr ctxt) {
+    xmlXPathObjectPtr cur;
+    double floatval;
+
+    cur = valuePop(ctxt);
+    floatval = xmlXPathCastToNumberInternal(ctxt, cur);
+    xmlXPathReleaseObject(ctxt->context, cur);
+    valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, floatval));
+}
+
 /**
  * xmlXPathNodeValHash:
  * @node:  a node pointer
@@ -5901,8 +5923,13 @@ error:
 void
 xmlXPathValueFlipSign(xmlXPathParserContextPtr ctxt) {
     if ((ctxt == NULL) || (ctxt->context == NULL)) return;
-    CAST_TO_NUMBER;
-    CHECK_TYPE(XPATH_NUMBER);
+
+    if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER)) {
+        xmlXPathNumberFuncInternal(ctxt);
+        if (ctxt->error)
+            return;
+    }
+
     ctxt->value->floatval = -ctxt->value->floatval;
 }
 
@@ -5916,16 +5943,19 @@ xmlXPathValueFlipSign(xmlXPathParserContextPtr ctxt) {
  */
 void
 xmlXPathAddValues(xmlXPathParserContextPtr ctxt) {
-    xmlXPathObjectPtr arg;
     double val;
 
-    arg = valuePop(ctxt);
-    if (arg == NULL)
-	XP_ERROR(XPATH_INVALID_OPERAND);
-    val = xmlXPathCastToNumberInternal(ctxt, arg);
-    xmlXPathReleaseObject(ctxt->context, arg);
-    CAST_TO_NUMBER;
-    CHECK_TYPE(XPATH_NUMBER);
+    if (ctxt == NULL)
+        return;
+
+    val = xmlXPathPopNumber(ctxt);
+
+    if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER)) {
+        xmlXPathNumberFuncInternal(ctxt);
+        if (ctxt->error)
+            return;
+    }
+
     ctxt->value->floatval += val;
 }
 
@@ -5939,16 +5969,19 @@ xmlXPathAddValues(xmlXPathParserContextPtr ctxt) {
  */
 void
 xmlXPathSubValues(xmlXPathParserContextPtr ctxt) {
-    xmlXPathObjectPtr arg;
     double val;
 
-    arg = valuePop(ctxt);
-    if (arg == NULL)
-	XP_ERROR(XPATH_INVALID_OPERAND);
-    val = xmlXPathCastToNumberInternal(ctxt, arg);
-    xmlXPathReleaseObject(ctxt->context, arg);
-    CAST_TO_NUMBER;
-    CHECK_TYPE(XPATH_NUMBER);
+    if (ctxt == NULL)
+        return;
+
+    val = xmlXPathPopNumber(ctxt);
+
+    if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER)) {
+        xmlXPathNumberFuncInternal(ctxt);
+        if (ctxt->error)
+            return;
+    }
+
     ctxt->value->floatval -= val;
 }
 
@@ -5962,16 +5995,19 @@ xmlXPathSubValues(xmlXPathParserContextPtr ctxt) {
  */
 void
 xmlXPathMultValues(xmlXPathParserContextPtr ctxt) {
-    xmlXPathObjectPtr arg;
     double val;
 
-    arg = valuePop(ctxt);
-    if (arg == NULL)
-	XP_ERROR(XPATH_INVALID_OPERAND);
-    val = xmlXPathCastToNumberInternal(ctxt, arg);
-    xmlXPathReleaseObject(ctxt->context, arg);
-    CAST_TO_NUMBER;
-    CHECK_TYPE(XPATH_NUMBER);
+    if (ctxt == NULL)
+        return;
+
+    val = xmlXPathPopNumber(ctxt);
+
+    if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER)) {
+        xmlXPathNumberFuncInternal(ctxt);
+        if (ctxt->error)
+            return;
+    }
+
     ctxt->value->floatval *= val;
 }
 
@@ -5986,16 +6022,19 @@ xmlXPathMultValues(xmlXPathParserContextPtr ctxt) {
 ATTRIBUTE_NO_SANITIZE("float-divide-by-zero")
 void
 xmlXPathDivValues(xmlXPathParserContextPtr ctxt) {
-    xmlXPathObjectPtr arg;
     double val;
 
-    arg = valuePop(ctxt);
-    if (arg == NULL)
-	XP_ERROR(XPATH_INVALID_OPERAND);
-    val = xmlXPathCastToNumberInternal(ctxt, arg);
-    xmlXPathReleaseObject(ctxt->context, arg);
-    CAST_TO_NUMBER;
-    CHECK_TYPE(XPATH_NUMBER);
+    if (ctxt == NULL)
+        return;
+
+    val = xmlXPathPopNumber(ctxt);
+
+    if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER)) {
+        xmlXPathNumberFuncInternal(ctxt);
+        if (ctxt->error)
+            return;
+    }
+
     ctxt->value->floatval /= val;
 }
 
@@ -6009,22 +6048,20 @@ xmlXPathDivValues(xmlXPathParserContextPtr ctxt) {
  */
 void
 xmlXPathModValues(xmlXPathParserContextPtr ctxt) {
-    xmlXPathObjectPtr arg;
-    double arg1, arg2;
+    double val;
 
-    arg = valuePop(ctxt);
-    if (arg == NULL)
-	XP_ERROR(XPATH_INVALID_OPERAND);
-    arg2 = xmlXPathCastToNumberInternal(ctxt, arg);
-    xmlXPathReleaseObject(ctxt->context, arg);
-    CAST_TO_NUMBER;
-    CHECK_TYPE(XPATH_NUMBER);
-    arg1 = ctxt->value->floatval;
-    if (arg2 == 0)
-	ctxt->value->floatval = xmlXPathNAN;
-    else {
-	ctxt->value->floatval = fmod(arg1, arg2);
+    if (ctxt == NULL)
+        return;
+
+    val = xmlXPathPopNumber(ctxt);
+
+    if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER)) {
+        xmlXPathNumberFuncInternal(ctxt);
+        if (ctxt->error)
+            return;
     }
+
+    ctxt->value->floatval = fmod(ctxt->value->floatval, val);
 }
 
 /************************************************************************
@@ -8046,17 +8083,6 @@ error:
     xmlFree(to);
 }
 
-static void
-xmlXPathBooleanFuncInternal(xmlXPathParserContextPtr ctxt) {
-    xmlXPathObjectPtr cur;
-    int boolval;
-
-    cur = valuePop(ctxt);
-    boolval = xmlXPathCastToBoolean(cur);
-    xmlXPathReleaseObject(ctxt->context, cur);
-    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, boolval));
-}
-
 /**
  * xmlXPathBooleanFunction:
  * @ctxt:  the XPath Parser context
@@ -8198,7 +8224,6 @@ not_equal:
  */
 void
 xmlXPathNumberFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr cur;
     double res;
 
     if (ctxt == NULL) return;
@@ -8218,15 +8243,8 @@ xmlXPathNumberFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     }
 
     CHECK_ARITY(1);
-    cur = valuePop(ctxt);
-    if (cur->type != XPATH_NUMBER) {
-        double floatval;
-
-        floatval = xmlXPathCastToNumberInternal(ctxt, cur);
-        xmlXPathReleaseObject(ctxt->context, cur);
-        cur = xmlXPathCacheNewFloat(ctxt, floatval);
-    }
-    valuePush(ctxt, cur);
+    if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER))
+        xmlXPathNumberFuncInternal(ctxt);
 }
 
 /**
@@ -8275,8 +8293,12 @@ xmlXPathSumFunction(xmlXPathParserContextPtr ctxt, int nargs) {
 void
 xmlXPathFloorFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     CHECK_ARITY(1);
-    CAST_TO_NUMBER;
-    CHECK_TYPE(XPATH_NUMBER);
+
+    if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER)) {
+        xmlXPathNumberFuncInternal(ctxt);
+        if (ctxt->error)
+            return;
+    }
 
     ctxt->value->floatval = floor(ctxt->value->floatval);
 }
@@ -8294,8 +8316,12 @@ xmlXPathFloorFunction(xmlXPathParserContextPtr ctxt, int nargs) {
 void
 xmlXPathCeilingFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     CHECK_ARITY(1);
-    CAST_TO_NUMBER;
-    CHECK_TYPE(XPATH_NUMBER);
+
+    if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER)) {
+        xmlXPathNumberFuncInternal(ctxt);
+        if (ctxt->error)
+            return;
+    }
 
 #ifdef _AIX
     /* Work around buggy ceil() function on AIX */
@@ -8321,8 +8347,12 @@ xmlXPathRoundFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     double f;
 
     CHECK_ARITY(1);
-    CAST_TO_NUMBER;
-    CHECK_TYPE(XPATH_NUMBER);
+
+    if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER)) {
+        xmlXPathNumberFuncInternal(ctxt);
+        if (ctxt->error)
+            return;
+    }
 
     f = ctxt->value->floatval;
 
