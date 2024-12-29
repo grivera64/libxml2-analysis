@@ -863,8 +863,12 @@ typedef enum {
     XPATH_OP_END=0,
     XPATH_OP_AND,
     XPATH_OP_OR,
-    XPATH_OP_EQUAL,
-    XPATH_OP_CMP,
+    XPATH_OP_EQ,
+    XPATH_OP_NE,
+    XPATH_OP_LT,
+    XPATH_OP_GT,
+    XPATH_OP_LE,
+    XPATH_OP_GE,
     XPATH_OP_PLUS,
     XPATH_OP_NEG,
     XPATH_OP_ADD,
@@ -1428,20 +1432,24 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	    fprintf(output, "AND"); break;
         case XPATH_OP_OR:
 	    fprintf(output, "OR"); break;
-        case XPATH_OP_EQUAL:
-	     if (op->value)
-		 fprintf(output, "EQUAL =");
-	     else
-		 fprintf(output, "EQUAL !=");
-	     break;
-        case XPATH_OP_CMP:
-	     if (op->value & 1)
-		 fprintf(output, "CMP <");
-	     else
-		 fprintf(output, "CMP >");
-	     if ((op->value & 2) == 0)
-		 fprintf(output, "=");
-	     break;
+        case XPATH_OP_EQ:
+	    fprintf(output, "EQ");
+            break;
+	case XPATH_OP_NE:
+	    fprintf(output, "NE");
+            break;
+        case XPATH_OP_LT:
+	    fprintf(output, "LT");
+            break;
+        case XPATH_OP_GT:
+	    fprintf(output, "GT");
+            break;
+        case XPATH_OP_LE:
+	    fprintf(output, "LE");
+            break;
+        case XPATH_OP_GE:
+	    fprintf(output, "GE");
+            break;
         case XPATH_OP_PLUS:
 	    fprintf(output, "PLUS");
 	    break;
@@ -9633,23 +9641,27 @@ xmlXPathCompRelationalExpr(xmlXPathParserContextPtr ctxt) {
     SKIP_BLANKS;
     while ((CUR == '<') || (CUR == '>')) {
         xmlXPathStepOpPtr op;
-	int inf, strict;
+        xmlXPathOp opval;
+        int inf, strict = 1;
 	int ch1 = ctxt->comp->last;
 
-        if (CUR == '<') inf = 1;
-	else inf = 0;
-	if (NXT(1) == '=') strict = 0;
-	else strict = 1;
+        inf = (CUR == '<');
 	NEXT;
-	if (!strict) NEXT;
+        if (CUR == '=') {
+            strict = 0;
+            NEXT;
+        }
 	SKIP_BLANKS;
         xmlXPathCompAdditiveExpr(ctxt);
 	CHECK_ERROR;
 
-        op = xmlXPathCompAddBinary(ctxt, XPATH_OP_CMP, ch1);
+        if (inf)
+            opval = strict ? XPATH_OP_LT : XPATH_OP_LE;
+        else
+            opval = strict ? XPATH_OP_GT : XPATH_OP_GE;
+        op = xmlXPathCompAddBinary(ctxt, opval, ch1);
         if (op == NULL)
             return;
-        op->value = inf | (strict << 1);
 
 	SKIP_BLANKS;
     }
@@ -9678,21 +9690,23 @@ xmlXPathCompEqualityExpr(xmlXPathParserContextPtr ctxt) {
     SKIP_BLANKS;
     while ((CUR == '=') || ((CUR == '!') && (NXT(1) == '='))) {
         xmlXPathStepOpPtr op;
-	int eq;
+	xmlXPathOp opval;
 	int ch1 = ctxt->comp->last;
 
-        if (CUR == '=') eq = 1;
-	else eq = 0;
+        if (CUR == '=') {
+            opval = XPATH_OP_EQ;
+        } else {
+            opval = XPATH_OP_NE;
+            NEXT;
+        }
 	NEXT;
-	if (!eq) NEXT;
 	SKIP_BLANKS;
         xmlXPathCompRelationalExpr(ctxt);
 	CHECK_ERROR;
 
-        op = xmlXPathCompAddBinary(ctxt, XPATH_OP_EQUAL, ch1);
+        op = xmlXPathCompAddBinary(ctxt, opval, ch1);
         if (op == NULL)
             return;
-        op->value = eq;
 
 	SKIP_BLANKS;
     }
@@ -11338,23 +11352,33 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
             break;
         }
 
-        case XPATH_OP_EQUAL:
+        case XPATH_OP_EQ:
+        case XPATH_OP_NE:
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
 	    CHECK_ERROR0;
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
 	    CHECK_ERROR0;
-	    equal = xmlXPathEqualValuesInternal(ctxt, !op->value);
+	    equal = xmlXPathEqualValuesInternal(ctxt, (op->op == XPATH_OP_NE));
 	    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, equal));
             break;
-        case XPATH_OP_CMP:
+
+        case XPATH_OP_LT:
+        case XPATH_OP_GT:
+        case XPATH_OP_LE:
+        case XPATH_OP_GE: {
+            int inf, strict;
+
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
 	    CHECK_ERROR0;
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
 	    CHECK_ERROR0;
-            ret = xmlXPathCompareValues(ctxt, op->value & 1,
-                                        (op->value >> 1) & 1);
+
+            inf = ((op->op == XPATH_OP_LT) || (op->op == XPATH_OP_LE));
+            strict = ((op->op == XPATH_OP_LT) || (op->op == XPATH_OP_GT));
+            ret = xmlXPathCompareValues(ctxt, inf, strict);
 	    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, ret));
             break;
+        }
 
         case XPATH_OP_PLUS:
         case XPATH_OP_NEG:
