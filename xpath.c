@@ -198,6 +198,10 @@ typedef enum {
     XPATH_OP_FILTER,
     XPATH_OP_SORT,
 
+    /* nullary ops */
+    XPATH_OP_POSITION,
+    XPATH_OP_LAST,
+
     /* Compiled to XPATH_OP_VAR */
     XPATH_OP_TRUE,
     XPATH_OP_FALSE
@@ -234,7 +238,7 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
     { "false", xmlXPathFalseFunction,
         xmlXPathTrueCompiler, XPATH_OP_FALSE, 0 },
     { "floor", xmlXPathFloorFunction, NULL, XPATH_OP_FLOOR, 1 },
-    { "last", xmlXPathLastFunction, NULL, 0, 0 },
+    { "last", xmlXPathLastFunction, NULL, XPATH_OP_LAST, 0 },
     { "lang", xmlXPathLangFunction, NULL, 0, 0 },
     { "local-name", xmlXPathLocalNameFunction, NULL, 0, 0 },
     { "not", xmlXPathNotFunction, NULL, XPATH_OP_NOT, 1 },
@@ -242,7 +246,7 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
     { "namespace-uri", xmlXPathNamespaceURIFunction, NULL, 0, 0 },
     { "normalize-space", xmlXPathNormalizeFunction, NULL, 0, 0 },
     { "number", xmlXPathNumberFunction, NULL, 0, 0 },
-    { "position", xmlXPathPositionFunction, NULL, 0, 0 },
+    { "position", xmlXPathPositionFunction, NULL, XPATH_OP_POSITION, 0 },
     { "round", xmlXPathRoundFunction, NULL, XPATH_OP_ROUND, 1 },
     { "string", xmlXPathStringFunction, NULL, 0, 0 },
     { "string-length", xmlXPathStringLengthFunction, NULL, 0, 0 },
@@ -11828,6 +11832,29 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                 xmlXPathNodeSetSort(ctxt->value->nodesetval);
 	    }
             break;
+
+        case XPATH_OP_LAST: {
+            int contextSize = ctxt->context->contextSize;
+
+            if (contextSize >= 0) {
+                valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, contextSize));
+            } else {
+                XP_ERROR0(XPATH_INVALID_CTXT_SIZE);
+            }
+            break;
+        }
+
+        case XPATH_OP_POSITION: {
+            int position = ctxt->context->proximityPosition;
+
+            if (position >= 0) {
+                valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, position));
+            } else {
+                XP_ERROR0(XPATH_INVALID_CTXT_SIZE);
+            }
+            break;
+        }
+
         default:
             XP_ERROR0(XPATH_INVALID_OPERAND);
             break;
