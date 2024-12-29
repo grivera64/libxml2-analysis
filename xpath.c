@@ -192,6 +192,7 @@ typedef enum {
     XPATH_OP_COLLECT,
     XPATH_OP_VALUE,
     XPATH_OP_VARIABLE,
+    XPATH_OP_SFUNC,
     XPATH_OP_FUNCTION,
     XPATH_OP_ARG,
     XPATH_OP_PREDICATE,
@@ -218,7 +219,8 @@ struct _xmlXPathStandardFunction {
     xmlXPathFunction func;
     xmlXPathFuncCompiler compiler;
     xmlXPathOp op;
-    int nbArgs;
+    int minArgs;
+    int maxArgs;
 };
 
 static void
@@ -229,35 +231,60 @@ xmlXPathTrueCompiler(xmlXPathParserContextPtr ctxt,
                      const xmlXPathStandardFunction *sfunc, int nargs);
 
 static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
-    { "boolean", xmlXPathBooleanFunction, NULL, XPATH_OP_BOOL, 1 },
-    { "ceiling", xmlXPathCeilingFunction, NULL, XPATH_OP_CEIL, 1 },
-    { "count", xmlXPathCountFunction, NULL, 0, 0 },
-    { "concat", xmlXPathConcatFunction, NULL, 0, 0 },
-    { "contains", xmlXPathContainsFunction, NULL, 0, 0 },
-    { "id", xmlXPathIdFunction, NULL, 0, 0 },
-    { "false", xmlXPathFalseFunction,
-        xmlXPathTrueCompiler, XPATH_OP_FALSE, 0 },
-    { "floor", xmlXPathFloorFunction, NULL, XPATH_OP_FLOOR, 1 },
-    { "last", xmlXPathLastFunction, NULL, XPATH_OP_LAST, 0 },
-    { "lang", xmlXPathLangFunction, NULL, 0, 0 },
-    { "local-name", xmlXPathLocalNameFunction, NULL, 0, 0 },
-    { "not", xmlXPathNotFunction, NULL, XPATH_OP_NOT, 1 },
-    { "name", xmlXPathNameFunction, NULL, 0, 0 },
-    { "namespace-uri", xmlXPathNamespaceURIFunction, NULL, 0, 0 },
-    { "normalize-space", xmlXPathNormalizeFunction, NULL, 0, 0 },
-    { "number", xmlXPathNumberFunction, NULL, 0, 0 },
-    { "position", xmlXPathPositionFunction, NULL, XPATH_OP_POSITION, 0 },
-    { "round", xmlXPathRoundFunction, NULL, XPATH_OP_ROUND, 1 },
-    { "string", xmlXPathStringFunction, NULL, 0, 0 },
-    { "string-length", xmlXPathStringLengthFunction, NULL, 0, 0 },
-    { "starts-with", xmlXPathStartsWithFunction, NULL, 0, 0 },
-    { "substring", xmlXPathSubstringFunction, NULL, 0, 0 },
-    { "substring-before", xmlXPathSubstringBeforeFunction, NULL, 0, 0 },
-    { "substring-after", xmlXPathSubstringAfterFunction, NULL, 0, 0 },
-    { "sum", xmlXPathSumFunction, NULL, 0, 0 },
-    { "true", xmlXPathTrueFunction,
-        xmlXPathTrueCompiler, XPATH_OP_TRUE, 0 },
-    { "translate", xmlXPathTranslateFunction, NULL, 0, 0 }
+    { "boolean", NULL, NULL,
+        XPATH_OP_BOOL, 1, 1 },
+    { "ceiling", NULL, NULL,
+        XPATH_OP_CEIL, 1, 1 },
+    { "count", xmlXPathCountFunction, NULL,
+        XPATH_OP_SFUNC, 1, 1 },
+    { "concat", xmlXPathConcatFunction, NULL,
+        XPATH_OP_SFUNC, 2, INT_MAX },
+    { "contains", xmlXPathContainsFunction, NULL,
+        XPATH_OP_SFUNC, 2, 2 },
+    { "id", xmlXPathIdFunction, NULL,
+        XPATH_OP_SFUNC, 1, 1 },
+    { "false", NULL, xmlXPathTrueCompiler,
+        XPATH_OP_FALSE, 0, 0 },
+    { "floor", NULL, NULL,
+        XPATH_OP_FLOOR, 1, 1 },
+    { "last", NULL, NULL,
+        XPATH_OP_LAST, 0, 0 },
+    { "lang", xmlXPathLangFunction, NULL,
+        XPATH_OP_SFUNC, 1, 1 },
+    { "local-name", xmlXPathLocalNameFunction, NULL,
+        XPATH_OP_SFUNC, 0, 1 },
+    { "not", NULL, NULL,
+        XPATH_OP_NOT, 1, 1 },
+    { "name", xmlXPathNameFunction, NULL,
+        XPATH_OP_SFUNC, 0, 1 },
+    { "namespace-uri", xmlXPathNamespaceURIFunction, NULL,
+        XPATH_OP_SFUNC, 0, 1 },
+    { "normalize-space", xmlXPathNormalizeFunction, NULL,
+        XPATH_OP_SFUNC, 0, 1 },
+    { "number", xmlXPathNumberFunction, NULL,
+        XPATH_OP_SFUNC, 0, 1 },
+    { "position", NULL, NULL,
+        XPATH_OP_POSITION, 0, 0 },
+    { "round", NULL, NULL,
+        XPATH_OP_ROUND, 1, 1 },
+    { "string", xmlXPathStringFunction, NULL,
+        XPATH_OP_SFUNC, 0, 1 },
+    { "string-length", xmlXPathStringLengthFunction, NULL,
+        XPATH_OP_SFUNC, 0, 1 },
+    { "starts-with", xmlXPathStartsWithFunction, NULL,
+        XPATH_OP_SFUNC, 2, 2 },
+    { "substring", xmlXPathSubstringFunction, NULL,
+        XPATH_OP_SFUNC, 2, 3 },
+    { "substring-after", xmlXPathSubstringAfterFunction, NULL,
+        XPATH_OP_SFUNC, 2, 2 },
+    { "substring-before", xmlXPathSubstringBeforeFunction, NULL,
+        XPATH_OP_SFUNC, 2, 2 },
+    { "sum", xmlXPathSumFunction, NULL,
+        XPATH_OP_SFUNC, 1, 1 },
+    { "true", NULL, xmlXPathTrueCompiler,
+        XPATH_OP_TRUE, 0, 0 },
+    { "translate", xmlXPathTranslateFunction, NULL,
+        XPATH_OP_SFUNC, 3, 3 }
 };
 
 #define NUM_STANDARD_FUNCTIONS \
@@ -4058,14 +4085,6 @@ xmlXPathFunctionLookupNS(xmlXPathContextPtr ctxt, const xmlChar *name,
     if (name == NULL)
 	return(NULL);
 
-    if (ns_uri == NULL) {
-        const xmlXPathStandardFunction *sfunc;
-
-        sfunc = xmlXPathLookupStandardFunction(name);
-        if (sfunc != NULL)
-            return(sfunc->func);
-    }
-
     if (ctxt->funcLookupFunc != NULL) {
 	xmlXPathFuncLookupFunc f;
 
@@ -7313,6 +7332,7 @@ xmlXPathIdFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     CHECK_ARITY(1);
     obj = valuePop(ctxt);
     if (obj == NULL) XP_ERROR(XPATH_INVALID_OPERAND);
+
     if ((obj->type == XPATH_NODESET) || (obj->type == XPATH_XSLT_TREE)) {
 	xmlNodeSetPtr ns;
 	int i;
@@ -7338,18 +7358,21 @@ xmlXPathIdFunction(xmlXPathParserContextPtr ctxt, int nargs) {
 		    xmlFree(tokens);
 	    }
 	}
-	xmlXPathReleaseObject(ctxt->context, obj);
-	valuePush(ctxt, xmlXPathCacheWrapNodeSet(ctxt, ret));
-	return;
+    } else {
+        tokens = xmlXPathCastToString(obj);
+        if (tokens == NULL)
+            xmlXPathPErrMemory(ctxt);
+        ret = xmlXPathGetElementsByIds(ctxt->context->doc, tokens);
+        if (ret == NULL)
+            xmlXPathPErrMemory(ctxt);
+        xmlFree(tokens);
     }
-    tokens = xmlXPathCastToString(obj);
-    if (tokens == NULL)
-        xmlXPathPErrMemory(ctxt);
+
     xmlXPathReleaseObject(ctxt->context, obj);
-    ret = xmlXPathGetElementsByIds(ctxt->context->doc, tokens);
-    if (ret == NULL)
-        xmlXPathPErrMemory(ctxt);
-    xmlFree(tokens);
+
+    if (ret->nodeNr > 1)
+        xmlXPathNodeSetSort(ret);
+
     valuePush(ctxt, xmlXPathCacheWrapNodeSet(ctxt, ret));
 }
 
@@ -9274,8 +9297,8 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
     } else {
         int opval;
 
-        if ((sfunc != NULL) && (sfunc->op != 0)) {
-            if (nbargs != sfunc->nbArgs) {
+        if (sfunc != NULL) {
+            if ((nbargs < sfunc->minArgs) || (nbargs > sfunc->maxArgs)) {
                 xmlXPathErr(ctxt, XPATH_INVALID_ARITY);
                 goto error;
             }
@@ -9292,10 +9315,10 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
         if (op == NULL)
             goto error;
 
-        if (opval == XPATH_OP_FUNCTION) {
-            op->as.func = func;
-            op->nbArgs = nbargs;
+        op->nbArgs = nbargs;
+        op->as.func = func;
 
+        if (opval == XPATH_OP_FUNCTION) {
             if (xmlXPathCompOpSetQName(ctxt, &op->qname,
                                        name, prefix, nsUri) == 0) {
                 name = NULL;
@@ -11631,6 +11654,14 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
             break;
         }
 
+        case XPATH_OP_SFUNC:
+            if (op->ch1 != -1) {
+                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
+                CHECK_ERROR0;
+            }
+            op->as.func(ctxt, op->nbArgs);
+            break;
+
         case XPATH_OP_FUNCTION: {
             xmlXPathFunction func = NULL;
             const xmlChar *oldFunc, *oldFuncURI;
@@ -11757,35 +11788,25 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
              * Optimization for ()[last()] selection i.e. the last elem
              */
             if ((comp->steps[op->ch1].op == XPATH_OP_SORT) &&
-                (comp->steps[op->ch2].op == XPATH_OP_SORT)) {
-                int f = comp->steps[op->ch2].ch1;
+                (comp->steps[op->ch2].op == XPATH_OP_LAST)) {
+                xmlNodePtr last = NULL;
 
-                if ((f != -1) &&
-                    (comp->steps[f].op == XPATH_OP_FUNCTION) &&
-                    (comp->steps[f].nbArgs == 0) &&
-                    (comp->steps[f].qname.ns.prefix == NULL) &&
-                    (comp->steps[f].qname.name != NULL) &&
-                    (xmlStrEqual
-                     (comp->steps[f].qname.name, BAD_CAST "last"))) {
-                    xmlNodePtr last = NULL;
-
-                    total +=
-                        xmlXPathCompOpEvalLast(ctxt,
-                                               &comp->steps[op->ch1],
-                                               &last);
-                    CHECK_ERROR0;
-                    /*
-                     * The nodeset should be in document order,
-                     * Keep only the last value
-                     */
-                    if ((ctxt->value != NULL) &&
-                        (ctxt->value->type == XPATH_NODESET) &&
-                        (ctxt->value->nodesetval != NULL) &&
-                        (ctxt->value->nodesetval->nodeTab != NULL) &&
-                        (ctxt->value->nodesetval->nodeNr > 1))
-                        xmlXPathNodeSetKeepLast(ctxt->value->nodesetval);
-                    break;
-                }
+                total +=
+                    xmlXPathCompOpEvalLast(ctxt,
+                                           &comp->steps[op->ch1],
+                                           &last);
+                CHECK_ERROR0;
+                /*
+                 * The nodeset should be in document order,
+                 * Keep only the last value
+                 */
+                if ((ctxt->value != NULL) &&
+                    (ctxt->value->type == XPATH_NODESET) &&
+                    (ctxt->value->nodesetval != NULL) &&
+                    (ctxt->value->nodesetval->nodeTab != NULL) &&
+                    (ctxt->value->nodesetval->nodeNr > 1))
+                    xmlXPathNodeSetKeepLast(ctxt->value->nodesetval);
+                break;
             }
             /*
             * Process inner predicates first.
