@@ -919,11 +919,7 @@ struct _xmlXPathStepOp {
     xmlXPathOp op;
     int ch1; /* first child */
     int ch2; /* second child */
-    /*
-     * Used as suboperation type for various binary ops and
-     * contains number of arguments for function calls.
-     */
-    int value;
+    int nbArgs;
 
     xmlXPathOpQName qname; /* for name tests, variables and functions */
 
@@ -1162,7 +1158,6 @@ xmlXPathCompAdd(xmlXPathParserContextPtr ctxt, xmlXPathOp opval) {
     op->op = opval;
     op->ch1 = -1;
     op->ch2 = -1;
-    op->value = 0;
 
     return(op);
 }
@@ -1540,7 +1535,7 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	    break;
 	}
 	case XPATH_OP_FUNCTION: {
-	    int nbargs = op->value;
+	    int nbargs = op->nbArgs;
 	    const xmlChar *prefix = op->qname.ns.prefix;
 	    const xmlChar *name = op->qname.name;
 
@@ -9197,7 +9192,7 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
         goto error;
 
     op->as.func = func;
-    op->value = nbargs;
+    op->nbArgs = nbargs;
 
     if (xmlXPathCompOpSetQName(ctxt, &op->qname, name, prefix, nsUri) == 0) {
         name = NULL;
@@ -11234,7 +11229,7 @@ xmlXPathCompOpEvalFilterFirst(xmlXPathParserContextPtr ctxt,
 
 	if ((f != -1) &&
 	    (comp->steps[f].op == XPATH_OP_FUNCTION) &&
-	    (comp->steps[f].value == 0) &&
+	    (comp->steps[f].nbArgs == 0) &&
 	    (comp->steps[f].qname.ns.prefix == NULL) &&
 	    (comp->steps[f].qname.name != NULL) &&
 	    (xmlStrEqual
@@ -11532,7 +11527,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                 const xmlChar *oldFunc, *oldFuncURI;
 		int i;
                 int frame;
-                int nbArgs = op->value;
+                int nbArgs = op->nbArgs;
                 int flags = ctxt->comp->flags;
 
                 frame = ctxt->valueNr;
@@ -11586,7 +11581,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                 oldFuncURI = ctxt->context->functionURI;
                 ctxt->context->function = op->qname.name;
                 ctxt->context->functionURI = op->qname.ns.uri;
-                func(ctxt, op->value);
+                func(ctxt, op->nbArgs);
                 ctxt->context->function = oldFunc;
                 ctxt->context->functionURI = oldFuncURI;
                 if ((ctxt->error == XPATH_EXPRESSION_OK) &&
@@ -11664,7 +11659,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
 
                     if ((f != -1) &&
                         (comp->steps[f].op == XPATH_OP_FUNCTION) &&
-                        (comp->steps[f].value == 0) &&
+                        (comp->steps[f].nbArgs == 0) &&
                         (comp->steps[f].qname.ns.prefix == NULL) &&
                         (comp->steps[f].qname.name != NULL) &&
                         (xmlStrEqual
