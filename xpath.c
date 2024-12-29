@@ -7647,26 +7647,21 @@ error:
  */
 void
 xmlXPathContainsFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr hay, needle;
+    xmlChar *hay, *needle;
+    int result;
 
     CHECK_ARITY(2);
-    CAST_TO_STRING;
-    CHECK_TYPE(XPATH_STRING);
-    needle = valuePop(ctxt);
-    CAST_TO_STRING;
-    hay = valuePop(ctxt);
+    needle = xmlXPathPopString(ctxt);
+    hay = xmlXPathPopString(ctxt);
+    if (ctxt->error)
+        goto error;
 
-    if ((hay == NULL) || (hay->type != XPATH_STRING)) {
-	xmlXPathReleaseObject(ctxt->context, hay);
-	xmlXPathReleaseObject(ctxt->context, needle);
-	XP_ERROR(XPATH_INVALID_TYPE);
-    }
-    if (xmlStrstr(hay->stringval, needle->stringval))
-	valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, 1));
-    else
-	valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, 0));
-    xmlXPathReleaseObject(ctxt->context, hay);
-    xmlXPathReleaseObject(ctxt->context, needle);
+    result = (strstr((char *) hay, (char *) needle) != NULL);
+    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, result));
+
+error:
+    xmlFree(hay);
+    xmlFree(needle);
 }
 
 /**
@@ -7681,28 +7676,24 @@ xmlXPathContainsFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  */
 void
 xmlXPathStartsWithFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr hay, needle;
-    int n;
+    xmlChar *hay, *needle;
+    size_t len;
+    int result;
 
     CHECK_ARITY(2);
-    CAST_TO_STRING;
-    CHECK_TYPE(XPATH_STRING);
-    needle = valuePop(ctxt);
-    CAST_TO_STRING;
-    hay = valuePop(ctxt);
+    needle = xmlXPathPopString(ctxt);
+    hay = xmlXPathPopString(ctxt);
+    if (ctxt->error)
+        goto error;
 
-    if ((hay == NULL) || (hay->type != XPATH_STRING)) {
-	xmlXPathReleaseObject(ctxt->context, hay);
-	xmlXPathReleaseObject(ctxt->context, needle);
-	XP_ERROR(XPATH_INVALID_TYPE);
-    }
-    n = xmlStrlen(needle->stringval);
-    if (xmlStrncmp(hay->stringval, needle->stringval, n))
-        valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, 0));
-    else
-        valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, 1));
-    xmlXPathReleaseObject(ctxt->context, hay);
-    xmlXPathReleaseObject(ctxt->context, needle);
+    len = strlen((char *) needle);
+    result = (strncmp((char *) hay, (char *) needle, len) == 0);
+
+    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, result));
+
+error:
+    xmlFree(hay);
+    xmlFree(needle);
 }
 
 /**
@@ -7735,35 +7726,23 @@ xmlXPathStartsWithFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  */
 void
 xmlXPathSubstringFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr str, start, len;
+    xmlChar *str;
     double le=0, in;
     int i = 1, j = INT_MAX;
 
-    if (nargs < 2) {
-	CHECK_ARITY(2);
-    }
-    if (nargs > 3) {
-	CHECK_ARITY(3);
-    }
+    if ((nargs < 2) || (nargs > 3))
+        XP_ERROR(XPATH_INVALID_ARITY);
+
     /*
      * take care of possible last (position) argument
     */
-    if (nargs == 3) {
-	CAST_TO_NUMBER;
-	CHECK_TYPE(XPATH_NUMBER);
-	len = valuePop(ctxt);
-	le = len->floatval;
-	xmlXPathReleaseObject(ctxt->context, len);
-    }
+    if (nargs == 3)
+	le = xmlXPathPopNumber(ctxt);
 
-    CAST_TO_NUMBER;
-    CHECK_TYPE(XPATH_NUMBER);
-    start = valuePop(ctxt);
-    in = start->floatval;
-    xmlXPathReleaseObject(ctxt->context, start);
-    CAST_TO_STRING;
-    CHECK_TYPE(XPATH_STRING);
-    str = valuePop(ctxt);
+    in = xmlXPathPopNumber(ctxt);
+    str = xmlXPathPopString(ctxt);
+    if (ctxt->error)
+        return;
 
     if (!(in < INT_MAX)) { /* Logical NOT to handle NaNs */
         i = INT_MAX;
@@ -7795,8 +7774,8 @@ xmlXPathSubstringFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     i -= 1;
     j -= 1;
 
-    if ((i < j) && (i < xmlUTF8Strlen(str->stringval))) {
-        xmlChar *ret = xmlUTF8Strsub(str->stringval, i, j - i);
+    if ((i < j) && (i < xmlUTF8Strlen(str))) {
+        xmlChar *ret = xmlUTF8Strsub(str, i, j - i);
         if (ret == NULL)
             xmlXPathPErrMemory(ctxt);
 	valuePush(ctxt, xmlXPathCacheNewString(ctxt, ret));
@@ -7805,7 +7784,7 @@ xmlXPathSubstringFunction(xmlXPathParserContextPtr ctxt, int nargs) {
 	valuePush(ctxt, xmlXPathCacheNewCString(ctxt, ""));
     }
 
-    xmlXPathReleaseObject(ctxt->context, str);
+    xmlFree(str);
 }
 
 /**
@@ -7823,24 +7802,27 @@ xmlXPathSubstringFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  */
 void
 xmlXPathSubstringBeforeFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr str = NULL;
-    xmlXPathObjectPtr find = NULL;
+    xmlChar *str, *find;
     const xmlChar *point;
     xmlChar *result;
 
     CHECK_ARITY(2);
-    CAST_TO_STRING;
-    find = valuePop(ctxt);
-    CAST_TO_STRING;
-    str = valuePop(ctxt);
+    find = xmlXPathPopString(ctxt);
+    str = xmlXPathPopString(ctxt);
     if (ctxt->error != 0)
         goto error;
 
-    point = xmlStrstr(str->stringval, find->stringval);
+    point = BAD_CAST strstr((char *) str, (char *) find);
     if (point == NULL) {
         result = xmlStrdup(BAD_CAST "");
     } else {
-        result = xmlStrndup(str->stringval, point - str->stringval);
+        size_t len = point - str;
+
+        if (len > INT_MAX) {
+            xmlXPathPErrMemory(ctxt);
+            goto error;
+        }
+        result = xmlStrndup(str, len);
     }
     if (result == NULL) {
         xmlXPathPErrMemory(ctxt);
@@ -7849,8 +7831,8 @@ xmlXPathSubstringBeforeFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     valuePush(ctxt, xmlXPathCacheWrapString(ctxt, result));
 
 error:
-    xmlXPathReleaseObject(ctxt->context, str);
-    xmlXPathReleaseObject(ctxt->context, find);
+    xmlFree(str);
+    xmlFree(find);
 }
 
 /**
@@ -7869,24 +7851,23 @@ error:
  */
 void
 xmlXPathSubstringAfterFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr str = NULL;
-    xmlXPathObjectPtr find = NULL;
+    xmlChar *str, *find;
     const xmlChar *point;
     xmlChar *result;
 
     CHECK_ARITY(2);
-    CAST_TO_STRING;
-    find = valuePop(ctxt);
-    CAST_TO_STRING;
-    str = valuePop(ctxt);
+    find = xmlXPathPopString(ctxt);
+    str = xmlXPathPopString(ctxt);
     if (ctxt->error != 0)
         goto error;
 
-    point = xmlStrstr(str->stringval, find->stringval);
+    point = BAD_CAST strstr((char *) str, (char *) find);
     if (point == NULL) {
         result = xmlStrdup(BAD_CAST "");
     } else {
-        result = xmlStrdup(point + xmlStrlen(find->stringval));
+        size_t len = strlen((char *) find);
+
+        result = xmlStrdup(point + len);
     }
     if (result == NULL) {
         xmlXPathPErrMemory(ctxt);
@@ -7895,8 +7876,8 @@ xmlXPathSubstringAfterFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     valuePush(ctxt, xmlXPathCacheWrapString(ctxt, result));
 
 error:
-    xmlXPathReleaseObject(ctxt->context, str);
-    xmlXPathReleaseObject(ctxt->context, find);
+    xmlFree(str);
+    xmlFree(find);
 }
 
 /**
@@ -7915,26 +7896,26 @@ error:
  */
 void
 xmlXPathNormalizeFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlChar *source, *target;
+    xmlChar *str, *source, *target;
     int blank;
 
     if (ctxt == NULL) return;
     if (nargs == 0) {
         /* Use current context node */
-        source = xmlXPathCastNodeToString(ctxt->context->node);
-        if (source == NULL)
+        str = xmlNodeGetContent(ctxt->context->node);
+        if (str == NULL) {
             xmlXPathPErrMemory(ctxt);
-        valuePush(ctxt, xmlXPathCacheWrapString(ctxt, source));
-        nargs = 1;
+            return;
+        }
+    } else {
+        CHECK_ARITY(1);
+        str = xmlXPathPopString(ctxt);
+        if (ctxt->error)
+            return;
     }
 
-    CHECK_ARITY(1);
-    CAST_TO_STRING;
-    CHECK_TYPE(XPATH_STRING);
-    source = ctxt->value->stringval;
-    if (source == NULL)
-        return;
-    target = source;
+    source = str;
+    target = str;
 
     /* Skip leading whitespaces */
     while (IS_BLANK_CH(*source))
@@ -7955,6 +7936,8 @@ xmlXPathNormalizeFunction(xmlXPathParserContextPtr ctxt, int nargs) {
         source++;
     }
     *target = 0;
+
+    valuePush(ctxt, xmlXPathCacheWrapString(ctxt, str));
 }
 
 /**
@@ -7980,9 +7963,7 @@ xmlXPathNormalizeFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  */
 void
 xmlXPathTranslateFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr str = NULL;
-    xmlXPathObjectPtr from = NULL;
-    xmlXPathObjectPtr to = NULL;
+    xmlChar *str, *from, *to;
     xmlBufPtr target;
     int offset, max;
     int ch;
@@ -7991,12 +7972,9 @@ xmlXPathTranslateFunction(xmlXPathParserContextPtr ctxt, int nargs) {
 
     CHECK_ARITY(3);
 
-    CAST_TO_STRING;
-    to = valuePop(ctxt);
-    CAST_TO_STRING;
-    from = valuePop(ctxt);
-    CAST_TO_STRING;
-    str = valuePop(ctxt);
+    to = xmlXPathPopString(ctxt);
+    from = xmlXPathPopString(ctxt);
+    str = xmlXPathPopString(ctxt);
     if (ctxt->error != 0)
         goto error;
 
@@ -8004,8 +7982,8 @@ xmlXPathTranslateFunction(xmlXPathParserContextPtr ctxt, int nargs) {
      * Account for quadratic runtime
      */
     if (ctxt->context->opLimit != 0) {
-        unsigned long f1 = xmlStrlen(from->stringval);
-        unsigned long f2 = xmlStrlen(str->stringval);
+        unsigned long f1 = xmlStrlen(from);
+        unsigned long f2 = xmlStrlen(str);
 
         if ((f1 > 0) && (f2 > 0)) {
             unsigned long p;
@@ -8024,12 +8002,12 @@ xmlXPathTranslateFunction(xmlXPathParserContextPtr ctxt, int nargs) {
         goto error;
     }
 
-    max = xmlUTF8Strlen(to->stringval);
-    for (cptr = str->stringval; (ch=*cptr); ) {
-        offset = xmlUTF8Strloc(from->stringval, cptr);
+    max = xmlUTF8Strlen(to);
+    for (cptr = str; (ch=*cptr); ) {
+        offset = xmlUTF8Strloc(from, cptr);
         if (offset >= 0) {
             if (offset < max) {
-                point = xmlUTF8Strpos(to->stringval, offset);
+                point = xmlUTF8Strpos(to, offset);
                 if (point)
                     xmlBufAdd(target, point, xmlUTF8Strsize(point, 1));
             }
@@ -8061,10 +8039,11 @@ xmlXPathTranslateFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     else
         valuePush(ctxt, xmlXPathCacheWrapString(ctxt, content));
     xmlBufFree(target);
+
 error:
-    xmlXPathReleaseObject(ctxt->context, str);
-    xmlXPathReleaseObject(ctxt->context, from);
-    xmlXPathReleaseObject(ctxt->context, to);
+    xmlFree(str);
+    xmlFree(from);
+    xmlFree(to);
 }
 
 static void
@@ -8174,18 +8153,17 @@ xmlXPathFalseFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  */
 void
 xmlXPathLangFunction(xmlXPathParserContextPtr ctxt, int nargs) {
-    xmlXPathObjectPtr val;
     xmlNodePtr cur;
     xmlChar *theLang;
-    const xmlChar *lang;
+    xmlChar *lang;
     int ret = 0;
     int i;
 
     CHECK_ARITY(1);
-    CAST_TO_STRING;
-    CHECK_TYPE(XPATH_STRING);
-    val = valuePop(ctxt);
-    lang = val->stringval;
+    lang = xmlXPathPopString(ctxt);
+    if (ctxt->error)
+        return;
+
     cur = ctxt->context->node;
     while (cur != NULL) {
         if (xmlNodeGetAttrValue(cur, BAD_CAST "lang", XML_XML_NAMESPACE,
@@ -8202,12 +8180,12 @@ xmlXPathLangFunction(xmlXPathParserContextPtr ctxt, int nargs) {
         if ((theLang[i] == 0) || (theLang[i] == '-'))
             ret = 1;
     }
-not_equal:
-    if (theLang != NULL)
-	xmlFree((void *)theLang);
 
-    xmlXPathReleaseObject(ctxt->context, val);
+not_equal:
     valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, ret));
+
+    xmlFree(theLang);
+    xmlFree(lang);
 }
 
 /**
