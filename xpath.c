@@ -11123,17 +11123,12 @@ xmlXPathCompOpEvalFirst(xmlXPathParserContextPtr ctxt,
             total += cur;
             break;
         case XPATH_OP_ROOT:
-            xmlXPathRoot(ctxt);
+	    valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt,
+                    (xmlNodePtr) ctxt->context->doc));
             break;
         case XPATH_OP_NODE:
-            if (op->ch1 != -1)
-                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-	    CHECK_ERROR0;
-            if (op->ch2 != -1)
-                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
-	    CHECK_ERROR0;
 	    valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt,
-		ctxt->context->node));
+                    ctxt->context->node));
             break;
         case XPATH_OP_COLLECT:{
                 if (op->ch1 == -1)
@@ -11262,17 +11257,12 @@ xmlXPathCompOpEvalLast(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op,
             total += cur;
             break;
         case XPATH_OP_ROOT:
-            xmlXPathRoot(ctxt);
+	    valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt,
+                    (xmlNodePtr) ctxt->context->doc));
             break;
         case XPATH_OP_NODE:
-            if (op->ch1 != -1)
-                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-	    CHECK_ERROR0;
-            if (op->ch2 != -1)
-                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
-	    CHECK_ERROR0;
 	    valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt,
-		ctxt->context->node));
+                    ctxt->context->node));
             break;
         case XPATH_OP_COLLECT:{
                 if (op->ch1 == -1)
@@ -11607,19 +11597,16 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
             valuePush(ctxt, arg1);
 	    xmlXPathReleaseObject(ctxt->context, arg2);
             break;
+
         case XPATH_OP_ROOT:
-            xmlXPathRoot(ctxt);
+	    valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt,
+                    (xmlNodePtr) ctxt->context->doc));
             break;
         case XPATH_OP_NODE:
-            if (op->ch1 != -1)
-                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-	    CHECK_ERROR0;
-            if (op->ch2 != -1)
-                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
-	    CHECK_ERROR0;
 	    valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt,
-                                                    ctxt->context->node));
+                    ctxt->context->node));
             break;
+
         case XPATH_OP_COLLECT:{
                 if (op->ch1 == -1)
                     break;
