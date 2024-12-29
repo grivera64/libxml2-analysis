@@ -11322,47 +11322,37 @@ xmlXPathCompOpEvalFilterFirst(xmlXPathParserContextPtr ctxt,
 {
     int total = 0;
     const xmlXPathCompExpr *comp;
+    const xmlXPathStepOp *op1, *op2;
     xmlXPathObjectPtr obj;
     xmlNodeSetPtr set;
 
     CHECK_ERROR0;
     comp = ctxt->comp;
+    op1 = &comp->steps[op->ch1];
+    op2 = &comp->steps[op->ch2];
     /*
     * Optimization for ()[last()] selection i.e. the last elem
     */
-    if ((op->ch1 != -1) && (op->ch2 != -1) &&
-	(comp->steps[op->ch1].op == XPATH_OP_SORT) &&
-	(comp->steps[op->ch2].op == XPATH_OP_SORT)) {
-	int f = comp->steps[op->ch2].ch1;
+    if ((op1->op == XPATH_OP_SORT) &&
+	(op2->op == XPATH_OP_SORT) &&
+        (comp->steps[op2->ch1].op == XPATH_OP_LAST)) {
+        xmlNodePtr last = NULL;
 
-	if ((f != -1) &&
-	    (comp->steps[f].op == XPATH_OP_FUNCTION) &&
-	    (comp->steps[f].nbArgs == 0) &&
-	    (comp->steps[f].qname.ns.prefix == NULL) &&
-	    (comp->steps[f].qname.name != NULL) &&
-	    (xmlStrEqual
-	    (comp->steps[f].qname.name, BAD_CAST "last"))) {
-	    xmlNodePtr last = NULL;
-
-	    total +=
-		xmlXPathCompOpEvalLast(ctxt,
-		    &comp->steps[op->ch1],
-		    &last);
-	    CHECK_ERROR0;
-	    /*
-	    * The nodeset should be in document order,
-	    * Keep only the last value
-	    */
-	    if ((ctxt->value != NULL) &&
-		(ctxt->value->type == XPATH_NODESET) &&
-		(ctxt->value->nodesetval != NULL) &&
-		(ctxt->value->nodesetval->nodeTab != NULL) &&
-		(ctxt->value->nodesetval->nodeNr > 1)) {
-                xmlXPathNodeSetKeepLast(ctxt->value->nodesetval);
-		*first = *(ctxt->value->nodesetval->nodeTab);
-	    }
-	    return (total);
-	}
+        total += xmlXPathCompOpEvalLast(ctxt, op1, &last);
+        CHECK_ERROR0;
+        /*
+        * The nodeset should be in document order,
+        * Keep only the last value
+        */
+        if ((ctxt->value != NULL) &&
+            (ctxt->value->type == XPATH_NODESET) &&
+            (ctxt->value->nodesetval != NULL) &&
+            (ctxt->value->nodesetval->nodeTab != NULL) &&
+            (ctxt->value->nodesetval->nodeNr > 1)) {
+            xmlXPathNodeSetKeepLast(ctxt->value->nodesetval);
+            *first = *(ctxt->value->nodesetval->nodeTab);
+        }
+        return (total);
     }
 
     if (op->ch1 != -1)
@@ -11738,13 +11728,14 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
             break;
 
         case XPATH_OP_FILTER: {
-            xmlXPathObjectPtr obj;
             xmlNodeSetPtr set;
+            xmlXPathStepOpPtr op1 = &comp->steps[op->ch1];
+            xmlXPathStepOpPtr op2 = &comp->steps[op->ch2];
 
             /*
              * Optimization for ()[1] selection i.e. the first elem
              */
-            if (
+            if (((op1->op == XPATH_OP_SORT)
 #ifdef XP_OPTIMIZED_FILTER_FIRST
                 /*
                 * FILTER TODO: Can we assume that the inner processing
@@ -11755,48 +11746,37 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                 *  to assume anything, so it would be more robust and
                 *  easier to optimize.
                 */
-                ((comp->steps[op->ch1].op == XPATH_OP_SORT) || /* 18 */
-                 (comp->steps[op->ch1].op == XPATH_OP_FILTER)) && /* 17 */
-#else
-                (comp->steps[op->ch1].op == XPATH_OP_SORT) &&
+                 || (op1->op == XPATH_OP_FILTER)
 #endif
-                (comp->steps[op->ch2].op == XPATH_OP_VALUE)) { /* 12 */
-                xmlXPathObjectPtr val;
+                ) &&
+                (op2->op == XPATH_OP_VALUE) &&
+                (op2->as.obj->type == XPATH_NUMBER) &&
+                (op2->as.obj->floatval == 1.0)) {
+                xmlNodePtr first = NULL;
 
-                val = comp->steps[op->ch2].as.obj;
-                if ((val != NULL) && (val->type == XPATH_NUMBER) &&
-                    (val->floatval == 1.0)) {
-                    xmlNodePtr first = NULL;
-
-                    total +=
-                        xmlXPathCompOpEvalFirst(ctxt,
-                                                &comp->steps[op->ch1],
-                                                &first);
-                    CHECK_ERROR0;
-                    /*
-                     * The nodeset should be in document order,
-                     * Keep only the first value
-                     */
-                    if ((ctxt->value != NULL) &&
-                        (ctxt->value->type == XPATH_NODESET) &&
-                        (ctxt->value->nodesetval != NULL) &&
-                        (ctxt->value->nodesetval->nodeNr > 1))
-                        xmlXPathNodeSetClearFromPos(ctxt->value->nodesetval,
-                                                    1, 1);
-                    break;
-                }
+                total += xmlXPathCompOpEvalFirst(ctxt, op1, &first);
+                CHECK_ERROR0;
+                /*
+                 * The nodeset should be in document order,
+                 * Keep only the first value
+                 */
+                if ((ctxt->value != NULL) &&
+                    (ctxt->value->type == XPATH_NODESET) &&
+                    (ctxt->value->nodesetval != NULL) &&
+                    (ctxt->value->nodesetval->nodeNr > 1))
+                    xmlXPathNodeSetClearFromPos(ctxt->value->nodesetval,
+                                                1, 1);
+                break;
             }
+
             /*
              * Optimization for ()[last()] selection i.e. the last elem
              */
-            if ((comp->steps[op->ch1].op == XPATH_OP_SORT) &&
-                (comp->steps[op->ch2].op == XPATH_OP_LAST)) {
+            if ((op1->op == XPATH_OP_SORT) &&
+                (op2->op == XPATH_OP_LAST)) {
                 xmlNodePtr last = NULL;
 
-                total +=
-                    xmlXPathCompOpEvalLast(ctxt,
-                                           &comp->steps[op->ch1],
-                                           &last);
+                total += xmlXPathCompOpEvalLast(ctxt, op1, &last);
                 CHECK_ERROR0;
                 /*
                  * The nodeset should be in document order,
@@ -11810,6 +11790,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                     xmlXPathNodeSetKeepLast(ctxt->value->nodesetval);
                 break;
             }
+
             /*
             * Process inner predicates first.
             * Example "index[parent::book][1]":
@@ -11821,24 +11802,13 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
             *           NODE
             *     ELEM Object is a number : 1
             */
-            total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
+            total += xmlXPathCompOpEval(ctxt, op1);
             CHECK_ERROR0;
-            if (ctxt->value == NULL)
-                break;
-
-            /*
-             * In case of errors, xmlXPathNodeSetFilter can pop additional
-             * nodes from the stack. We have to temporarily remove the
-             * nodeset object from the stack to avoid freeing it
-             * prematurely.
-             */
             CHECK_TYPE0(XPATH_NODESET);
-            obj = valuePop(ctxt);
-            set = obj->nodesetval;
+
+            set = ctxt->value->nodesetval;
             if (set != NULL)
-                xmlXPathNodeSetFilter(ctxt, set, op->ch2,
-                                      1, set->nodeNr, 1);
-            valuePush(ctxt, obj);
+                xmlXPathNodeSetFilter(ctxt, set, op->ch2, 1, set->nodeNr, 1);
             break;
         }
 
