@@ -155,8 +155,16 @@
 
 typedef enum {
     XPATH_OP_END=0,
+
+    /* unary bool ops */
+    XPATH_OP_BOOL,
+    XPATH_OP_NOT,
+
+    /* binary bool ops */
     XPATH_OP_AND,
     XPATH_OP_OR,
+
+    /* relational ops */
     XPATH_OP_EQ,
     XPATH_OP_NE,
     XPATH_OP_LT,
@@ -217,7 +225,7 @@ xmlXPathTrueCompiler(xmlXPathParserContextPtr ctxt,
                      const xmlXPathStandardFunction *sfunc, int nargs);
 
 static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
-    { "boolean", xmlXPathBooleanFunction, NULL, 0, 0 },
+    { "boolean", xmlXPathBooleanFunction, NULL, XPATH_OP_BOOL, 1 },
     { "ceiling", xmlXPathCeilingFunction, NULL, XPATH_OP_CEIL, 1 },
     { "count", xmlXPathCountFunction, NULL, 0, 0 },
     { "concat", xmlXPathConcatFunction, NULL, 0, 0 },
@@ -229,7 +237,7 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
     { "last", xmlXPathLastFunction, NULL, 0, 0 },
     { "lang", xmlXPathLangFunction, NULL, 0, 0 },
     { "local-name", xmlXPathLocalNameFunction, NULL, 0, 0 },
-    { "not", xmlXPathNotFunction, NULL, 0, 0 },
+    { "not", xmlXPathNotFunction, NULL, XPATH_OP_NOT, 1 },
     { "name", xmlXPathNameFunction, NULL, 0, 0 },
     { "namespace-uri", xmlXPathNamespaceURIFunction, NULL, 0, 0 },
     { "normalize-space", xmlXPathNormalizeFunction, NULL, 0, 0 },
@@ -11402,6 +11410,21 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
     comp = ctxt->comp;
     switch (op->op) {
         case XPATH_OP_END:
+            break;
+
+        case XPATH_OP_BOOL:
+        case XPATH_OP_NOT:
+            total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
+            CHECK_ERROR0;
+
+            /* Convert arg 1 to bool */
+            if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_BOOLEAN))
+                xmlXPathBooleanFuncInternal(ctxt);
+            CHECK_ERROR0;
+
+            if (op->op == XPATH_OP_NOT)
+                ctxt->value->boolval = !ctxt->value->boolval;
+
             break;
 
         case XPATH_OP_AND:
