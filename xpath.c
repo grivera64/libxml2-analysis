@@ -11609,93 +11609,94 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
         case XPATH_OP_VALUE:
             valuePush(ctxt, xmlXPathCacheObjectCopy(ctxt, op->as.obj));
             break;
-        case XPATH_OP_VARIABLE:{
-		xmlXPathObjectPtr val;
+
+        case XPATH_OP_VARIABLE: {
+            xmlXPathObjectPtr val;
+            const xmlChar *URI = NULL;
+
+            if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
+                URI = op->qname.ns.uri;
+            } else if (op->qname.ns.prefix != NULL) {
+                URI = xmlXPathNsLookup(ctxt->context, op->qname.ns.prefix);
+                if (URI == NULL) {
+                    XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
+                    break;
+                }
+            }
+            val = xmlXPathVariableLookupNS(ctxt->context,
+                                           op->qname.name, URI);
+            if (val == NULL)
+                XP_ERROR0(XPATH_UNDEF_VARIABLE_ERROR);
+            valuePush(ctxt, val);
+            break;
+        }
+
+        case XPATH_OP_FUNCTION: {
+            xmlXPathFunction func = NULL;
+            const xmlChar *oldFunc, *oldFuncURI;
+            int i;
+            int frame;
+            int nbArgs = op->nbArgs;
+            int flags = ctxt->comp->flags;
+
+            frame = ctxt->valueNr;
+            if (op->ch1 != -1) {
+                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
+                if (ctxt->error != XPATH_EXPRESSION_OK)
+                    break;
+            }
+            if (ctxt->valueNr < frame + nbArgs)
+                XP_ERROR0(XPATH_INVALID_OPERAND);
+            for (i = 0; i < nbArgs; i++) {
+                if (ctxt->valueTab[(ctxt->valueNr - 1) - i] == NULL)
+                    XP_ERROR0(XPATH_INVALID_OPERAND);
+            }
+            if (op->as.func != NULL) {
+                func = op->as.func;
+            } else {
                 const xmlChar *URI = NULL;
 
-                if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
+                if (flags & XML_XPATH_COMPILE_NS) {
                     URI = op->qname.ns.uri;
                 } else if (op->qname.ns.prefix != NULL) {
                     URI = xmlXPathNsLookup(ctxt->context, op->qname.ns.prefix);
-                    if (URI == NULL) {
+                    if (URI == NULL)
                         XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
-                        break;
+                }
+                func = xmlXPathFunctionLookupNS(ctxt->context, op->qname.name,
+                                                URI);
+                if (func == NULL)
+                    XP_ERROR0(XPATH_UNKNOWN_FUNC_ERROR);
+
+                /*
+                 * This modifies the compiled expression and isn't
+                 * thread-safe.
+                 */
+                if (func != NULL) {
+                    xmlXPathStepOpPtr mutOp = (xmlXPathStepOpPtr) op;
+
+                    if ((comp->dict == NULL) &&
+                        ((flags & XML_XPATH_COMPILE_NS) == 0) &&
+                        (mutOp->qname.ns.prefix != NULL)) {
+                        xmlFree(mutOp->qname.ns.prefix);
                     }
-                }
-                val = xmlXPathVariableLookupNS(ctxt->context,
-                                               op->qname.name, URI);
-                if (val == NULL)
-                    XP_ERROR0(XPATH_UNDEF_VARIABLE_ERROR);
-                valuePush(ctxt, val);
-                break;
+                    mutOp->qname.ns.uri = URI;
+                    mutOp->as.func = func;
+                 }
             }
-        case XPATH_OP_FUNCTION:{
-                xmlXPathFunction func = NULL;
-                const xmlChar *oldFunc, *oldFuncURI;
-		int i;
-                int frame;
-                int nbArgs = op->nbArgs;
-                int flags = ctxt->comp->flags;
+            oldFunc = ctxt->context->function;
+            oldFuncURI = ctxt->context->functionURI;
+            ctxt->context->function = op->qname.name;
+            ctxt->context->functionURI = op->qname.ns.uri;
+            func(ctxt, op->nbArgs);
+            ctxt->context->function = oldFunc;
+            ctxt->context->functionURI = oldFuncURI;
+            if ((ctxt->error == XPATH_EXPRESSION_OK) &&
+                (ctxt->valueNr != frame + 1))
+                XP_ERROR0(XPATH_STACK_ERROR);
+            break;
+        }
 
-                frame = ctxt->valueNr;
-                if (op->ch1 != -1) {
-                    total +=
-                        xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-                    if (ctxt->error != XPATH_EXPRESSION_OK)
-                        break;
-                }
-		if (ctxt->valueNr < frame + nbArgs)
-		    XP_ERROR0(XPATH_INVALID_OPERAND);
-		for (i = 0; i < nbArgs; i++) {
-		    if (ctxt->valueTab[(ctxt->valueNr - 1) - i] == NULL)
-			XP_ERROR0(XPATH_INVALID_OPERAND);
-                }
-                if (op->as.func != NULL) {
-                    func = op->as.func;
-                } else {
-                    const xmlChar *URI = NULL;
-
-                    if (flags & XML_XPATH_COMPILE_NS) {
-                        URI = op->qname.ns.uri;
-                    } else if (op->qname.ns.prefix != NULL) {
-                        URI = xmlXPathNsLookup(ctxt->context,
-                                               op->qname.ns.prefix);
-                        if (URI == NULL)
-                            XP_ERROR0(XPATH_UNDEF_PREFIX_ERROR);
-                    }
-                    func = xmlXPathFunctionLookupNS(ctxt->context,
-                                                    op->qname.name, URI);
-                    if (func == NULL)
-                        XP_ERROR0(XPATH_UNKNOWN_FUNC_ERROR);
-
-                    /*
-                     * This modifies the compiled expression and isn't
-                     * thread-safe.
-                     */
-                    if (func != NULL) {
-                        xmlXPathStepOpPtr mutOp = (xmlXPathStepOpPtr) op;
-
-                        if ((comp->dict == NULL) &&
-                            ((flags & XML_XPATH_COMPILE_NS) == 0) &&
-                            (mutOp->qname.ns.prefix != NULL)) {
-                            xmlFree(mutOp->qname.ns.prefix);
-                        }
-                        mutOp->qname.ns.uri = URI;
-                        mutOp->as.func = func;
-                     }
-                }
-                oldFunc = ctxt->context->function;
-                oldFuncURI = ctxt->context->functionURI;
-                ctxt->context->function = op->qname.name;
-                ctxt->context->functionURI = op->qname.ns.uri;
-                func(ctxt, op->nbArgs);
-                ctxt->context->function = oldFunc;
-                ctxt->context->functionURI = oldFuncURI;
-                if ((ctxt->error == XPATH_EXPRESSION_OK) &&
-                    (ctxt->valueNr != frame + 1))
-                    XP_ERROR0(XPATH_STACK_ERROR);
-                break;
-            }
         case XPATH_OP_ARG:
             if (op->ch1 != -1) {
                 /* next arg */
@@ -11706,121 +11707,123 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch2]);
             CHECK_ERROR0;
             break;
+
         case XPATH_OP_PREDICATE:
-        case XPATH_OP_FILTER:{
-                xmlXPathObjectPtr obj;
-                xmlNodeSetPtr set;
+        case XPATH_OP_FILTER: {
+            xmlXPathObjectPtr obj;
+            xmlNodeSetPtr set;
 
-                /*
-                 * Optimization for ()[1] selection i.e. the first elem
-                 */
-                if (
+            /*
+             * Optimization for ()[1] selection i.e. the first elem
+             */
+            if (
 #ifdef XP_OPTIMIZED_FILTER_FIRST
-		    /*
-		    * FILTER TODO: Can we assume that the inner processing
-		    *  will result in an ordered list if we have an
-		    *  XPATH_OP_FILTER?
-		    *  What about an additional field or flag on
-		    *  xmlXPathObject like @sorted ? This way we wouldn't need
-		    *  to assume anything, so it would be more robust and
-		    *  easier to optimize.
-		    */
-                    ((comp->steps[op->ch1].op == XPATH_OP_SORT) || /* 18 */
-		     (comp->steps[op->ch1].op == XPATH_OP_FILTER)) && /* 17 */
+                /*
+                * FILTER TODO: Can we assume that the inner processing
+                *  will result in an ordered list if we have an
+                *  XPATH_OP_FILTER?
+                *  What about an additional field or flag on
+                *  xmlXPathObject like @sorted ? This way we wouldn't need
+                *  to assume anything, so it would be more robust and
+                *  easier to optimize.
+                */
+                ((comp->steps[op->ch1].op == XPATH_OP_SORT) || /* 18 */
+                 (comp->steps[op->ch1].op == XPATH_OP_FILTER)) && /* 17 */
 #else
-		    (comp->steps[op->ch1].op == XPATH_OP_SORT) &&
+                (comp->steps[op->ch1].op == XPATH_OP_SORT) &&
 #endif
-                    (comp->steps[op->ch2].op == XPATH_OP_VALUE)) { /* 12 */
-                    xmlXPathObjectPtr val;
+                (comp->steps[op->ch2].op == XPATH_OP_VALUE)) { /* 12 */
+                xmlXPathObjectPtr val;
 
-                    val = comp->steps[op->ch2].as.obj;
-                    if ((val != NULL) && (val->type == XPATH_NUMBER) &&
-                        (val->floatval == 1.0)) {
-                        xmlNodePtr first = NULL;
+                val = comp->steps[op->ch2].as.obj;
+                if ((val != NULL) && (val->type == XPATH_NUMBER) &&
+                    (val->floatval == 1.0)) {
+                    xmlNodePtr first = NULL;
 
-                        total +=
-                            xmlXPathCompOpEvalFirst(ctxt,
-                                                    &comp->steps[op->ch1],
-                                                    &first);
-			CHECK_ERROR0;
-                        /*
-                         * The nodeset should be in document order,
-                         * Keep only the first value
-                         */
-                        if ((ctxt->value != NULL) &&
-                            (ctxt->value->type == XPATH_NODESET) &&
-                            (ctxt->value->nodesetval != NULL) &&
-                            (ctxt->value->nodesetval->nodeNr > 1))
-                            xmlXPathNodeSetClearFromPos(ctxt->value->nodesetval,
-                                                        1, 1);
-                        break;
-                    }
-                }
-                /*
-                 * Optimization for ()[last()] selection i.e. the last elem
-                 */
-                if ((comp->steps[op->ch1].op == XPATH_OP_SORT) &&
-                    (comp->steps[op->ch2].op == XPATH_OP_SORT)) {
-                    int f = comp->steps[op->ch2].ch1;
-
-                    if ((f != -1) &&
-                        (comp->steps[f].op == XPATH_OP_FUNCTION) &&
-                        (comp->steps[f].nbArgs == 0) &&
-                        (comp->steps[f].qname.ns.prefix == NULL) &&
-                        (comp->steps[f].qname.name != NULL) &&
-                        (xmlStrEqual
-                         (comp->steps[f].qname.name, BAD_CAST "last"))) {
-                        xmlNodePtr last = NULL;
-
-                        total +=
-                            xmlXPathCompOpEvalLast(ctxt,
-                                                   &comp->steps[op->ch1],
-                                                   &last);
-			CHECK_ERROR0;
-                        /*
-                         * The nodeset should be in document order,
-                         * Keep only the last value
-                         */
-                        if ((ctxt->value != NULL) &&
-                            (ctxt->value->type == XPATH_NODESET) &&
-                            (ctxt->value->nodesetval != NULL) &&
-                            (ctxt->value->nodesetval->nodeTab != NULL) &&
-                            (ctxt->value->nodesetval->nodeNr > 1))
-                            xmlXPathNodeSetKeepLast(ctxt->value->nodesetval);
-                        break;
-                    }
-                }
-		/*
-		* Process inner predicates first.
-		* Example "index[parent::book][1]":
-		* ...
-		*   PREDICATE   <-- we are here "[1]"
-		*     PREDICATE <-- process "[parent::book]" first
-		*       SORT
-		*         COLLECT  'parent' 'name' 'node' book
-		*           NODE
-		*     ELEM Object is a number : 1
-		*/
-                total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
-		CHECK_ERROR0;
-                if (ctxt->value == NULL)
+                    total +=
+                        xmlXPathCompOpEvalFirst(ctxt,
+                                                &comp->steps[op->ch1],
+                                                &first);
+                    CHECK_ERROR0;
+                    /*
+                     * The nodeset should be in document order,
+                     * Keep only the first value
+                     */
+                    if ((ctxt->value != NULL) &&
+                        (ctxt->value->type == XPATH_NODESET) &&
+                        (ctxt->value->nodesetval != NULL) &&
+                        (ctxt->value->nodesetval->nodeNr > 1))
+                        xmlXPathNodeSetClearFromPos(ctxt->value->nodesetval,
+                                                    1, 1);
                     break;
-
-                /*
-                 * In case of errors, xmlXPathNodeSetFilter can pop additional
-                 * nodes from the stack. We have to temporarily remove the
-                 * nodeset object from the stack to avoid freeing it
-                 * prematurely.
-                 */
-                CHECK_TYPE0(XPATH_NODESET);
-                obj = valuePop(ctxt);
-                set = obj->nodesetval;
-                if (set != NULL)
-                    xmlXPathNodeSetFilter(ctxt, set, op->ch2,
-                                          1, set->nodeNr, 1);
-                valuePush(ctxt, obj);
-                break;
+                }
             }
+            /*
+             * Optimization for ()[last()] selection i.e. the last elem
+             */
+            if ((comp->steps[op->ch1].op == XPATH_OP_SORT) &&
+                (comp->steps[op->ch2].op == XPATH_OP_SORT)) {
+                int f = comp->steps[op->ch2].ch1;
+
+                if ((f != -1) &&
+                    (comp->steps[f].op == XPATH_OP_FUNCTION) &&
+                    (comp->steps[f].nbArgs == 0) &&
+                    (comp->steps[f].qname.ns.prefix == NULL) &&
+                    (comp->steps[f].qname.name != NULL) &&
+                    (xmlStrEqual
+                     (comp->steps[f].qname.name, BAD_CAST "last"))) {
+                    xmlNodePtr last = NULL;
+
+                    total +=
+                        xmlXPathCompOpEvalLast(ctxt,
+                                               &comp->steps[op->ch1],
+                                               &last);
+                    CHECK_ERROR0;
+                    /*
+                     * The nodeset should be in document order,
+                     * Keep only the last value
+                     */
+                    if ((ctxt->value != NULL) &&
+                        (ctxt->value->type == XPATH_NODESET) &&
+                        (ctxt->value->nodesetval != NULL) &&
+                        (ctxt->value->nodesetval->nodeTab != NULL) &&
+                        (ctxt->value->nodesetval->nodeNr > 1))
+                        xmlXPathNodeSetKeepLast(ctxt->value->nodesetval);
+                    break;
+                }
+            }
+            /*
+            * Process inner predicates first.
+            * Example "index[parent::book][1]":
+            * ...
+            *   PREDICATE   <-- we are here "[1]"
+            *     PREDICATE <-- process "[parent::book]" first
+            *       SORT
+            *         COLLECT  'parent' 'name' 'node' book
+            *           NODE
+            *     ELEM Object is a number : 1
+            */
+            total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
+            CHECK_ERROR0;
+            if (ctxt->value == NULL)
+                break;
+
+            /*
+             * In case of errors, xmlXPathNodeSetFilter can pop additional
+             * nodes from the stack. We have to temporarily remove the
+             * nodeset object from the stack to avoid freeing it
+             * prematurely.
+             */
+            CHECK_TYPE0(XPATH_NODESET);
+            obj = valuePop(ctxt);
+            set = obj->nodesetval;
+            if (set != NULL)
+                xmlXPathNodeSetFilter(ctxt, set, op->ch2,
+                                      1, set->nodeNr, 1);
+            valuePush(ctxt, obj);
+            break;
+        }
+
         case XPATH_OP_SORT:
             total += xmlXPathCompOpEval(ctxt, &comp->steps[op->ch1]);
 	    CHECK_ERROR0;
