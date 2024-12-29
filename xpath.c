@@ -12498,6 +12498,29 @@ xmlXPathOptimizeExpression(xmlXPathParserContextPtr pctxt,
         ctxt->depth -= 1;
 }
 
+static void
+xmlXPathDoCompile(xmlXPathParserContext *pctxt) {
+    xmlXPathContext *ctxt = pctxt->context;
+    xmlXPathCompExprPtr comp = pctxt->comp;
+    int oldDepth;
+
+    comp->flags = ctxt->flags;
+
+    oldDepth = ctxt->depth;
+
+    xmlXPathCompileExpr(pctxt, 1);
+
+    if (*pctxt->cur != 0)
+	xmlXPathErr(pctxt, XPATH_EXPR_ERROR);
+
+    if (pctxt->error == XPATH_EXPRESSION_OK) {
+        if ((comp->nbStep > 1) && (comp->last >= 0))
+            xmlXPathOptimizeExpression(pctxt, &comp->steps[comp->last]);
+    }
+
+    ctxt->depth = oldDepth;
+}
+
 /**
  * xmlXPathCtxtCompile:
  * @ctxt: an XPath context
@@ -12510,10 +12533,9 @@ xmlXPathOptimizeExpression(xmlXPathParserContextPtr pctxt,
  */
 xmlXPathCompExprPtr
 xmlXPathCtxtCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
-    xmlXPathParserContextPtr pctxt;
+    xmlXPathParserContextPtr pctxt = NULL;
     xmlXPathContextPtr tmpctxt = NULL;
-    xmlXPathCompExprPtr comp;
-    int oldDepth = 0;
+    xmlXPathCompExprPtr comp = NULL;
 
 #ifdef XPATH_STREAMING
     comp = xmlXPathTryStreamCompile(ctxt, str);
@@ -12527,57 +12549,30 @@ xmlXPathCtxtCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
     if (ctxt == NULL) {
         tmpctxt = xmlXPathNewContext(NULL);
         if (tmpctxt == NULL)
-            return(NULL);
+            goto error;
         ctxt = tmpctxt;
     }
 
     pctxt = xmlXPathNewParserContext(str, ctxt);
-    if (pctxt == NULL) {
-        if (tmpctxt != NULL)
-            xmlXPathFreeContext(tmpctxt);
-        return NULL;
-    }
-    pctxt->comp->flags = ctxt->flags;
+    if (pctxt == NULL)
+        goto error;
 
-    oldDepth = ctxt->depth;
-    xmlXPathCompileExpr(pctxt, 1);
-    ctxt->depth = oldDepth;
+    xmlXPathDoCompile(pctxt);
 
-    if( pctxt->error != XPATH_EXPRESSION_OK )
-    {
-        xmlXPathFreeParserContext(pctxt);
-        if (tmpctxt != NULL)
-            xmlXPathFreeContext(tmpctxt);
-        return(NULL);
-    }
+    pctxt->comp->expr = xmlStrdup(str);
+    if (pctxt->comp->expr == NULL)
+        xmlXPathPErrMemory(pctxt);
 
-    if (*pctxt->cur != 0) {
-	/*
-	 * aleksey: in some cases this line prints *second* error message
-	 * (see bug #78858) and probably this should be fixed.
-	 * However, we are not sure that all error messages are printed
-	 * out in other places. It's not critical so we leave it as-is for now
-	 */
-	xmlXPathErr(pctxt, XPATH_EXPR_ERROR);
-	comp = NULL;
-    } else {
-	comp = pctxt->comp;
-	if ((comp->nbStep > 1) && (comp->last >= 0)) {
-            if (ctxt != NULL)
-                oldDepth = ctxt->depth;
-	    xmlXPathOptimizeExpression(pctxt, &comp->steps[comp->last]);
-            if (ctxt != NULL)
-                ctxt->depth = oldDepth;
-	}
-	pctxt->comp = NULL;
-    }
+    if (pctxt->error != XPATH_EXPRESSION_OK)
+        goto error;
+
+    comp = pctxt->comp;
+    pctxt->comp = NULL;
+
+error:
     xmlXPathFreeParserContext(pctxt);
     if (tmpctxt != NULL)
         xmlXPathFreeContext(tmpctxt);
-
-    if (comp != NULL) {
-	comp->expr = xmlStrdup(str);
-    }
     return(comp);
 }
 
@@ -12697,7 +12692,6 @@ xmlXPathEvalExpr(xmlXPathParserContextPtr ctxt) {
 #ifdef XPATH_STREAMING
     xmlXPathCompExprPtr comp;
 #endif
-    int oldDepth = 0;
 
     if ((ctxt == NULL) || (ctxt->context == NULL))
         return;
@@ -12718,27 +12712,7 @@ xmlXPathEvalExpr(xmlXPathParserContextPtr ctxt) {
     } else
 #endif
     {
-        ctxt->comp->flags = ctxt->context->flags;
-
-        if (ctxt->context != NULL)
-            oldDepth = ctxt->context->depth;
-	xmlXPathCompileExpr(ctxt, 1);
-        if (ctxt->context != NULL)
-            ctxt->context->depth = oldDepth;
-        CHECK_ERROR;
-
-        /* Check for trailing characters. */
-        if (*ctxt->cur != 0)
-            XP_ERROR(XPATH_EXPR_ERROR);
-
-	if ((ctxt->comp->nbStep > 1) && (ctxt->comp->last >= 0)) {
-            if (ctxt->context != NULL)
-                oldDepth = ctxt->context->depth;
-	    xmlXPathOptimizeExpression(ctxt,
-		&ctxt->comp->steps[ctxt->comp->last]);
-            if (ctxt->context != NULL)
-                ctxt->context->depth = oldDepth;
-        }
+        xmlXPathDoCompile(ctxt);
     }
 
     xmlXPathRunEval(ctxt, 0);
