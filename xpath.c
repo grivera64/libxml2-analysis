@@ -2160,13 +2160,13 @@ valuePush(xmlXPathParserContextPtr ctxt, xmlXPathObjectPtr value)
  * Returns the boolean
  */
 int
-xmlXPathPopBoolean (xmlXPathParserContextPtr ctxt) {
+xmlXPathPopBoolean(xmlXPathParserContextPtr ctxt) {
     xmlXPathObjectPtr obj;
     int ret;
 
     obj = valuePop(ctxt);
     if (obj == NULL) {
-	xmlXPathSetError(ctxt, XPATH_INVALID_OPERAND);
+	xmlXPathErr(ctxt, XPATH_STACK_ERROR);
 	return(0);
     }
     if (obj->type != XPATH_BOOLEAN)
@@ -2187,13 +2187,13 @@ xmlXPathPopBoolean (xmlXPathParserContextPtr ctxt) {
  * Returns the number
  */
 double
-xmlXPathPopNumber (xmlXPathParserContextPtr ctxt) {
+xmlXPathPopNumber(xmlXPathParserContextPtr ctxt) {
     xmlXPathObjectPtr obj;
     double ret;
 
     obj = valuePop(ctxt);
     if (obj == NULL) {
-	xmlXPathSetError(ctxt, XPATH_INVALID_OPERAND);
+	xmlXPathErr(ctxt, XPATH_STACK_ERROR);
 	return(0);
     }
     if (obj->type != XPATH_NUMBER)
@@ -2214,18 +2214,23 @@ xmlXPathPopNumber (xmlXPathParserContextPtr ctxt) {
  * Returns the string
  */
 xmlChar *
-xmlXPathPopString (xmlXPathParserContextPtr ctxt) {
+xmlXPathPopString(xmlXPathParserContextPtr ctxt) {
     xmlXPathObjectPtr obj;
-    xmlChar * ret;
+    xmlChar *ret;
 
     obj = valuePop(ctxt);
     if (obj == NULL) {
-	xmlXPathSetError(ctxt, XPATH_INVALID_OPERAND);
+	xmlXPathErr(ctxt, XPATH_STACK_ERROR);
 	return(NULL);
     }
-    ret = xmlXPathCastToString(obj);
-    if (ret == NULL)
-        xmlXPathPErrMemory(ctxt);
+    if (obj->type != XPATH_STRING) {
+        ret = xmlXPathCastToString(obj);
+        if (ret == NULL)
+            xmlXPathPErrMemory(ctxt);
+    } else {
+        ret = obj->stringval;
+        obj->stringval = NULL;
+    }
     xmlXPathReleaseObject(ctxt->context, obj);
     return(ret);
 }
@@ -2240,20 +2245,19 @@ xmlXPathPopString (xmlXPathParserContextPtr ctxt) {
  * Returns the node-set
  */
 xmlNodeSetPtr
-xmlXPathPopNodeSet (xmlXPathParserContextPtr ctxt) {
+xmlXPathPopNodeSet(xmlXPathParserContextPtr ctxt) {
     xmlXPathObjectPtr obj;
     xmlNodeSetPtr ret;
 
-    if (ctxt == NULL) return(NULL);
-    if (ctxt->value == NULL) {
-	xmlXPathSetError(ctxt, XPATH_INVALID_OPERAND);
-	return(NULL);
-    }
-    if (!xmlXPathStackIsNodeSet(ctxt)) {
-	xmlXPathSetTypeError(ctxt);
-	return(NULL);
-    }
     obj = valuePop(ctxt);
+    if (obj == NULL) {
+	xmlXPathErr(ctxt, XPATH_STACK_ERROR);
+	return(NULL);
+    }
+    if (obj->type != XPATH_NODESET) {
+	xmlXPathErr(ctxt, XPATH_INVALID_TYPE);
+	return(NULL);
+    }
     ret = obj->nodesetval;
     obj->nodesetval = NULL;
     xmlXPathReleaseObject(ctxt->context, obj);
@@ -2270,19 +2274,19 @@ xmlXPathPopNodeSet (xmlXPathParserContextPtr ctxt) {
  * Returns the object
  */
 void *
-xmlXPathPopExternal (xmlXPathParserContextPtr ctxt) {
+xmlXPathPopExternal(xmlXPathParserContextPtr ctxt) {
     xmlXPathObjectPtr obj;
-    void * ret;
+    void *ret;
 
-    if ((ctxt == NULL) || (ctxt->value == NULL)) {
-	xmlXPathSetError(ctxt, XPATH_INVALID_OPERAND);
-	return(NULL);
-    }
-    if (ctxt->value->type != XPATH_USERS) {
-	xmlXPathSetTypeError(ctxt);
-	return(NULL);
-    }
     obj = valuePop(ctxt);
+    if (obj == NULL) {
+	xmlXPathErr(ctxt, XPATH_STACK_ERROR);
+	return(NULL);
+    }
+    if (obj->type != XPATH_USERS) {
+	xmlXPathErr(ctxt, XPATH_INVALID_TYPE);
+	return(NULL);
+    }
     ret = obj->user;
     obj->user = NULL;
     xmlXPathReleaseObject(ctxt->context, obj);
