@@ -8378,8 +8378,8 @@ xmlXPathSumFunction(xmlXPathParserContextPtr ctxt, int nargs) {
                                                 cur->nodesetval->nodeTab[i]);
 	}
     }
-    valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, res));
     xmlXPathReleaseObject(ctxt->context, cur);
+    valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, res));
 }
 
 /**
@@ -11602,8 +11602,8 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, const xmlXPathStepOp *op)
                     xmlXPathPErrMemory(ctxt);
 	    }
 
-            valuePush(ctxt, arg1);
 	    xmlXPathReleaseObject(xpctxt, arg2);
+            valuePush(ctxt, arg1);
             break;
 
         case XPATH_OP_ROOT:
