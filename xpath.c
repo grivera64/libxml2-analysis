@@ -7226,20 +7226,20 @@ xmlXPathPositionFunction(xmlXPathParserContextPtr ctxt, int nargs) {
 void
 xmlXPathCountFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     xmlXPathObjectPtr cur;
+    int result = 0;
 
     CHECK_ARITY(1);
-    if ((ctxt->value == NULL) ||
-	((ctxt->value->type != XPATH_NODESET) &&
-	 (ctxt->value->type != XPATH_XSLT_TREE)))
-	XP_ERROR(XPATH_INVALID_TYPE);
     cur = valuePop(ctxt);
+    if ((cur == NULL) ||
+	((cur->type != XPATH_NODESET) &&
+         (cur->type != XPATH_XSLT_TREE)))
+	XP_ERROR(XPATH_INVALID_TYPE);
 
-    if ((cur == NULL) || (cur->nodesetval == NULL))
-	valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, 0.0));
-    else
-	valuePush(ctxt, xmlXPathCacheNewFloat(ctxt,
-	    (double) cur->nodesetval->nodeNr));
+    if (cur->nodesetval != NULL)
+        result = cur->nodesetval->nodeNr;
+
     xmlXPathReleaseObject(ctxt->context, cur);
+    valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, result));
 }
 
 /**
