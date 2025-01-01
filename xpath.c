@@ -6177,21 +6177,22 @@ typedef xmlNodeSetPtr (*xmlXPathNodeSetMergeFunction)
 typedef struct {
     union {
         xmlNodePtr node;
-        struct {
-            xmlNsPtr *list;
-            int index;
-        } ns;
+        xmlNodePtr *nodes;
     } as;
-} xmlIterCtxt;
+
+    int index;
+    int hasNodes;
+} xmlIter;
 
 typedef xmlNodePtr
-(*xmlIterNextFunc)(xmlIterCtxt *ctxt, xmlNodePtr cur);
+(*xmlIterNextFunc)(xmlIter *ctxt, xmlNodePtr cur);
 
 typedef xmlNodePtr
-(*xmlIterStartFunc)(xmlIterCtxt *ctxt, xmlNodePtr cur, xmlIterNextFunc *next);
+(*xmlIterStartFunc)(xmlIter *ctxt, xmlNodePtr cur, int direction,
+                    xmlIterNextFunc *next);
 
 static xmlNodePtr
-xmlIterEnd(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+xmlIterEnd(xmlIter *ctxt, xmlNodePtr cur) {
     (void) ctxt;
     (void) cur;
 
@@ -6199,28 +6200,46 @@ xmlIterEnd(xmlIterCtxt *ctxt, xmlNodePtr cur) {
 }
 
 static xmlNodePtr
-xmlIterNextSibling(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+xmlIterNextSibling(xmlIter *ctxt, xmlNodePtr cur) {
     (void) ctxt;
 
     return(cur->next);
 }
 
 static xmlNodePtr
-xmlIterPrevSibling(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+xmlIterPrevSibling(xmlIter *ctxt, xmlNodePtr cur) {
     (void) ctxt;
 
     return(cur->prev);
 }
 
 static xmlNodePtr
-xmlIterNextParent(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+xmlIterNextSiblingUntil(xmlIter *ctxt, xmlNodePtr cur) {
+    xmlNodePtr node = cur->next;
+
+    if (node == ctxt->as.node)
+        return(NULL);
+    return(node);
+}
+
+static xmlNodePtr
+xmlIterPrevSiblingUntil(xmlIter *ctxt, xmlNodePtr cur) {
+    xmlNodePtr node = cur->prev;
+
+    if (node == ctxt->as.node)
+        return(NULL);
+    return(node);
+}
+
+static xmlNodePtr
+xmlIterNextParent(xmlIter *ctxt, xmlNodePtr cur) {
     (void) ctxt;
 
     return(cur->parent);
 }
 
 static xmlNodePtr
-xmlIterNextParentNs(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+xmlIterNextParentNs(xmlIter *ctxt, xmlNodePtr cur) {
     (void) ctxt;
 
     if (cur->type == XML_NAMESPACE_DECL) {
@@ -6233,7 +6252,7 @@ xmlIterNextParentNs(xmlIterCtxt *ctxt, xmlNodePtr cur) {
 }
 
 static xmlNodePtr
-xmlIterNextDescendant(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+xmlIterNextDescendant(xmlIter *ctxt, xmlNodePtr cur) {
     if ((cur->children != NULL) && ((1 << cur->type) & TYPE_MASK_NODE))
         return(cur->children);
 
@@ -6248,7 +6267,30 @@ xmlIterNextDescendant(xmlIterCtxt *ctxt, xmlNodePtr cur) {
 }
 
 static xmlNodePtr
-xmlIterNextPreceding(xmlIterCtxt *ctxt, xmlNodePtr cur) {
+xmlIterPrevDescendant(xmlIter *ctxt, xmlNodePtr cur) {
+    if (cur->prev == NULL) {
+        cur = cur->parent;
+        if ((cur == NULL) || (cur == ctxt->as.node))
+            return(NULL);
+
+        return(cur);
+    }
+
+    cur = cur->prev;
+    if (cur == ctxt->as.node)
+        return(NULL);
+
+    while ((cur->last != NULL) && ((1 << cur->last->type) & TYPE_MASK_NODE)) {
+        if (cur == ctxt->as.node)
+            return(NULL);
+        cur = cur->last;
+    }
+
+    return(cur);
+}
+
+static xmlNodePtr
+xmlIterNextPreceding(xmlIter *ctxt, xmlNodePtr cur) {
     if (cur->prev == NULL) {
         cur = cur->parent;
         if (cur == NULL)
@@ -6274,239 +6316,537 @@ xmlIterNextPreceding(xmlIterCtxt *ctxt, xmlNodePtr cur) {
 }
 
 static xmlNodePtr
-xmlIterNextNamespace(xmlIterCtxt *ctxt, xmlNodePtr cur) {
-    (void) cur;
+xmlIterPrevPreceding(xmlIter *ctxt, xmlNodePtr cur) {
+    int i;
 
-    if (ctxt->as.ns.index == 0)
-        return(NULL);
+    if ((cur->children != NULL) && ((1 << cur->type) & TYPE_MASK_NODE))
+        return(cur->children);
 
-    return((xmlNodePtr) ctxt->as.ns.list[--ctxt->as.ns.index]);
-}
+    while (cur->next == NULL) {
+        cur = cur->parent;
 
-static xmlNodePtr
-xmlIterStartSelf(xmlIterCtxt *ctxt, xmlNodePtr cur, xmlIterNextFunc *next) {
-    (void) ctxt;
-
-    *next = xmlIterEnd;
-    return(cur);
-}
-
-static xmlNodePtr
-xmlIterStartChild(xmlIterCtxt *ctxt, xmlNodePtr cur, xmlIterNextFunc *next) {
-    (void) ctxt;
-
-    if ((cur->type == XML_ATTRIBUTE_NODE) ||
-        (cur->type == XML_NAMESPACE_DECL))
-        return(NULL);
-
-    *next = xmlIterNextSibling;
-    return(cur->children);
-}
-
-static xmlNodePtr
-xmlIterStartAttribute(xmlIterCtxt *ctxt, xmlNodePtr cur,
-                      xmlIterNextFunc *next) {
-    (void) ctxt;
-
-    if (cur->type != XML_ELEMENT_NODE)
-        return(NULL);
-
-    *next = xmlIterNextSibling;
-    return((xmlNodePtr) cur->properties);
-}
-
-static xmlNodePtr
-xmlIterStartDescendant(xmlIterCtxt *ctxt, xmlNodePtr cur,
-                       xmlIterNextFunc *next) {
-    if ((cur->type == XML_ATTRIBUTE_NODE) ||
-        (cur->type == XML_NAMESPACE_DECL))
-        return(NULL);
-
-    *next = xmlIterNextDescendant;
-    ctxt->as.node = cur;
-    return(cur->children);
-}
-
-static xmlNodePtr
-xmlIterStartDescendantOrSelf(xmlIterCtxt *ctxt, xmlNodePtr cur,
-                             xmlIterNextFunc *next) {
-    if ((cur->type == XML_ATTRIBUTE_NODE) ||
-        (cur->type == XML_NAMESPACE_DECL)) {
-        *next = xmlIterEnd;
-        return(cur);
-    }
-
-    *next = xmlIterNextDescendant;
-    ctxt->as.node = cur;
-    return(cur);
-}
-
-static xmlNodePtr
-xmlIterStartParent(xmlIterCtxt *ctxt, xmlNodePtr cur, xmlIterNextFunc *next) {
-    (void) ctxt;
-
-    *next = xmlIterEnd;
-
-    if (cur->type == XML_NAMESPACE_DECL) {
-        xmlNsPtr ns = (xmlNsPtr) cur;
-
-        return((xmlNodePtr) ns->next);
-    } else {
-        return(cur->parent);
-    }
-}
-
-static xmlNodePtr
-xmlIterStartAncestor(xmlIterCtxt *ctxt, xmlNodePtr cur,
-                     xmlIterNextFunc *next) {
-    (void) ctxt;
-
-    *next = xmlIterNextParent;
-
-    if (cur->type == XML_NAMESPACE_DECL) {
-        xmlNsPtr ns = (xmlNsPtr) cur;
-
-        return((xmlNodePtr) ns->next);
-    } else {
-        return(cur->parent);
-    }
-}
-
-static xmlNodePtr
-xmlIterStartAncestorOrSelf(xmlIterCtxt *ctxt, xmlNodePtr cur,
-                           xmlIterNextFunc *next) {
-    (void) ctxt;
-
-    if (cur->type == XML_NAMESPACE_DECL)
-        *next = xmlIterNextParentNs;
-    else
-        *next = xmlIterNextParent;
-
-    return(cur);
-}
-
-static xmlNodePtr
-xmlIterStartFollowingSibling(xmlIterCtxt *ctxt, xmlNodePtr cur,
-                             xmlIterNextFunc *next) {
-    (void) ctxt;
-
-    if ((cur->type == XML_ATTRIBUTE_NODE) ||
-        (cur->type == XML_NAMESPACE_DECL) ||
-        (cur->type == XML_DOCUMENT_NODE) ||
-        (cur->type == XML_HTML_DOCUMENT_NODE))
-        return(NULL);
-
-    *next = xmlIterNextSibling;
-    return(cur->next);
-}
-
-static xmlNodePtr
-xmlIterStartPrecedingSibling(xmlIterCtxt *ctxt, xmlNodePtr cur,
-                             xmlIterNextFunc *next) {
-    (void) ctxt;
-
-    if ((cur->type == XML_ATTRIBUTE_NODE) ||
-        (cur->type == XML_NAMESPACE_DECL) ||
-        (cur->type == XML_DOCUMENT_NODE) ||
-        (cur->type == XML_HTML_DOCUMENT_NODE))
-        return(NULL);
-
-    *next = xmlIterPrevSibling;
-    return(cur->prev);
-}
-
-static xmlNodePtr
-xmlIterStartFollowing(xmlIterCtxt *ctxt, xmlNodePtr cur,
-                      xmlIterNextFunc *next) {
-    xmlNodePtr ancestor;
-
-    if (cur->type == XML_ATTRIBUTE_NODE) {
-        ancestor = cur->parent;
-    } else if (cur->type == XML_NAMESPACE_DECL) {
-        xmlNsPtr ns = (xmlNsPtr) cur;
-
-        ancestor = (xmlNodePtr) ns->next;
-    } else {
-        ancestor = cur;
-    }
-
-    while ((ancestor != NULL) &&
-           (ancestor->type != XML_DOCUMENT_NODE) &&
-           (ancestor->type != XML_HTML_DOCUMENT_NODE)) {
-        if (ancestor->next != NULL) {
-            *next = xmlIterNextDescendant;
-            ctxt->as.node = (xmlNodePtr) ancestor->doc;
-            return(ancestor->next);
-        }
-
-        ancestor = ancestor->parent;
-    }
-
-    return(NULL);
-}
-
-static xmlNodePtr
-xmlIterStartPreceding(xmlIterCtxt *ctxt, xmlNodePtr cur,
-                      xmlIterNextFunc *next) {
-    xmlNodePtr ancestor, last;
-
-    if (cur->type == XML_ATTRIBUTE_NODE) {
-        ancestor = cur->parent;
-    } else if (cur->type == XML_NAMESPACE_DECL) {
-        xmlNsPtr ns = (xmlNsPtr) cur;
-
-        ancestor = (xmlNodePtr) ns->next;
-    } else {
-        ancestor = cur;
-    }
-
-    while (ancestor->prev == NULL) {
-        ancestor = ancestor->parent;
-        if ((ancestor == NULL) ||
-            (ancestor->type == XML_DOCUMENT_NODE) ||
-            (ancestor->type == XML_HTML_DOCUMENT_NODE))
+        if ((cur == NULL) || (cur == ctxt->as.node))
             return(NULL);
     }
 
-    *next = xmlIterNextPreceding;
-    ctxt->as.node = ancestor->parent;
+    i = ctxt->index;
+    if (cur->next != ctxt->as.nodes[i])
+        return(cur->next);
 
-    last = ancestor->prev;
+    if (i <= 0)
+        return(NULL);
 
-    while ((last->last != NULL) && ((1 << last->last->type) & TYPE_MASK_NODE))
-        last = last->last;
+    i -= 1;
+    ctxt->index = i;
+    cur = ctxt->as.nodes[i];
 
-    return(last);
+    while (cur->prev != NULL)
+        cur = cur->prev;
+
+    return(cur);
 }
 
 static xmlNodePtr
-xmlIterStartNamespace(xmlIterCtxt *ctxt, xmlNodePtr cur,
+xmlIterNextTable(xmlIter *ctxt, xmlNodePtr cur) {
+    (void) cur;
+
+    if (ctxt->index == 0)
+        return(NULL);
+
+    return(ctxt->as.nodes[--ctxt->index]);
+}
+
+static xmlNodePtr
+xmlIterStartSelf(xmlIter *ctxt, xmlNodePtr node, int direction,
+                 xmlIterNextFunc *next) {
+    (void) direction;
+
+    ctxt->hasNodes = 0;
+    *next = xmlIterEnd;
+    return(node);
+}
+
+static xmlNodePtr
+xmlIterStartChild(xmlIter *ctxt, xmlNodePtr node, int direction,
+                  xmlIterNextFunc *next) {
+    ctxt->hasNodes = 0;
+
+    if ((node->type == XML_ATTRIBUTE_NODE) ||
+        (node->type == XML_NAMESPACE_DECL))
+        return(NULL);
+
+    if (direction >= 0) {
+        *next = xmlIterNextSibling;
+        return(node->children);
+    } else {
+        *next = xmlIterPrevSibling;
+        return(node->last);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartAttribute(xmlIter *ctxt, xmlNodePtr node, int direction,
+                      xmlIterNextFunc *next) {
+    ctxt->hasNodes = 0;
+
+    if (node->type != XML_ELEMENT_NODE)
+        return(NULL);
+
+    if (direction >= 0) {
+        *next = xmlIterNextSibling;
+        return((xmlNodePtr) node->properties);
+    } else {
+        xmlAttrPtr attr = node->properties;
+
+        if (attr != NULL) {
+            while (attr->next != NULL)
+                attr = attr->next;
+        }
+
+        *next = xmlIterPrevSibling;
+        return((xmlNodePtr) attr);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartDescendant(xmlIter *ctxt, xmlNodePtr node, int direction,
+                       xmlIterNextFunc *next) {
+    ctxt->hasNodes = 0;
+
+    if ((node->type == XML_ATTRIBUTE_NODE) ||
+        (node->type == XML_NAMESPACE_DECL))
+        return(NULL);
+
+    if (direction >= 0) {
+        *next = xmlIterNextDescendant;
+        ctxt->as.node = node;
+        return(node->children);
+    } else {
+        xmlNodePtr cur;
+
+        cur = node;
+        while ((cur->last != NULL) &&
+               ((1 << cur->last->type) & TYPE_MASK_NODE))
+            cur = cur->last;
+
+        ctxt->as.node = node;
+        *next = xmlIterPrevDescendant;
+        return(cur);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartDescendantOrSelf(xmlIter *ctxt, xmlNodePtr node, int direction,
+                             xmlIterNextFunc *next) {
+    ctxt->hasNodes = 0;
+
+    if ((node->type == XML_ATTRIBUTE_NODE) ||
+        (node->type == XML_NAMESPACE_DECL)) {
+        *next = xmlIterEnd;
+        return(node);
+    }
+
+    if (direction >= 0) {
+        *next = xmlIterNextDescendant;
+        ctxt->as.node = node;
+        return(node);
+    } else {
+        xmlNodePtr cur;
+
+        if (node->prev != NULL)
+            ctxt->as.node = node->prev;
+        else
+            ctxt->as.node = node->parent;
+
+        cur = node;
+        while ((cur->last != NULL) &&
+               ((1 << cur->last->type) & TYPE_MASK_NODE))
+            cur = cur->last;
+
+        *next = xmlIterPrevDescendant;
+        return(cur);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartParent(xmlIter *ctxt, xmlNodePtr node, int direction,
+                   xmlIterNextFunc *next) {
+    (void) direction;
+
+    ctxt->hasNodes = 0;
+
+    *next = xmlIterEnd;
+
+    if (node->type == XML_NAMESPACE_DECL) {
+        xmlNsPtr ns = (xmlNsPtr) node;
+
+        return((xmlNodePtr) ns->next);
+    } else {
+        return(node->parent);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartAncestor(xmlIter *ctxt, xmlNodePtr node, int direction,
+                     xmlIterNextFunc *next) {
+    xmlNodePtr parent;
+
+    ctxt->hasNodes = 0;
+
+    if (node->type == XML_NAMESPACE_DECL) {
+        xmlNsPtr ns = (xmlNsPtr) node;
+
+        parent = (xmlNodePtr) ns->next;
+    } else {
+        parent = node->parent;
+    }
+
+    if (direction <= 0) {
+        *next = xmlIterNextParent;
+        return(parent);
+    } else {
+        xmlNodePtr cur;
+        xmlNodePtr *nodes = NULL;
+        int numNodes, i;
+
+        if (parent == NULL)
+            return(NULL);
+
+        cur = parent;
+        numNodes = 0;
+
+        if (cur->parent != NULL) {
+            ctxt->hasNodes = 1;
+
+            while (cur->parent != NULL) {
+                numNodes += 1;
+                cur = cur->parent;
+            }
+
+            nodes = xmlMalloc(numNodes * sizeof(nodes[0]));
+            if (nodes == NULL) {
+                ctxt->as.nodes = NULL;
+                return(NULL);
+            }
+
+            i = 0;
+            cur = parent;
+            while (cur->parent != NULL) {
+                nodes[i] = cur;
+                i += 1;
+                cur = cur->parent;
+            }
+        }
+
+        ctxt->as.nodes = nodes;
+        ctxt->index = numNodes;
+
+        *next = xmlIterNextTable;
+        return(cur);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartAncestorOrSelf(xmlIter *ctxt, xmlNodePtr node, int direction,
+                           xmlIterNextFunc *next) {
+    ctxt->hasNodes = 0;
+
+    if (direction <= 0) {
+        if (node->type == XML_NAMESPACE_DECL)
+            *next = xmlIterNextParentNs;
+        else
+            *next = xmlIterNextParent;
+
+        return(node);
+    } else {
+        xmlNodePtr parent, cur;
+        xmlNodePtr *nodes = NULL;
+        int numNodes, i;
+
+        if (node->type == XML_NAMESPACE_DECL) {
+            xmlNsPtr ns = (xmlNsPtr) node;
+
+            parent = (xmlNodePtr) ns->next;
+        } else {
+            parent = node->parent;
+        }
+
+        numNodes = 0;
+
+        if (parent == NULL) {
+            cur = node;
+        } else {
+            ctxt->hasNodes = 1;
+
+            cur = parent;
+            numNodes += 1;
+
+            while (cur->parent != NULL) {
+                numNodes += 1;
+                cur = cur->parent;
+            }
+
+            nodes = xmlMalloc(numNodes * sizeof(nodes[0]));
+            if (nodes == NULL) {
+                ctxt->as.nodes = NULL;
+                return(NULL);
+            }
+
+            nodes[0] = node;
+            i = 1;
+            cur = parent;
+            while (cur->parent != NULL) {
+                nodes[i] = cur;
+                i += 1;
+                cur = cur->parent;
+            }
+
+        }
+
+        ctxt->as.nodes = nodes;
+        ctxt->index = numNodes;
+
+        *next = xmlIterNextTable;
+        return(cur);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartFollowingSibling(xmlIter *ctxt, xmlNodePtr node, int direction,
+                             xmlIterNextFunc *next) {
+    ctxt->hasNodes = 0;
+
+    if ((node->type == XML_ATTRIBUTE_NODE) ||
+        (node->type == XML_NAMESPACE_DECL) ||
+        (node->type == XML_DOCUMENT_NODE) ||
+        (node->type == XML_HTML_DOCUMENT_NODE))
+        return(NULL);
+
+    if (direction >= 0) {
+        *next = xmlIterNextSibling;
+        return(node->next);
+    } else {
+        xmlNodePtr last;
+
+        if (node->parent == NULL)
+            return(NULL);
+        last = node->parent->last;
+        if (node == last)
+            return(NULL);
+
+        ctxt->as.node = node;
+        *next = xmlIterPrevSiblingUntil;
+        return(last);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartPrecedingSibling(xmlIter *ctxt, xmlNodePtr node, int direction,
+                             xmlIterNextFunc *next) {
+    ctxt->hasNodes = 0;
+
+    if ((node->type == XML_ATTRIBUTE_NODE) ||
+        (node->type == XML_NAMESPACE_DECL) ||
+        (node->type == XML_DOCUMENT_NODE) ||
+        (node->type == XML_HTML_DOCUMENT_NODE))
+        return(NULL);
+
+    if (direction <= 0) {
+        *next = xmlIterPrevSibling;
+        return(node->prev);
+    } else {
+        xmlNodePtr first;
+
+        if (node->parent == NULL)
+            return(NULL);
+        first = node->parent->children;
+        if (node == first)
+            return(NULL);
+
+        ctxt->as.node = node;
+        *next = xmlIterNextSiblingUntil;
+        return(first);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartFollowing(xmlIter *ctxt, xmlNodePtr node, int direction,
+                      xmlIterNextFunc *next) {
+    xmlNodePtr ancestor;
+
+    ctxt->hasNodes = 0;
+
+    if (node->type == XML_ATTRIBUTE_NODE) {
+        ancestor = node->parent;
+    } else if (node->type == XML_NAMESPACE_DECL) {
+        xmlNsPtr ns = (xmlNsPtr) node;
+
+        ancestor = (xmlNodePtr) ns->next;
+    } else {
+        ancestor = node;
+    }
+
+    if (direction >= 0) {
+        while ((ancestor != NULL) &&
+               (ancestor->type != XML_DOCUMENT_NODE) &&
+               (ancestor->type != XML_HTML_DOCUMENT_NODE)) {
+            if (ancestor->next != NULL) {
+                *next = xmlIterNextDescendant;
+                ctxt->as.node = (xmlNodePtr) ancestor->doc;
+                return(ancestor->next);
+            }
+
+            ancestor = ancestor->parent;
+        }
+
+        return(NULL);
+    } else {
+        xmlNodePtr cur = NULL;
+
+        while ((ancestor != NULL) &&
+               (ancestor->type != XML_DOCUMENT_NODE) &&
+               (ancestor->type != XML_HTML_DOCUMENT_NODE)) {
+            if (ancestor->next != NULL)
+                cur = ancestor->next;
+            ancestor = ancestor->parent;
+        }
+
+        if (cur == NULL)
+            return(NULL);
+
+        while (cur->next != NULL)
+            cur = cur->next;
+
+        while ((cur->last != NULL) &&
+               ((1 << cur->last->type) & TYPE_MASK_NODE))
+            cur = cur->last;
+
+        *next = xmlIterPrevDescendant;
+        ctxt->as.node = node;
+        return(cur);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartPreceding(xmlIter *ctxt, xmlNodePtr node, int direction,
+                      xmlIterNextFunc *next) {
+    xmlNodePtr ancestor, cur;
+
+    ctxt->hasNodes = 0;
+
+    if (node->type == XML_ATTRIBUTE_NODE) {
+        ancestor = node->parent;
+    } else if (node->type == XML_NAMESPACE_DECL) {
+        xmlNsPtr ns = (xmlNsPtr) node;
+
+        ancestor = (xmlNodePtr) ns->next;
+    } else {
+        ancestor = node;
+    }
+
+    if (direction <= 0) {
+        while (ancestor->prev == NULL) {
+            ancestor = ancestor->parent;
+            if ((ancestor == NULL) ||
+                (ancestor->type == XML_DOCUMENT_NODE) ||
+                (ancestor->type == XML_HTML_DOCUMENT_NODE))
+                return(NULL);
+        }
+
+        *next = xmlIterNextPreceding;
+        ctxt->as.node = ancestor->parent;
+
+        cur = ancestor->prev;
+
+        while ((cur->last != NULL) &&
+               ((1 << cur->last->type) & TYPE_MASK_NODE))
+            cur = cur->last;
+
+        return(cur);
+    } else {
+        xmlNodePtr *nodes;
+        int numNodes, i;
+
+        numNodes = 0;
+        cur = ancestor;
+        while (cur != NULL) {
+            if (cur->prev != NULL)
+                numNodes += 1;
+            cur = cur->parent;
+            if ((cur == NULL) ||
+                (cur->type == XML_DOCUMENT_NODE) ||
+                (cur->type == XML_HTML_DOCUMENT_NODE))
+                break;
+        }
+
+        if (numNodes == 0)
+            return(NULL);
+
+        ctxt->hasNodes = 1;
+
+        nodes = xmlMalloc(numNodes * sizeof(nodes[0]));
+        if (nodes == NULL) {
+            ctxt->as.nodes = NULL;
+            return(NULL);
+        }
+
+        i = 0;
+        cur = ancestor;
+        while (cur != NULL) {
+            if (cur->prev != NULL) {
+                nodes[i] = cur;
+                i += 1;
+            }
+            cur = cur->parent;
+            if ((cur == NULL) ||
+                (cur->type == XML_DOCUMENT_NODE) ||
+                (cur->type == XML_HTML_DOCUMENT_NODE))
+                break;
+        }
+
+        cur = nodes[numNodes - 1];
+        while (cur->prev != NULL)
+            cur = cur->prev;
+
+        ctxt->as.nodes = nodes;
+        ctxt->index = numNodes - 1;
+        ctxt->hasNodes = 1;
+
+        *next = xmlIterPrevPreceding;
+        return(cur);
+    }
+}
+
+static xmlNodePtr
+xmlIterStartNamespace(xmlIter *ctxt, xmlNodePtr node, int direction,
                       xmlIterNextFunc *next) {
     xmlNsPtr *list;
     int i = 0;
 
-    ctxt->as.ns.list = NULL;
-    ctxt->as.ns.index = 0;
+    (void) direction;
 
-    if (cur->type != XML_ELEMENT_NODE)
+    ctxt->hasNodes = 0;
+
+    if (node->type != XML_ELEMENT_NODE)
         return(NULL);
 
-    if (xmlGetNsListSafe(cur->doc, cur, &list) < 0) {
-        /*
-        TODO
-        xmlXPathPErrMemory(ctxt);
-        */
+    if (xmlGetNsListSafe(node->doc, node, &list) < 0) {
+        ctxt->as.nodes = NULL;
+        ctxt->hasNodes = 1;
         return(NULL);
     }
     if (list != NULL) {
+        ctxt->hasNodes = 1;
+
         while (list[i] != NULL) {
             i++;
         }
     }
 
-    *next = xmlIterNextNamespace;
-    ctxt->as.ns.list = list;
-    ctxt->as.ns.index = i;
+    ctxt->as.nodes = (xmlNodePtr *) list;
+    ctxt->index = i;
+
+    *next = xmlIterNextTable;
     return((xmlNodePtr) xmlXPathXMLNamespace);
 }
 
@@ -10810,7 +11150,7 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 
     while (((contextIdx < contextSeq->nodeNr) || (contextNode != NULL)) &&
            (ctxt->error == XPATH_EXPRESSION_OK)) {
-        xmlIterCtxt iterCtxt;
+        xmlIter iter;
         xmlIterNextFunc next;
 
 	xpctxt->node = contextSeq->nodeTab[contextIdx++];
@@ -10828,7 +11168,7 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 	* Traverse the axis and test the nodes.
 	*/
 
-        cur = xmlIterStart[axis](&iterCtxt, xpctxt->node, &next);
+        cur = xmlIterStart[axis](&iter, xpctxt->node, 0, &next);
 	pos = 0;
 	hasNsNodes = 0;
         while ((cur != NULL) && (ctxt->error == XPATH_EXPRESSION_OK)) {
@@ -10937,11 +11277,16 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
                 break;
 
 no_match:
-            cur = next(&iterCtxt, cur);
+            cur = next(&iter, cur);
         }
 
-        if (axis == AXIS_NAMESPACE)
-            xmlFree(iterCtxt.as.ns.list);
+        if (iter.hasNodes) {
+            if (iter.as.nodes == NULL) {
+                xmlXPathPErrMemory(ctxt);
+                goto error;
+            }
+            xmlFree(iter.as.nodes);
+        }
 
         if (ctxt->error != XPATH_EXPRESSION_OK)
 	    goto error;
