@@ -199,6 +199,7 @@ typedef enum {
     XPATH_OP_VALUE,
     XPATH_OP_VARIABLE,
     XPATH_OP_SFUNC,
+    XPATH_OP_SFUNC_FIRST,
     XPATH_OP_FUNCTION,
     XPATH_OP_ARG,
     XPATH_OP_PREDICATE,
@@ -251,9 +252,9 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
     { "count", xmlXPathCountFunction, NULL,
         XPATH_OP_SFUNC, 1, 1 },
     { "concat", xmlXPathConcatFunction, NULL,
-        XPATH_OP_SFUNC, 2, INT_MAX },
+        XPATH_OP_SFUNC_FIRST, 2, INT_MAX },
     { "contains", xmlXPathContainsFunction, NULL,
-        XPATH_OP_SFUNC, 2, 2 },
+        XPATH_OP_SFUNC_FIRST, 2, 2 },
     { "id", xmlXPathIdFunction, NULL,
         XPATH_OP_SFUNC, 1, 1 },
     { "false", NULL, xmlXPathTrueCompiler,
@@ -263,41 +264,41 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
     { "last", NULL, NULL,
         XPATH_OP_LAST, 0, 0 },
     { "lang", xmlXPathLangFunction, NULL,
-        XPATH_OP_SFUNC, 1, 1 },
+        XPATH_OP_SFUNC_FIRST, 1, 1 },
     { "local-name", xmlXPathLocalNameFunction, NULL,
-        XPATH_OP_SFUNC, 0, 1 },
+        XPATH_OP_SFUNC_FIRST, 0, 1 },
     { "not", NULL, NULL,
         XPATH_OP_NOT, 1, 1 },
     { "name", xmlXPathNameFunction, NULL,
-        XPATH_OP_SFUNC, 0, 1 },
+        XPATH_OP_SFUNC_FIRST, 0, 1 },
     { "namespace-uri", xmlXPathNamespaceURIFunction, NULL,
-        XPATH_OP_SFUNC, 0, 1 },
+        XPATH_OP_SFUNC_FIRST, 0, 1 },
     { "normalize-space", xmlXPathNormalizeFunction, NULL,
-        XPATH_OP_SFUNC, 0, 1 },
+        XPATH_OP_SFUNC_FIRST, 0, 1 },
     { "number", xmlXPathNumberFunction, NULL,
-        XPATH_OP_SFUNC, 0, 1 },
+        XPATH_OP_SFUNC_FIRST, 0, 1 },
     { "position", NULL, NULL,
         XPATH_OP_POSITION, 0, 0 },
     { "round", NULL, NULL,
         XPATH_OP_ROUND, 1, 1 },
     { "string", xmlXPathStringFunction, NULL,
-        XPATH_OP_SFUNC, 0, 1 },
+        XPATH_OP_SFUNC_FIRST, 0, 1 },
     { "string-length", xmlXPathStringLengthFunction, NULL,
-        XPATH_OP_SFUNC, 0, 1 },
+        XPATH_OP_SFUNC_FIRST, 0, 1 },
     { "starts-with", xmlXPathStartsWithFunction, NULL,
-        XPATH_OP_SFUNC, 2, 2 },
+        XPATH_OP_SFUNC_FIRST, 2, 2 },
     { "substring", xmlXPathSubstringFunction, NULL,
-        XPATH_OP_SFUNC, 2, 3 },
+        XPATH_OP_SFUNC_FIRST, 2, 3 },
     { "substring-after", xmlXPathSubstringAfterFunction, NULL,
-        XPATH_OP_SFUNC, 2, 2 },
+        XPATH_OP_SFUNC_FIRST, 2, 2 },
     { "substring-before", xmlXPathSubstringBeforeFunction, NULL,
-        XPATH_OP_SFUNC, 2, 2 },
+        XPATH_OP_SFUNC_FIRST, 2, 2 },
     { "sum", xmlXPathSumFunction, NULL,
         XPATH_OP_SFUNC, 1, 1 },
     { "true", NULL, xmlXPathTrueCompiler,
         XPATH_OP_TRUE, 0, 0 },
     { "translate", xmlXPathTranslateFunction, NULL,
-        XPATH_OP_SFUNC, 3, 3 }
+        XPATH_OP_SFUNC_FIRST, 3, 3 }
 };
 
 #define NUM_STANDARD_FUNCTIONS \
@@ -11557,7 +11558,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
         case XPATH_OP_FLOOR:
         case XPATH_OP_CEIL:
         case XPATH_OP_ROUND:
-            total += xmlXPathCompOpEval(ctxt, XPATH_EVAL_ALL, op->ch1);
+            total += xmlXPathCompOpEval(ctxt, XPATH_EVAL_FIRST, op->ch1);
             CHECK_ERROR0;
 
             /* Convert arg 1 to number */
@@ -11593,9 +11594,9 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
         case XPATH_OP_MOD: {
             double val2 = 0.0;
 
-            total += xmlXPathCompOpEval(ctxt, XPATH_EVAL_ALL, op->ch1);
+            total += xmlXPathCompOpEval(ctxt, XPATH_EVAL_FIRST, op->ch1);
             CHECK_ERROR0;
-            total += xmlXPathCompOpEval(ctxt, XPATH_EVAL_ALL, op->ch2);
+            total += xmlXPathCompOpEval(ctxt, XPATH_EVAL_FIRST, op->ch2);
             CHECK_ERROR0;
 
             /* Pop arg 2 */
@@ -11728,6 +11729,14 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
             op->as.func(ctxt, op->nbArgs);
             break;
 
+        case XPATH_OP_SFUNC_FIRST:
+            if (op->ch1 != -1) {
+                total += xmlXPathCompOpEval(ctxt, XPATH_EVAL_FIRST, op->ch1);
+                CHECK_ERROR0;
+            }
+            op->as.func(ctxt, op->nbArgs);
+            break;
+
         case XPATH_OP_FUNCTION: {
             xmlXPathFunction func = NULL;
             const xmlChar *oldFunc, *oldFuncURI;
@@ -11792,11 +11801,11 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
         case XPATH_OP_ARG:
             if (op->ch1 != -1) {
                 /* next arg */
-                total += xmlXPathCompOpEval(ctxt, XPATH_EVAL_ALL, op->ch1);
+                total += xmlXPathCompOpEval(ctxt, mode, op->ch1);
 	        CHECK_ERROR0;
             }
             /* arg */
-            total += xmlXPathCompOpEval(ctxt, XPATH_EVAL_ALL, op->ch2);
+            total += xmlXPathCompOpEval(ctxt, mode, op->ch2);
             CHECK_ERROR0;
             break;
 
