@@ -11035,7 +11035,6 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
     int direction;
     int checkDupls;
 
-    xmlNodePtr oldContextNode;
     xmlXPathContextPtr xpctxt = ctxt->context;
 
 
@@ -11153,7 +11152,6 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
      * principal node type. For example, child::* will
      * select all element children of the context node
      */
-    oldContextNode = xpctxt->node;
     outSeq = NULL;
     seq = NULL;
     contextNode = NULL;
@@ -11162,10 +11160,11 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 
     while (((contextIdx < contextSeq->nodeNr) || (contextNode != NULL)) &&
            (ctxt->error == XPATH_EXPRESSION_OK)) {
+        xmlNodePtr start;
         xmlIter iter;
         xmlIterNextFunc next;
 
-        xpctxt->node = contextSeq->nodeTab[contextIdx++];
+        start = contextSeq->nodeTab[contextIdx++];
 
 	if (seq == NULL) {
 	    seq = xmlXPathNodeSetCreate(NULL);
@@ -11180,7 +11179,7 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
 	* Traverse the axis and test the nodes.
 	*/
 
-        cur = xmlIterStart[axis](&iter, xpctxt->node, direction, &next);
+        cur = xmlIterStart[axis](&iter, start, direction, &next);
 	pos = 0;
 	hasNsNodes = 0;
         while ((cur != NULL) && (ctxt->error == XPATH_EXPRESSION_OK)) {
@@ -11234,10 +11233,10 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
             }
 
             if (cur->type == XML_NAMESPACE_DECL) {
-                xmlNodePtr parent = xpctxt->node;
+                xmlNodePtr parent = start;
 
                 if (parent->type == XML_NAMESPACE_DECL) {
-                    xmlNsPtr ns = (xmlNsPtr) xpctxt->node;
+                    xmlNsPtr ns = (xmlNsPtr) start;
 
                     /* namespace::* / self::node() */
                     parent = (xmlNodePtr) ns->next;
@@ -11380,10 +11379,7 @@ error:
     * case of errors.
     */
     valuePush(ctxt, xmlXPathCacheWrapNodeSet(ctxt, outSeq));
-    /*
-    * Reset the context node.
-    */
-    xpctxt->node = oldContextNode;
+
     /*
     * When traversing the namespace axis in "toBool" mode, it's
     * possible that tmpNsList wasn't freed.
