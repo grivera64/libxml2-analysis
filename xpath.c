@@ -4797,33 +4797,16 @@ xmlXPathCastToString(xmlXPathObjectPtr val) {
  */
 xmlXPathObjectPtr
 xmlXPathConvertString(xmlXPathObjectPtr val) {
-    xmlChar *res = NULL;
+    xmlChar *res;
 
-    if (val == NULL)
-	return(xmlXPathNewCString(""));
-
-    switch (val->type) {
-    case XPATH_UNDEFINED:
-	break;
-    case XPATH_NODESET:
-    case XPATH_XSLT_TREE:
-	res = xmlXPathCastNodeSetToString(val->nodesetval);
-	break;
-    case XPATH_STRING:
+    if ((val != NULL) && (val->type == XPATH_STRING))
 	return(val);
-    case XPATH_BOOLEAN:
-	res = xmlXPathCastBooleanToString(val->boolval);
-	break;
-    case XPATH_NUMBER:
-	res = xmlXPathCastNumberToString(val->floatval);
-	break;
-    case XPATH_USERS:
-	/* TODO */
-	break;
-    }
+
+    res = xmlXPathCastToString(val);
     xmlXPathFreeObject(val);
     if (res == NULL)
-	return(xmlXPathNewCString(""));
+        return(NULL);
+
     return(xmlXPathWrapString(res));
 }
 
@@ -4941,10 +4924,9 @@ xmlXPathObjectPtr
 xmlXPathConvertNumber(xmlXPathObjectPtr val) {
     xmlXPathObjectPtr ret;
 
-    if (val == NULL)
-	return(xmlXPathNewFloat(0.0));
-    if (val->type == XPATH_NUMBER)
+    if ((val != NULL) && (val->type == XPATH_NUMBER))
 	return(val);
+
     ret = xmlXPathNewFloat(xmlXPathCastToNumber(val));
     xmlXPathFreeObject(val);
     return(ret);
@@ -5045,10 +5027,9 @@ xmlXPathObjectPtr
 xmlXPathConvertBoolean(xmlXPathObjectPtr val) {
     xmlXPathObjectPtr ret;
 
-    if (val == NULL)
-	return(xmlXPathNewBoolean(0));
-    if (val->type == XPATH_BOOLEAN)
+    if ((val != NULL) && (val->type == XPATH_BOOLEAN))
 	return(val);
+
     ret = xmlXPathNewBoolean(xmlXPathCastToBoolean(val));
     xmlXPathFreeObject(val);
     return(ret);
