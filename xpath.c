@@ -1052,8 +1052,8 @@ struct _xmlXPathCompExpr {
  *									*
  ************************************************************************/
 
-static xmlNodeSetPtr
-xmlXPathNodeSetCopy(xmlNodeSetPtr set);
+static int
+xmlXPathNodeSetAddInternal(xmlNodeSetPtr set, xmlNodePtr val);
 static void
 xmlXPathReleaseObject(xmlXPathContextPtr ctxt, xmlXPathObjectPtr obj);
 static int
@@ -2090,7 +2090,7 @@ xmlXPathCacheObjectCopy(xmlXPathParserContextPtr pctxt, xmlXPathObjectPtr val)
                 }
 
                 for (i = 0; i < src->nodeNr; i++) {
-                    if (xmlXPathNodeSetAddUnique(dst, src->nodeTab[i]) < 0) {
+                    if (xmlXPathNodeSetAddInternal(dst, src->nodeTab[i]) < 0) {
                         xmlXPathFreeObject(ret);
                         return(NULL);
                     }
@@ -2893,6 +2893,21 @@ xmlXPathNodeSetFreeNs(xmlNsPtr ns) {
     }
 }
 
+static int
+xmlXPathNodeSetAddInternal(xmlNodeSetPtr set, xmlNodePtr val) {
+    if (val->type == XML_NAMESPACE_DECL) {
+        xmlNsPtr ns = (xmlNsPtr) val;
+        val = xmlXPathNodeSetDupNs((xmlNodePtr) ns->next, ns);
+
+        if (val == NULL)
+            return(-1);
+    }
+
+    set->nodeTab[set->nodeNr++] = val;
+
+    return(0);
+}
+
 /**
  * xmlXPathNodeSetCreate:
  * @val:  an initial xmlNodePtr, or NULL
@@ -2919,17 +2934,11 @@ xmlXPathNodeSetCreate(xmlNodePtr val) {
 	memset(ret->nodeTab, 0 ,
 	       XML_NODESET_DEFAULT * sizeof(xmlNodePtr));
         ret->nodeMax = XML_NODESET_DEFAULT;
-	if (val->type == XML_NAMESPACE_DECL) {
-	    xmlNsPtr ns = (xmlNsPtr) val;
-            xmlNodePtr nsNode = xmlXPathNodeSetDupNs((xmlNodePtr) ns->next, ns);
 
-            if (nsNode == NULL) {
-                xmlXPathFreeNodeSet(ret);
-                return(NULL);
-            }
-	    ret->nodeTab[ret->nodeNr++] = nsNode;
-	} else
-	    ret->nodeTab[ret->nodeNr++] = val;
+        if (xmlXPathNodeSetAddInternal(ret, val) < 0) {
+            xmlXPathFreeNodeSet(ret);
+            return(NULL);
+        }
     }
     return(ret);
 }
@@ -3057,24 +3066,7 @@ xmlXPathNodeSetAdd(xmlNodeSetPtr cur, xmlNodePtr val) {
     for (i = 0;i < cur->nodeNr;i++)
         if (cur->nodeTab[i] == val) return(0);
 
-    /*
-     * grow the nodeTab if needed
-     */
-    if (cur->nodeNr >= cur->nodeMax) {
-        if (xmlXPathNodeSetGrow(cur) < 0)
-            return(-1);
-    }
-
-    if (val->type == XML_NAMESPACE_DECL) {
-	xmlNsPtr ns = (xmlNsPtr) val;
-        xmlNodePtr nsNode = xmlXPathNodeSetDupNs((xmlNodePtr) ns->next, ns);
-
-        if (nsNode == NULL)
-            return(-1);
-	cur->nodeTab[cur->nodeNr++] = nsNode;
-    } else
-	cur->nodeTab[cur->nodeNr++] = val;
-    return(0);
+    return(xmlXPathNodeSetAddUnique(cur, val));
 }
 
 /**
@@ -3100,16 +3092,7 @@ xmlXPathNodeSetAddUnique(xmlNodeSetPtr cur, xmlNodePtr val) {
             return(-1);
     }
 
-    if (val->type == XML_NAMESPACE_DECL) {
-	xmlNsPtr ns = (xmlNsPtr) val;
-        xmlNodePtr nsNode = xmlXPathNodeSetDupNs((xmlNodePtr) ns->next, ns);
-
-        if (nsNode == NULL)
-            return(-1);
-	cur->nodeTab[cur->nodeNr++] = nsNode;
-    } else
-	cur->nodeTab[cur->nodeNr++] = val;
-    return(0);
+    return(xmlXPathNodeSetAddInternal(cur, val));
 }
 
 static xmlNodeSetPtr
@@ -3131,25 +3114,15 @@ xmlXPathNodeSetCopy(xmlNodeSetPtr set) {
         }
     }
 
-    result->nodeNr = size;
+    result->nodeNr = 0;
     result->nodeMax = size;
     result->nodeTab = tmp;
 
     for (i = 0; i < size; i++) {
-        xmlNodePtr node = set->nodeTab[i];
-
-        if (node->type == XML_NAMESPACE_DECL) {
-	    xmlNsPtr ns = (xmlNsPtr) node;
-
-            node = xmlXPathNodeSetDupNs((xmlNodePtr) ns->next, ns);
-            if (node == NULL) {
-                result->nodeNr = i;
-                xmlXPathFreeNodeSet(result);
-                return(NULL);
-            }
+        if (xmlXPathNodeSetAddInternal(result, set->nodeTab[i]) < 0) {
+            xmlXPathFreeNodeSet(result);
+            return(NULL);
         }
-
-        tmp[i] = node;
     }
 
     return(result);
@@ -3205,22 +3178,8 @@ xmlXPathNodeSetMerge(xmlNodeSetPtr val1, xmlNodeSetPtr val2) {
 	if (skip)
 	    continue;
 
-	/*
-	 * grow the nodeTab if needed
-	 */
-        if (val1->nodeNr >= val1->nodeMax) {
-            if (xmlXPathNodeSetGrow(val1) < 0)
-                goto error;
-        }
-	if (n2->type == XML_NAMESPACE_DECL) {
-	    xmlNsPtr ns = (xmlNsPtr) n2;
-            xmlNodePtr nsNode = xmlXPathNodeSetDupNs((xmlNodePtr) ns->next, ns);
-
-            if (nsNode == NULL)
-                goto error;
-	    val1->nodeTab[val1->nodeNr++] = nsNode;
-	} else
-	    val1->nodeTab[val1->nodeNr++] = n2;
+        if (xmlXPathNodeSetAddUnique(val1, n2) < 0)
+            goto error;
     }
 
     return(val1);
