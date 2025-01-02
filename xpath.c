@@ -7601,19 +7601,16 @@ xmlXPathCountFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  *
  * Returns a node-set of selected elements.
  */
-static xmlNodeSetPtr
-xmlXPathGetElementsByIds (xmlDocPtr doc, const xmlChar *ids) {
-    xmlNodeSetPtr ret;
+static int
+xmlXPathAddElementsByIds(xmlNodeSetPtr set, xmlDocPtr doc,
+                         const xmlChar *ids) {
     const xmlChar *cur = ids;
     xmlChar *ID;
     xmlAttrPtr attr;
     xmlNodePtr elem = NULL;
 
-    if (ids == NULL) return(NULL);
-
-    ret = xmlXPathNodeSetCreate(NULL);
-    if (ret == NULL)
-        return(ret);
+    if (ids == NULL)
+        return(-1);
 
     while (IS_BLANK_CH(*cur)) cur++;
     while (*cur != 0) {
@@ -7621,10 +7618,9 @@ xmlXPathGetElementsByIds (xmlDocPtr doc, const xmlChar *ids) {
 	    cur++;
 
         ID = xmlStrndup(ids, cur - ids);
-	if (ID == NULL) {
-            xmlXPathFreeNodeSet(ret);
-            return(NULL);
-        }
+	if (ID == NULL)
+            return(-1);
+
         /*
          * We used to check the fact that the value passed
          * was an NCName, but this generated much troubles for
@@ -7642,17 +7638,16 @@ xmlXPathGetElementsByIds (xmlDocPtr doc, const xmlChar *ids) {
             else
                 elem = NULL;
             if (elem != NULL) {
-                if (xmlXPathNodeSetAdd(ret, elem) < 0) {
-                    xmlXPathFreeNodeSet(ret);
-                    return(NULL);
-                }
+                if (xmlXPathNodeSetAdd(set, elem) < 0)
+                    return(-1);
             }
         }
 
 	while (IS_BLANK_CH(*cur)) cur++;
 	ids = cur;
     }
-    return(ret);
+
+    return(0);
 }
 
 /**
@@ -7683,46 +7678,48 @@ xmlXPathIdFunction(xmlXPathParserContextPtr ctxt, int nargs) {
     obj = valuePop(ctxt);
     if (obj == NULL) XP_ERROR(XPATH_INVALID_OPERAND);
 
-    if ((obj->type == XPATH_NODESET) || (obj->type == XPATH_XSLT_TREE)) {
-	xmlNodeSetPtr ns;
-	int i;
-
-	ret = xmlXPathNodeSetCreate(NULL);
-        if (ret == NULL)
-            xmlXPathPErrMemory(ctxt);
-
-	if (obj->nodesetval != NULL) {
-	    for (i = 0; i < obj->nodesetval->nodeNr; i++) {
-		tokens =
-		    xmlXPathCastNodeToString(obj->nodesetval->nodeTab[i]);
-                if (tokens == NULL)
-                    xmlXPathPErrMemory(ctxt);
-		ns = xmlXPathGetElementsByIds(ctxt->context->doc, tokens);
-                if (ns == NULL)
-                    xmlXPathPErrMemory(ctxt);
-		ret = xmlXPathNodeSetMerge(ret, ns);
-                if (ret == NULL)
-                    xmlXPathPErrMemory(ctxt);
-		xmlXPathFreeNodeSet(ns);
-		if (tokens != NULL)
-		    xmlFree(tokens);
-	    }
-	}
-    } else {
-        tokens = xmlXPathCastToString(obj);
-        if (tokens == NULL)
-            xmlXPathPErrMemory(ctxt);
-        ret = xmlXPathGetElementsByIds(ctxt->context->doc, tokens);
-        if (ret == NULL)
-            xmlXPathPErrMemory(ctxt);
-        xmlFree(tokens);
+    ret = xmlXPathNodeSetCreate(NULL);
+    if (ret == NULL) {
+        xmlXPathPErrMemory(ctxt);
+        goto error;
     }
 
-    xmlXPathReleaseObject(ctxt->context, obj);
+    if ((obj->type == XPATH_NODESET) || (obj->type == XPATH_XSLT_TREE)) {
+	int i;
+
+        for (i = 0; i < obj->nodesetval->nodeNr; i++) {
+            tokens =
+                xmlXPathCastNodeToString(obj->nodesetval->nodeTab[i]);
+            if (tokens == NULL) {
+                xmlXPathPErrMemory(ctxt);
+                goto error;
+            }
+            if (xmlXPathAddElementsByIds(ret, ctxt->context->doc,
+                                         tokens) < 0) {
+                xmlXPathPErrMemory(ctxt);
+                goto error;
+            }
+            if (tokens != NULL)
+                xmlFree(tokens);
+        }
+    } else {
+        tokens = xmlXPathCastToString(obj);
+        if (tokens == NULL) {
+            xmlXPathPErrMemory(ctxt);
+            goto error;
+        }
+        if (xmlXPathAddElementsByIds(ret, ctxt->context->doc, tokens) < 0) {
+            xmlXPathPErrMemory(ctxt);
+            goto error;
+        }
+        xmlFree(tokens);
+    }
 
     if (ret->nodeNr > 1)
         xmlXPathNodeSetSort(ret);
 
+error:
+    xmlXPathReleaseObject(ctxt->context, obj);
     valuePush(ctxt, xmlXPathCacheWrapNodeSet(ctxt, ret));
 }
 

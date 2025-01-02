@@ -40,4 +40,6 @@
    <title>Chapter 5</title>
    <p>this is chapter 5 ...</p>
   </chapter>
+  <ref ref="chapter1 chapter3 chapter1"/>
+  <ref ref="chapter1 chapter5 chapter5"/>
 </iddemo>
