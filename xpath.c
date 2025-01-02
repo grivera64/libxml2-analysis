@@ -11575,7 +11575,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
             break;
 
         case XPATH_OP_VARIABLE: {
-            xmlXPathObjectPtr val;
+            xmlXPathObjectPtr val = NULL;
             const xmlChar *URI = NULL;
 
             if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
@@ -11587,8 +11587,22 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
                     break;
                 }
             }
-            val = xmlXPathVariableLookupNS(xpctxt,
-                                           op->qname.name, URI);
+
+            if (xpctxt->varLookupFunc != NULL)
+                val = xpctxt->varLookupFunc(xpctxt->varLookupData,
+                                            op->qname.name, URI);
+
+            if ((val == NULL) && (xpctxt->varHash != NULL)) {
+                val = xmlHashLookup2(xpctxt->varHash, op->qname.name, URI);
+                if (val != NULL) {
+                    val = xmlXPathCacheObjectCopy(ctxt, val);
+                    if (val == NULL) {
+                        xmlXPathPErrMemory(ctxt);
+                        break;
+                    }
+                }
+            }
+
             if (val == NULL)
                 XP_ERROR(XPATH_UNDEF_VARIABLE_ERROR);
             valuePush(ctxt, val);
