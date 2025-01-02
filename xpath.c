@@ -1052,6 +1052,8 @@ struct _xmlXPathCompExpr {
  *									*
  ************************************************************************/
 
+static xmlNodeSetPtr
+xmlXPathNodeSetCopy(xmlNodeSetPtr set);
 static void
 xmlXPathReleaseObject(xmlXPathContextPtr ctxt, xmlXPathObjectPtr obj);
 static int
@@ -2104,7 +2106,7 @@ xmlXPathCacheObjectCopy(xmlXPathParserContextPtr pctxt, xmlXPathObjectPtr val)
             case XPATH_NODESET: {
                 xmlNodeSetPtr set;
 
-                set = xmlXPathNodeSetMerge(NULL, val->nodesetval);
+                set = xmlXPathNodeSetCopy(val->nodesetval);
                 if (set == NULL) {
                     xmlXPathPErrMemory(pctxt);
                     return(NULL);
@@ -3125,6 +3127,49 @@ xmlXPathNodeSetAddUnique(xmlNodeSetPtr cur, xmlNodePtr val) {
     return(0);
 }
 
+static xmlNodeSetPtr
+xmlXPathNodeSetCopy(xmlNodeSetPtr set) {
+    xmlNodeSetPtr result;
+    xmlNodePtr *tmp = NULL;
+    int size, i;
+
+    result = xmlMalloc(sizeof(*result));
+    if (result == NULL)
+        return(NULL);
+
+    size = set->nodeNr;
+    if (size > 0) {
+        tmp = xmlMalloc(size * sizeof(tmp[0]));
+        if (tmp == NULL) {
+            xmlFree(result);
+            return(NULL);
+        }
+    }
+
+    result->nodeNr = size;
+    result->nodeMax = size;
+    result->nodeTab = tmp;
+
+    for (i = 0; i < size; i++) {
+        xmlNodePtr node = set->nodeTab[i];
+
+        if (node->type == XML_NAMESPACE_DECL) {
+	    xmlNsPtr ns = (xmlNsPtr) node;
+
+            node = xmlXPathNodeSetDupNs((xmlNodePtr) ns->next, ns);
+            if (node == NULL) {
+                result->nodeNr = i;
+                xmlXPathFreeNodeSet(result);
+                return(NULL);
+            }
+        }
+
+        tmp[i] = node;
+    }
+
+    return(result);
+}
+
 /**
  * xmlXPathNodeSetMerge:
  * @val1:  the first NodeSet or NULL
@@ -3142,13 +3187,10 @@ xmlXPathNodeSetMerge(xmlNodeSetPtr val1, xmlNodeSetPtr val2) {
     int i, j, initNr, skip;
     xmlNodePtr n1, n2;
 
-    if (val1 == NULL) {
-	val1 = xmlXPathNodeSetCreate(NULL);
-        if (val1 == NULL)
-            return (NULL);
-    }
     if (val2 == NULL)
         return(val1);
+    if (val1 == NULL)
+        return(xmlXPathNodeSetCopy(val2));
 
     /* @@ with_ns to check whether namespace nodes should be looked at @@ */
     initNr = val1->nodeNr;
@@ -3519,18 +3561,18 @@ xmlXPathNewNodeSetList(xmlNodeSetPtr val)
     xmlXPathObjectPtr ret;
 
     if (val == NULL)
-        ret = NULL;
-    else if (val->nodeTab == NULL)
-        ret = xmlXPathNewNodeSet(NULL);
-    else {
-        ret = xmlXPathNewNodeSet(val->nodeTab[0]);
-        if (ret) {
-            ret->nodesetval = xmlXPathNodeSetMerge(NULL, val);
-            if (ret->nodesetval == NULL) {
-                xmlFree(ret);
-                return(NULL);
-            }
-        }
+        return(NULL);
+
+    ret = xmlMalloc(sizeof(xmlXPathObject));
+    if (ret == NULL)
+        return(NULL);
+    memset(ret, 0 , sizeof(xmlXPathObject));
+    ret->type = XPATH_NODESET;
+    ret->boolval = 0;
+    ret->nodesetval = xmlXPathNodeSetCopy(val);
+    if (ret->nodesetval == NULL) {
+        xmlFree(ret);
+        return(NULL);
     }
 
     return (ret);
@@ -4548,7 +4590,7 @@ xmlXPathObjectCopy(xmlXPathObjectPtr val) {
 	    break;
 	case XPATH_XSLT_TREE:
 	case XPATH_NODESET:
-	    ret->nodesetval = xmlXPathNodeSetMerge(NULL, val->nodesetval);
+	    ret->nodesetval = xmlXPathNodeSetCopy(val->nodesetval);
             if (ret->nodesetval == NULL) {
                 xmlFree(ret);
                 return(NULL);
