@@ -4601,86 +4601,74 @@ xmlXPathFreeObjectEntry(void *obj, const xmlChar *name ATTRIBUTE_UNUSED) {
 static void
 xmlXPathReleaseObject(xmlXPathContextPtr ctxt, xmlXPathObjectPtr obj)
 {
+    xmlXPathContextCachePtr cache;
+
     if (obj == NULL)
-	return;
-    if ((ctxt == NULL) || (ctxt->cache == NULL)) {
-	 xmlXPathFreeObject(obj);
-    } else {
-	xmlXPathContextCachePtr cache =
-	    (xmlXPathContextCachePtr) ctxt->cache;
+        return;
 
-	switch (obj->type) {
-	    case XPATH_NODESET:
-	    case XPATH_XSLT_TREE:
-		if (obj->nodesetval != NULL) {
-		    if ((obj->nodesetval->nodeMax <= 40) &&
-			(cache->numNodeset < cache->maxNodeset)) {
-                        obj->stringval = (void *) cache->nodesetObjs;
-                        cache->nodesetObjs = obj;
-                        cache->numNodeset += 1;
-			goto obj_cached;
-		    } else {
-			xmlXPathFreeNodeSet(obj->nodesetval);
-			obj->nodesetval = NULL;
-		    }
-		}
-		break;
-	    case XPATH_STRING:
-		if (obj->stringval != NULL)
-		    xmlFree(obj->stringval);
-                obj->stringval = NULL;
-		break;
-	    case XPATH_BOOLEAN:
-	    case XPATH_NUMBER:
-		break;
-	    default:
-		goto free_obj;
-	}
+    cache = ctxt->cache;
+    if (cache == NULL) {
+        xmlXPathFreeObject(obj);
+        return;
+    }
 
-	/*
-	* Fallback to adding to the misc-objects slot.
-	*/
-        if (cache->numMisc >= cache->maxMisc)
-	    goto free_obj;
+    switch (obj->type) {
+        case XPATH_NODESET:
+        case XPATH_XSLT_TREE: {
+            xmlNodeSetPtr set = obj->nodesetval;
+
+            if (set != NULL) {
+                int i;
+
+                for (i = 0; i < set->nodeNr; i++) {
+                    xmlNodePtr node = set->nodeTab[i];
+                    if ((node != NULL) &&
+                        (node->type == XML_NAMESPACE_DECL))
+                        xmlXPathNodeSetFreeNs((xmlNsPtr) node);
+                }
+
+                if ((set->nodeMax <= 40) &&
+                    (cache->numNodeset < cache->maxNodeset)) {
+                    set->nodeNr = 0;
+                    obj->stringval = (void *) cache->nodesetObjs;
+                    cache->nodesetObjs = obj;
+                    cache->numNodeset += 1;
+
+                    return;
+                }
+
+                xmlFree(set->nodeTab);
+                xmlFree(set);
+                obj->nodesetval = NULL;
+            }
+            break;
+        }
+
+        case XPATH_STRING:
+            if (obj->stringval != NULL)
+                xmlFree(obj->stringval);
+            obj->stringval = NULL;
+            break;
+
+        default:
+            break;
+    }
+
+    /*
+    * Fallback to adding to the misc-objects slot.
+    */
+    if (cache->numMisc < cache->maxMisc) {
         obj->stringval = (void *) cache->miscObjs;
         cache->miscObjs = obj;
         cache->numMisc += 1;
 
-obj_cached:
-        obj->boolval = 0;
-	if (obj->nodesetval != NULL) {
-	    xmlNodeSetPtr tmpset = obj->nodesetval;
-
-	    /*
-	    * Due to those nasty ns-nodes, we need to traverse
-	    * the list and free the ns-nodes.
-	    */
-	    if (tmpset->nodeNr > 0) {
-		int i;
-		xmlNodePtr node;
-
-		for (i = 0; i < tmpset->nodeNr; i++) {
-		    node = tmpset->nodeTab[i];
-		    if ((node != NULL) &&
-			(node->type == XML_NAMESPACE_DECL))
-		    {
-			xmlXPathNodeSetFreeNs((xmlNsPtr) node);
-		    }
-		}
-	    }
-	    tmpset->nodeNr = 0;
-        }
-
-	return;
-
-free_obj:
-	/*
-	* Cache is full; free the object.
-	*/
-	if (obj->nodesetval != NULL)
-	    xmlXPathFreeNodeSet(obj->nodesetval);
-	xmlFree(obj);
+        return;
     }
+
+    /*
+    * Cache is full; free the object.
+    */
+    xmlFree(obj);
 }
 
 
