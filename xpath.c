@@ -12289,11 +12289,9 @@ xmlXPathTryStreamCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
 #endif /* XPATH_STREAMING */
 
 static void
-xmlXPathOptimizeExpression(xmlXPathParserContextPtr pctxt,
-                           xmlXPathStepOpPtr op)
-{
-    xmlXPathCompExprPtr comp = pctxt->comp;
-    xmlXPathContextPtr ctxt;
+xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
+                           int opIndex) {
+    xmlXPathStepOpPtr op = &comp->steps[opIndex];
 
     /*
     * Try to rewrite "descendant-or-self::node()/foo" to an optimized
@@ -12348,18 +12346,17 @@ xmlXPathOptimizeExpression(xmlXPathParserContextPtr pctxt,
         return;
 
     /* Recurse */
-    ctxt = pctxt->context;
-    if (ctxt != NULL) {
-        if (ctxt->depth >= XPATH_MAX_RECURSION_DEPTH)
-            return;
-        ctxt->depth += 1;
-    }
+
+    if (ctxt->depth >= XPATH_MAX_RECURSION_DEPTH)
+        return;
+    ctxt->depth += 1;
+
     if (op->ch1 != -1)
-        xmlXPathOptimizeExpression(pctxt, &comp->steps[op->ch1]);
+        xmlXPathOptimizeExpression(ctxt, comp, op->ch1);
     if (op->ch2 != -1)
-	xmlXPathOptimizeExpression(pctxt, &comp->steps[op->ch2]);
-    if (ctxt != NULL)
-        ctxt->depth -= 1;
+	xmlXPathOptimizeExpression(ctxt, comp, op->ch2);
+
+    ctxt->depth -= 1;
 }
 
 static void
@@ -12416,7 +12413,7 @@ xmlXPathDoCompile(xmlXPathParserContext *pctxt) {
 
     if (pctxt->error == XPATH_EXPRESSION_OK) {
         if ((comp->nbStep > 1) && (comp->last >= 0))
-            xmlXPathOptimizeExpression(pctxt, &comp->steps[comp->last]);
+            xmlXPathOptimizeExpression(ctxt, comp, comp->last);
     }
 
     ctxt->depth = oldDepth;
