@@ -11913,7 +11913,7 @@ next_node:
     do {
         if (ctxt->opLimit != 0) {
             if (ctxt->opCount >= ctxt->opLimit) {
-                xmlXPathErr(ctxt, XPATH_RECURSION_LIMIT_EXCEEDED);
+                xmlXPathErr(pctxt, XPATH_RECURSION_LIMIT_EXCEEDED);
                 xmlFreeStreamCtxt(patstream);
                 return(-1);
             }
@@ -12368,6 +12368,22 @@ xmlXPathDoCompile(xmlXPathParserContext *pctxt) {
     xmlXPathCompExprPtr comp;
     int oldDepth;
 
+#ifdef XPATH_STREAMING
+    comp = xmlXPathTryStreamCompile(ctxt, pctxt->base);
+    if ((comp == NULL) &&
+        (ctxt->lastError.code == XML_ERR_NO_MEMORY)) {
+        xmlXPathPErrMemory(pctxt);
+        return;
+    }
+    if (comp != NULL) {
+        /* See XPointer comment below */
+        if (pctxt->comp != NULL)
+	    xmlXPathFreeCompExpr(pctxt->comp);
+        pctxt->comp = comp;
+        return;
+    }
+#endif
+
     /*
      * The XPointer code can call xmlXPathEvalExpr multiple times
      * leading to a compiled expression still stored in the parser
@@ -12423,12 +12439,6 @@ xmlXPathCtxtCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
     xmlXPathCompExprPtr comp = NULL;
     xmlXPathCompExprPtr oldComp;
     int oldError;
-
-#ifdef XPATH_STREAMING
-    comp = xmlXPathTryStreamCompile(ctxt, str);
-    if (comp != NULL)
-        return(comp);
-#endif
 
     /*
      * We need an xmlXPathContext for the depth check.
@@ -12588,33 +12598,15 @@ xmlXPathCompiledEvalToBoolean(xmlXPathCompExprPtr comp,
  */
 void
 xmlXPathEvalExpr(xmlXPathParserContextPtr ctxt) {
-#ifdef XPATH_STREAMING
-    xmlXPathCompExprPtr comp;
-#endif
-
     if ((ctxt == NULL) || (ctxt->context == NULL))
         return;
     if (ctxt->context->lastError.code != 0)
         return;
 
-#ifdef XPATH_STREAMING
-    comp = xmlXPathTryStreamCompile(ctxt->context, ctxt->base);
-    if ((comp == NULL) &&
-        (ctxt->context->lastError.code == XML_ERR_NO_MEMORY)) {
-        xmlXPathPErrMemory(ctxt);
-        return;
-    }
-    if (comp != NULL) {
-        if (ctxt->comp != NULL)
-	    xmlXPathFreeCompExpr(ctxt->comp);
-        ctxt->comp = comp;
-    } else
-#endif
-    {
-        xmlXPathDoCompile(ctxt);
-    }
+    xmlXPathDoCompile(ctxt);
 
-    xmlXPathRunEval(ctxt, 0);
+    if (ctxt->error == XPATH_EXPRESSION_OK)
+        xmlXPathRunEval(ctxt, 0);
 }
 
 /**
@@ -12649,7 +12641,10 @@ xmlXPathEval(const xmlChar *str, xmlXPathContextPtr ctx) {
     ctxt->error = XPATH_EXPRESSION_OK;
     ctxt->comp = NULL;
 
-    xmlXPathEvalExpr(ctxt);
+    xmlXPathDoCompile(ctxt);
+
+    if (ctxt->error == XPATH_EXPRESSION_OK)
+        xmlXPathRunEval(ctxt, 0);
 
     if (ctxt->error != XPATH_EXPRESSION_OK) {
 	res = NULL;
