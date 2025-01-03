@@ -3550,6 +3550,9 @@ xmlXPathObjectPtr
 xmlXPathWrapNodeSet(xmlNodeSetPtr val) {
     xmlXPathObjectPtr ret;
 
+    if (val == NULL)
+        return(xmlXPathNewNodeSet(NULL));
+
     ret = (xmlXPathObjectPtr) xmlMalloc(sizeof(xmlXPathObject));
     if (ret == NULL) {
         xmlXPathFreeNodeSet(val);
