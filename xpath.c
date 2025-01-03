@@ -5083,6 +5083,8 @@ xmlXPathNewContext(xmlDocPtr doc) {
     }
 #endif
 
+    ret->pctxt.context = ret;
+
     return(ret);
 }
 
@@ -5102,6 +5104,7 @@ xmlXPathFreeContext(xmlXPathContextPtr ctxt) {
     xmlXPathRegisteredFuncsCleanup(ctxt);
     xmlXPathRegisteredVariablesCleanup(ctxt);
     xmlResetError(&ctxt->lastError);
+    xmlFree(ctxt->pctxt.valueTab);
     xmlFree(ctxt);
 }
 
@@ -5155,56 +5158,6 @@ xmlXPathNewParserContext(const xmlChar *str, xmlXPathContextPtr ctxt) {
     memset(ret, 0 , sizeof(xmlXPathParserContext));
     ret->cur = ret->base = str;
     ret->context = ctxt;
-
-    ret->comp = xmlXPathNewCompExpr();
-    if (ret->comp == NULL) {
-        xmlXPathErrMemory(ctxt);
-	xmlFree(ret->valueTab);
-	xmlFree(ret);
-	return(NULL);
-    }
-    if ((ctxt != NULL) && (ctxt->dict != NULL)) {
-        ret->comp->dict = ctxt->dict;
-	xmlDictReference(ret->comp->dict);
-    }
-
-    return(ret);
-}
-
-/**
- * xmlXPathCompParserContext:
- * @comp:  the XPath compiled expression
- * @ctxt:  the XPath context
- *
- * Create a new xmlXPathParserContext when processing a compiled expression
- *
- * Returns the xmlXPathParserContext just allocated.
- */
-static xmlXPathParserContextPtr
-xmlXPathCompParserContext(xmlXPathCompExprPtr comp, xmlXPathContextPtr ctxt) {
-    xmlXPathParserContextPtr ret;
-
-    ret = (xmlXPathParserContextPtr) xmlMalloc(sizeof(xmlXPathParserContext));
-    if (ret == NULL) {
-        xmlXPathErrMemory(ctxt);
-	return(NULL);
-    }
-    memset(ret, 0 , sizeof(xmlXPathParserContext));
-
-    /* Allocate the value stack */
-    ret->valueTab = (xmlXPathObjectPtr *)
-                     xmlMalloc(10 * sizeof(xmlXPathObjectPtr));
-    if (ret->valueTab == NULL) {
-	xmlFree(ret);
-	xmlXPathErrMemory(ctxt);
-	return(NULL);
-    }
-    ret->valueNr = 0;
-    ret->valueMax = 10;
-    ret->value = NULL;
-
-    ret->context = ctxt;
-    ret->comp = comp;
 
     return(ret);
 }
@@ -11576,8 +11529,9 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
             }
 
             if (val == NULL)
-                XP_ERROR(XPATH_UNDEF_VARIABLE_ERROR);
-            valuePush(ctxt, val);
+                xmlXPathErr(ctxt, XPATH_UNDEF_VARIABLE_ERROR);
+            else
+                valuePush(ctxt, val);
             break;
         }
 
@@ -11643,17 +11597,33 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
                  }
             }
 
+            /*
+             * In libxslt and possibly other applications, extension
+             * functions can evaluate XPath expressions recursively,
+             * reusing the XPath and parser contexts.
+             *
+             * This requires to back up and restore some state.
+             *
+             * TODO: We should think about backing up and restoring
+             * the context node, size and position here. This has been
+             * an endless source of bugs in libxslt.
+             */
+
             oldFunc = xpctxt->function;
             oldFuncURI = xpctxt->functionURI;
+
             xpctxt->function = op->qname.name;
             xpctxt->functionURI = op->qname.ns.uri;
+
             func(ctxt, op->nbArgs);
+
             xpctxt->function = oldFunc;
             xpctxt->functionURI = oldFuncURI;
 
             if ((ctxt->error == XPATH_EXPRESSION_OK) &&
-                (ctxt->valueNr != frame + 1))
+                (ctxt->valueNr != frame + 1)) {
                 XP_ERROR(XPATH_STACK_ERROR);
+            }
 
             break;
         }
@@ -12062,6 +12032,8 @@ xmlXPathRunEval(xmlXPathParserContextPtr ctxt, int toBool)
 {
     const xmlXPathCompExpr *comp;
     int oldDepth;
+    int frame;
+    int res;
 
     if ((ctxt == NULL) || (ctxt->comp == NULL))
 	return(-1);
@@ -12078,10 +12050,9 @@ xmlXPathRunEval(xmlXPathParserContextPtr ctxt, int toBool)
 	ctxt->valueMax = 10;
 	ctxt->value = NULL;
     }
+
 #ifdef XPATH_STREAMING
     if (ctxt->comp->stream) {
-	int res;
-
 	if (toBool) {
 	    /*
 	    * Evaluation to boolean result.
@@ -12116,14 +12087,30 @@ xmlXPathRunEval(xmlXPathParserContextPtr ctxt, int toBool)
 	return(-1);
     }
 
+    frame = ctxt->valueNr;
+
     oldDepth = ctxt->context->depth;
-    if (toBool)
-	return(xmlXPathCompOpEvalToBoolean(ctxt, comp->last, 0));
-    else
+    if (toBool) {
+	res = xmlXPathCompOpEvalToBoolean(ctxt, comp->last, 0);
+    } else {
 	xmlXPathCompOpEval(ctxt, XPATH_EVAL_ALL, comp->last);
+        res = 0;
+    }
     ctxt->context->depth = oldDepth;
 
-    return(0);
+    if (ctxt->error == XPATH_EXPRESSION_OK) {
+        if (ctxt->valueNr != ((toBool) ? frame : frame + 1))
+            xmlXPathErr(ctxt, XPATH_STACK_ERROR);
+    }
+
+    if (ctxt->error) {
+        while (ctxt->valueNr > frame)
+            xmlXPathReleaseObject(ctxt->context, valuePop(ctxt));
+
+        return(-1);
+    }
+
+    return(res);
 }
 
 /************************************************************************
@@ -12378,8 +12365,29 @@ xmlXPathOptimizeExpression(xmlXPathParserContextPtr pctxt,
 static void
 xmlXPathDoCompile(xmlXPathParserContext *pctxt) {
     xmlXPathContext *ctxt = pctxt->context;
-    xmlXPathCompExprPtr comp = pctxt->comp;
+    xmlXPathCompExprPtr comp;
     int oldDepth;
+
+    /*
+     * The XPointer code can call xmlXPathEvalExpr multiple times
+     * leading to a compiled expression still stored in the parser
+     * context. This seems like a bug.
+     */
+    if (pctxt->comp == NULL) {
+        comp = xmlXPathNewCompExpr();
+        if (comp == NULL) {
+            xmlXPathPErrMemory(pctxt);
+            return;
+        }
+        if (ctxt->dict != NULL) {
+            comp->dict = ctxt->dict;
+            xmlDictReference(comp->dict);
+        }
+
+        pctxt->comp = comp;
+    } else {
+        comp = pctxt->comp;
+    }
 
     comp->flags = ctxt->flags;
 
@@ -12413,6 +12421,8 @@ xmlXPathCtxtCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
     xmlXPathParserContextPtr pctxt = NULL;
     xmlXPathContextPtr tmpctxt = NULL;
     xmlXPathCompExprPtr comp = NULL;
+    xmlXPathCompExprPtr oldComp;
+    int oldError;
 
 #ifdef XPATH_STREAMING
     comp = xmlXPathTryStreamCompile(ctxt, str);
@@ -12426,13 +12436,19 @@ xmlXPathCtxtCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
     if (ctxt == NULL) {
         tmpctxt = xmlXPathNewContext(NULL);
         if (tmpctxt == NULL)
-            goto error;
+            return(NULL);
         ctxt = tmpctxt;
     }
 
-    pctxt = xmlXPathNewParserContext(str, ctxt);
-    if (pctxt == NULL)
-        goto error;
+    pctxt = &ctxt->pctxt;
+
+    oldError = pctxt->error;
+    oldComp = pctxt->comp;
+
+    pctxt->base = str;
+    pctxt->cur = str;
+    pctxt->error = XPATH_EXPRESSION_OK;
+    pctxt->comp = NULL;
 
     xmlXPathDoCompile(pctxt);
 
@@ -12441,15 +12457,18 @@ xmlXPathCtxtCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
         xmlXPathPErrMemory(pctxt);
 
     if (pctxt->error != XPATH_EXPRESSION_OK)
-        goto error;
+        xmlXPathFreeCompExpr(pctxt->comp);
+    else
+        comp = pctxt->comp;
 
-    comp = pctxt->comp;
-    pctxt->comp = NULL;
+    pctxt->base = NULL;
+    pctxt->cur = NULL;
+    pctxt->error = oldError;
+    pctxt->comp = oldComp;
 
-error:
-    xmlXPathFreeParserContext(pctxt);
     if (tmpctxt != NULL)
         xmlXPathFreeContext(tmpctxt);
+
     return(comp);
 }
 
@@ -12488,32 +12507,35 @@ xmlXPathCompiledEvalInternal(xmlXPathCompExprPtr comp,
 {
     xmlXPathParserContextPtr pctxt;
     xmlXPathObjectPtr resObj = NULL;
-    int res;
+    xmlXPathCompExprPtr oldComp;
+    int res, oldError;
 
     if (comp == NULL)
 	return(-1);
 
     xmlResetError(&ctxt->lastError);
 
-    pctxt = xmlXPathCompParserContext(comp, ctxt);
-    if (pctxt == NULL)
-        return(-1);
+    pctxt = &ctxt->pctxt;
+
+    oldError = pctxt->error;
+    oldComp = pctxt->comp;
+
+    pctxt->comp = comp;
+    pctxt->error = XPATH_EXPRESSION_OK;
+
     res = xmlXPathRunEval(pctxt, toBool);
 
-    if (pctxt->error == XPATH_EXPRESSION_OK) {
-        if (pctxt->valueNr != ((toBool) ? 0 : 1))
-            xmlXPathErr(pctxt, XPATH_STACK_ERROR);
-        else if (!toBool)
-            resObj = valuePop(pctxt);
+    if ((res >= 0) && (!toBool)) {
+        resObj = valuePop(pctxt);
+
+        if (resObjPtr)
+            *resObjPtr = resObj;
+        else
+            xmlXPathReleaseObject(ctxt, resObj);
     }
 
-    if (resObjPtr)
-        *resObjPtr = resObj;
-    else
-        xmlXPathReleaseObject(ctxt, resObj);
-
-    pctxt->comp = NULL;
-    xmlXPathFreeParserContext(pctxt);
+    pctxt->error = oldError;
+    pctxt->comp = oldComp;
 
     return(res);
 }
@@ -12609,15 +12631,24 @@ xmlXPathObjectPtr
 xmlXPathEval(const xmlChar *str, xmlXPathContextPtr ctx) {
     xmlXPathParserContextPtr ctxt;
     xmlXPathObjectPtr res;
+    xmlXPathCompExprPtr oldComp;
+    int oldError;
 
     if (ctx == NULL)
         return(NULL);
 
     xmlResetError(&ctx->lastError);
 
-    ctxt = xmlXPathNewParserContext(str, ctx);
-    if (ctxt == NULL)
-        return NULL;
+    ctxt = &ctx->pctxt;
+
+    oldError = ctxt->error;
+    oldComp = ctxt->comp;
+
+    ctxt->base = str;
+    ctxt->cur = str;
+    ctxt->error = XPATH_EXPRESSION_OK;
+    ctxt->comp = NULL;
+
     xmlXPathEvalExpr(ctxt);
 
     if (ctxt->error != XPATH_EXPRESSION_OK) {
@@ -12629,7 +12660,13 @@ xmlXPathEval(const xmlChar *str, xmlXPathContextPtr ctx) {
 	res = valuePop(ctxt);
     }
 
-    xmlXPathFreeParserContext(ctxt);
+    xmlXPathFreeCompExpr(ctxt->comp);
+
+    ctxt->base = NULL;
+    ctxt->cur = NULL;
+    ctxt->error = oldError;
+    ctxt->comp = oldComp;
+
     return(res);
 }
 
