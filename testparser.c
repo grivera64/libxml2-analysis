@@ -13,6 +13,7 @@
 #include <libxml/xmlreader.h>
 #include <libxml/xmlsave.h>
 #include <libxml/xmlwriter.h>
+#include <libxml/xpathInternals.h>
 #include <libxml/HTMLparser.h>
 
 #include <string.h>
@@ -803,6 +804,65 @@ testCharEncConvImpl(void) {
     return err;
 }
 
+#ifdef LIBXML_XPATH_ENABLED
+static void
+localNameIs(xmlXPathParserContextPtr ctxt, int nargs) {
+    xmlChar *name;
+    int res = 0;
+
+    CHECK_ARITY(1);
+
+    name = xmlXPathPopString(ctxt);
+    res = xmlStrEqual(ctxt->context->node->name, name);
+    xmlFree(name);
+
+    valuePush(ctxt, xmlXPathNewBoolean(res));
+}
+
+static int
+testXPathFunc(void) {
+    static const xmlChar *html = BAD_CAST
+        "<html><body>\n"
+        "  <div class='has-bold'>\n"
+        "    <div>\n"
+        "      <b>bold</b>\n"
+        "    </div>\n"
+        "  </div>\n"
+        "  <div class='has-para'>\n"
+        "    <p>para</p>\n"
+        "  </div>\n"
+        "</body></html>\n";
+
+    xmlDocPtr doc;
+    xmlXPathContextPtr xpctxt;
+    xmlXPathObjectPtr obj;
+    int err = 0;
+
+    doc = htmlReadDoc(html, NULL, NULL, 0);
+    xpctxt = xmlXPathNewContext(doc);
+
+    xmlXPathRegisterFuncNS(xpctxt, BAD_CAST "local-name-is",
+                           BAD_CAST "urn:ext", localNameIs);
+    xmlXPathRegisterNs(xpctxt, BAD_CAST "ext", BAD_CAST "urn:ext");
+
+    obj = xmlXPathEval(BAD_CAST
+        "count(//*[ext:local-name-is('div')][.//*[ext:local-name-is('b')]])",
+        xpctxt);
+    if ((obj == NULL) ||
+        (obj->type != XPATH_NUMBER) ||
+        (obj->floatval != 2.0)) {
+        fprintf(stderr, "XPath with extension function failed\n");
+        err = 1;
+    }
+
+    xmlXPathFreeObject(obj);
+    xmlXPathFreeContext(xpctxt);
+    xmlFreeDoc(doc);
+
+    return err;
+}
+#endif
+
 int
 main(void) {
     int err = 0;
@@ -843,6 +903,9 @@ main(void) {
 #endif
     err |= testBuildRelativeUri();
     err |= testCharEncConvImpl();
+#ifdef LIBXML_XPATH_ENABLED
+    err |= testXPathFunc();
+#endif
 
     return err;
 }
