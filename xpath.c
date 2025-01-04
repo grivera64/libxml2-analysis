@@ -1311,6 +1311,27 @@ xmlXPathCompAddStep(xmlXPathParserContextPtr ctxt,
     return(op);
 }
 
+static void
+xmlXPathCompAddSort(xmlXPathParserContextPtr ctxt) {
+    if (ctxt->comp->last < 0)
+        return;
+
+    switch (ctxt->comp->steps[ctxt->comp->last].op) {
+        case XPATH_OP_UNION:
+        case XPATH_OP_COLLECT:
+        case XPATH_OP_FUNCTION: {
+            xmlXPathObjectType type;
+
+            type = ctxt->comp->steps[ctxt->comp->last].type;
+            xmlXPathCompAddUnary(ctxt, XPATH_OP_SORT, type,
+                                 ctxt->comp->last);
+            break;
+        }
+        default:
+            break;
+    }
+}
+
 static int
 xmlXPathCompGetArg(xmlXPathParserContextPtr ctxt, xmlXPathObjectType type) {
     xmlXPathStepOpPtr op;
@@ -8794,7 +8815,7 @@ xmlXPathRoundFunction(xmlXPathParserContextPtr ctxt, int nargs) {
  * a few forward declarations since we use a recursive call based
  * implementation.
  */
-static void xmlXPathCompileExpr(xmlXPathParserContextPtr ctxt, int sort);
+static void xmlXPathCompileExpr(xmlXPathParserContextPtr ctxt);
 static void xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter);
 static void xmlXPathCompLocationPath(xmlXPathParserContextPtr ctxt);
 static void xmlXPathCompRelativeLocationPath(xmlXPathParserContextPtr ctxt);
@@ -9600,7 +9621,9 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
 	while (1) {
             xmlXPathObjectType type;
 
-	    xmlXPathCompileExpr(ctxt, sort);
+	    xmlXPathCompileExpr(ctxt);
+            if (sort)
+                xmlXPathCompAddSort(ctxt);
 	    if (ctxt->error != XPATH_EXPRESSION_OK)
                 goto error;
 
@@ -9691,7 +9714,7 @@ xmlXPathCompPrimaryExpr(xmlXPathParserContextPtr ctxt) {
     else if (CUR == '(') {
 	NEXT;
 	SKIP_BLANKS;
-	xmlXPathCompileExpr(ctxt, 1);
+	xmlXPathCompileExpr(ctxt);
 	CHECK_ERROR;
 	if (CUR != ')') {
 	    XP_ERROR(XPATH_EXPR_ERROR);
@@ -9728,6 +9751,13 @@ xmlXPathCompFilterExpr(xmlXPathParserContextPtr ctxt) {
     xmlXPathCompPrimaryExpr(ctxt);
     CHECK_ERROR;
     SKIP_BLANKS;
+
+    if (CUR == '[') {
+        /*
+         * Filter input must be sorted.
+         */
+        xmlXPathCompAddSort(ctxt);
+    }
 
     while (CUR == '[') {
 	xmlXPathCompPredicate(ctxt, 1);
@@ -10230,7 +10260,7 @@ xmlXPathCompAndExpr(xmlXPathParserContextPtr ctxt) {
  * Parse and compile an expression
  */
 static void
-xmlXPathCompileExpr(xmlXPathParserContextPtr ctxt, int sort) {
+xmlXPathCompileExpr(xmlXPathParserContextPtr ctxt) {
     xmlXPathContextPtr xpctxt = ctxt->context;
 
     if (xpctxt != NULL) {
@@ -10267,22 +10297,6 @@ xmlXPathCompileExpr(xmlXPathParserContextPtr ctxt, int sort) {
 
 	SKIP_BLANKS;
     }
-    if (sort) {
-        switch (ctxt->comp->steps[ctxt->comp->last].op) {
-            case XPATH_OP_UNION:
-            case XPATH_OP_COLLECT:
-            case XPATH_OP_FUNCTION: {
-                xmlXPathObjectType type;
-
-                type = ctxt->comp->steps[ctxt->comp->last].type;
-                xmlXPathCompAddUnary(ctxt, XPATH_OP_SORT, type,
-                                     ctxt->comp->last);
-                break;
-            }
-            default:
-                break;
-        }
-    }
 
 error:
     if (xpctxt != NULL)
@@ -10312,7 +10326,7 @@ xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter) {
     SKIP_BLANKS;
 
     ctxt->comp->last = -1;
-    xmlXPathCompileExpr(ctxt, 0);
+    xmlXPathCompileExpr(ctxt);
     CHECK_ERROR;
 
     if (CUR != ']') {
@@ -12479,7 +12493,8 @@ xmlXPathDoCompile(xmlXPathParserContext *pctxt) {
 
     oldDepth = ctxt->depth;
 
-    xmlXPathCompileExpr(pctxt, 1);
+    xmlXPathCompileExpr(pctxt);
+    xmlXPathCompAddSort(pctxt);
 
     if (*pctxt->cur != 0)
 	xmlXPathErr(pctxt, XPATH_EXPR_ERROR);
