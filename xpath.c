@@ -1130,6 +1130,8 @@ xmlXPathFreeCompExpr(xmlXPathCompExprPtr comp)
                 }
                 break;
 
+            case XPATH_OP_SFUNC:
+            case XPATH_OP_SFUNC_FIRST:
             case XPATH_OP_FUNCTION:
                 if ((comp->dict == NULL) && (op->qname.name != NULL)) {
                     xmlFree(op->qname.name);
@@ -1599,49 +1601,46 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
     switch (op->op) {
         case XPATH_OP_END:
 	    fprintf(output, "END"); break;
+        case XPATH_OP_BOOL:
+	    fprintf(output, "BOOL"); break;
+        case XPATH_OP_NOT:
+	    fprintf(output, "NOT"); break;
         case XPATH_OP_AND:
 	    fprintf(output, "AND"); break;
         case XPATH_OP_OR:
 	    fprintf(output, "OR"); break;
         case XPATH_OP_EQ:
-	    fprintf(output, "EQ");
-            break;
+	    fprintf(output, "EQ"); break;
 	case XPATH_OP_NE:
-	    fprintf(output, "NE");
-            break;
+	    fprintf(output, "NE"); break;
         case XPATH_OP_LT:
-	    fprintf(output, "LT");
-            break;
+	    fprintf(output, "LT"); break;
         case XPATH_OP_GT:
-	    fprintf(output, "GT");
-            break;
+	    fprintf(output, "GT"); break;
         case XPATH_OP_LE:
-	    fprintf(output, "LE");
-            break;
+	    fprintf(output, "LE"); break;
         case XPATH_OP_GE:
-	    fprintf(output, "GE");
-            break;
+	    fprintf(output, "GE"); break;
         case XPATH_OP_PLUS:
-	    fprintf(output, "PLUS");
-	    break;
+	    fprintf(output, "PLUS"); break;
         case XPATH_OP_NEG:
-	    fprintf(output, "NEG");
-	    break;
+	    fprintf(output, "NEG"); break;
+        case XPATH_OP_FLOOR:
+	    fprintf(output, "FLOOR"); break;
+        case XPATH_OP_CEIL:
+	    fprintf(output, "CEIL"); break;
+        case XPATH_OP_ROUND:
+	    fprintf(output, "ROUND"); break;
         case XPATH_OP_ADD:
-	    fprintf(output, "ADD");
-	    break;
+	    fprintf(output, "ADD"); break;
         case XPATH_OP_SUB:
-	    fprintf(output, "SUB");
-	    break;
+	    fprintf(output, "SUB"); break;
         case XPATH_OP_MULT:
-	    fprintf(output, "MULT");
-	    break;
+	    fprintf(output, "MULT"); break;
         case XPATH_OP_DIV:
-	    fprintf(output, "DIV");
-	    break;
+	    fprintf(output, "DIV"); break;
         case XPATH_OP_MOD:
-	    fprintf(output, "MOD");
-	    break;
+	    fprintf(output, "MOD"); break;
         case XPATH_OP_UNION:
 	     fprintf(output, "UNION"); break;
         case XPATH_OP_ROOT:
@@ -1656,47 +1655,60 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	    const xmlChar *prefix = op->qname.ns.prefix;
 	    const xmlChar *name = op->qname.name;
 
-	    fprintf(output, "COLLECT ");
+	    fprintf(output, "STEP ");
 	    switch (axis) {
 		case AXIS_ANCESTOR:
-		    fprintf(output, " 'ancestors' "); break;
+		    fprintf(output, "ancestor::"); break;
 		case AXIS_ANCESTOR_OR_SELF:
-		    fprintf(output, " 'ancestors-or-self' "); break;
+		    fprintf(output, "ancestor-or-self::"); break;
 		case AXIS_ATTRIBUTE:
-		    fprintf(output, " 'attributes' "); break;
+		    fprintf(output, "attribute::"); break;
 		case AXIS_CHILD:
-		    fprintf(output, " 'child' "); break;
+		    fprintf(output, "child::"); break;
 		case AXIS_DESCENDANT:
-		    fprintf(output, " 'descendant' "); break;
+		    fprintf(output, "descendant::"); break;
 		case AXIS_DESCENDANT_OR_SELF:
-		    fprintf(output, " 'descendant-or-self' "); break;
+		    fprintf(output, "descendant-or-self::"); break;
 		case AXIS_FOLLOWING:
-		    fprintf(output, " 'following' "); break;
+		    fprintf(output, "following::"); break;
 		case AXIS_FOLLOWING_SIBLING:
-		    fprintf(output, " 'following-siblings' "); break;
+		    fprintf(output, "following-sibling::"); break;
 		case AXIS_NAMESPACE:
-		    fprintf(output, " 'namespace' "); break;
+		    fprintf(output, "namespace::"); break;
 		case AXIS_PARENT:
-		    fprintf(output, " 'parent' "); break;
+		    fprintf(output, "parent::"); break;
 		case AXIS_PRECEDING:
-		    fprintf(output, " 'preceding' "); break;
+		    fprintf(output, "preceding::"); break;
 		case AXIS_PRECEDING_SIBLING:
-		    fprintf(output, " 'preceding-sibling' "); break;
+		    fprintf(output, "preceding-sibling::"); break;
 		case AXIS_SELF:
-		    fprintf(output, " 'self' "); break;
+		    fprintf(output, "self::"); break;
 	    }
-	    fprintf(output, "typeMask=%0X ", type); break;
-	    if (prefix != NULL)
-		fprintf(output, "%s:", prefix);
-	    if (name != NULL)
-		fprintf(output, "%s", (const char *) name);
+            switch (type) {
+                case TYPE_MASK_NODE:
+                    fprintf(output, "node()"); break;
+                case TYPE_MASK_TEXT:
+                    fprintf(output, "text()"); break;
+                case TYPE_MASK_COMMENT:
+                    fprintf(output, "comment()"); break;
+                case TYPE_MASK_PI:
+                    fprintf(output, "processing-instruction()"); break;
+                default:
+                    if (prefix != NULL)
+                        fprintf(output, "%s:", prefix);
+                    if (name != NULL)
+                        fprintf(output, "%s", name);
+                    else
+                        fprintf(output, "*");
+                    break;
+            }
 	    break;
 
         }
 	case XPATH_OP_VALUE: {
 	    xmlXPathObjectPtr object = op->as.obj;
 
-	    fprintf(output, "ELEM ");
+	    fprintf(output, "VALUE ");
 	    xmlXPathDebugDumpObject(output, object, 0);
 	    goto finish;
 	}
@@ -1710,23 +1722,32 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 		fprintf(output, "VARIABLE %s", name);
 	    break;
 	}
+        case XPATH_OP_SFUNC:
+        case XPATH_OP_SFUNC_FIRST:
 	case XPATH_OP_FUNCTION: {
 	    int nbargs = op->nbArgs;
 	    const xmlChar *prefix = op->qname.ns.prefix;
 	    const xmlChar *name = op->qname.name;
 
             if (prefix != NULL)
-		fprintf(output, "FUNCTION %s:%s(%d args)",
+		fprintf(output, "FUNCTION %s:%s (%d args)",
 			prefix, name, nbargs);
 	    else
-		fprintf(output, "FUNCTION %s(%d args)", name, nbargs);
+		fprintf(output, "FUNCTION %s (%d args)", name, nbargs);
 	    break;
 	}
-        case XPATH_OP_ARG: fprintf(output, "ARG"); break;
-        case XPATH_OP_PREDICATE: fprintf(output, "PREDICATE"); break;
-        case XPATH_OP_FILTER: fprintf(output, "FILTER"); break;
+        case XPATH_OP_ARG:
+            fprintf(output, "ARG"); break;
+        case XPATH_OP_PREDICATE:
+            fprintf(output, "PREDICATE"); break;
+        case XPATH_OP_FILTER:
+            fprintf(output, "FILTER"); break;
+        case XPATH_OP_POSITION:
+            fprintf(output, "POSITION"); break;
+        case XPATH_OP_LAST:
+            fprintf(output, "LAST"); break;
 	default:
-        fprintf(output, "UNKNOWN %d\n", op->op); return;
+            fprintf(output, "UNKNOWN %d\n", op->op); return;
     }
     fprintf(output, "\n");
 finish:
@@ -9675,7 +9696,12 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
         op->nbArgs = nbargs;
         op->as.func = func;
 
-        if (opval == XPATH_OP_FUNCTION) {
+        /*
+         * Standard functions only need the name for debug output.
+         */
+        if ((opval == XPATH_OP_FUNCTION) ||
+            (opval == XPATH_OP_SFUNC) ||
+            (opval == XPATH_OP_SFUNC_FIRST)) {
             if (xmlXPathCompOpSetQName(ctxt, &op->qname,
                                        name, prefix, nsUri) == 0) {
                 name = NULL;
@@ -11112,14 +11138,13 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
     *
     * Example - expression "/foo[parent::bar][1]":
     *
-    * COLLECT 'child' 'name' 'node' foo    -- op (we are here)
-    *   ROOT                               -- op->ch1
-    *   PREDICATE                          -- op->ch2 (predOp)
-    *     PREDICATE                          -- predOp->ch1 = [parent::bar]
-    *       SORT
-    *         COLLECT  'parent' 'name' 'node' bar
-    *           NODE
-    *     ELEM Object is a number : 1        -- predOp->ch2 = [1]
+    * STEP child::foo                   -- op (we are here)
+    *   ROOT                            -- op->ch1
+    *   PREDICATE                       -- op->ch2 (predOp)
+    *     PREDICATE                     -- predOp->ch1 = [parent::bar]
+    *       STEP parent::bar
+    *         NODE
+    *     VALUE Object is a number : 1  -- predOp->ch2 = [1]
     *
     */
 
@@ -11770,10 +11795,9 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
             * ...
             *   PREDICATE   <-- we are here "[1]"
             *     PREDICATE <-- process "[parent::book]" first
-            *       SORT
-            *         COLLECT  'parent' 'name' 'node' book
-            *           NODE
-            *     ELEM Object is a number : 1
+            *       STEP parent::book
+            *         NODE
+            *     VALUE Object is a number : 1
             */
             xmlXPathCompOpEval(ctxt, XPATH_EVAL_ALL, op->ch1);
             CHECK_ERROR;
