@@ -162,8 +162,12 @@
 typedef enum {
     XPATH_OP_END=0,
 
-    /* unary bool ops */
+    /* conversion */
     XPATH_OP_BOOL,
+    XPATH_OP_NUMBER,
+    XPATH_OP_STRING,
+
+    /* unary bool ops */
     XPATH_OP_NOT,
 
     /* binary bool ops */
@@ -212,10 +216,7 @@ typedef enum {
 
     /* Compiled to XPATH_OP_VAR */
     XPATH_OP_TRUE,
-    XPATH_OP_FALSE,
-
-    /* Eliminated or converted */
-    XPATH_OP_CAST
+    XPATH_OP_FALSE
 } xmlXPathOp;
 
 typedef enum {
@@ -286,13 +287,13 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
     { "normalize-space", xmlXPathNormalizeFunction, NULL,
         XPATH_OP_SFUNC_FIRST, XPATH_STRING, 0, 1, XPATH_STRING, 0 },
     { "number", xmlXPathNumberFunction, NULL,
-        XPATH_OP_CAST, XPATH_NUMBER, 0, 1, XPATH_NUMBER, 0 },
+        XPATH_OP_NUMBER, XPATH_NUMBER, 0, 1, XPATH_NUMBER, 0 },
     { "position", NULL, NULL,
         XPATH_OP_POSITION, XPATH_NUMBER, 0, 0, 0, 0 },
     { "round", NULL, NULL,
         XPATH_OP_ROUND, XPATH_NUMBER, 1, 1, XPATH_NUMBER, 0 },
     { "string", xmlXPathStringFunction, NULL,
-        XPATH_OP_CAST, XPATH_STRING, 0, 1, XPATH_STRING, 0 },
+        XPATH_OP_STRING, XPATH_STRING, 0, 1, XPATH_STRING, 0 },
     { "string-length", xmlXPathStringLengthFunction, NULL,
         XPATH_OP_SFUNC_FIRST, XPATH_NUMBER, 0, 1, XPATH_STRING, 0 },
     { "starts-with", xmlXPathStartsWithFunction, NULL,
@@ -1440,7 +1441,7 @@ xmlXPathCompGetArg(xmlXPathParserContextPtr ctxt, xmlXPathObjectType type) {
             break;
         case XPATH_NUMBER:
             if (op->type != XPATH_NUMBER) {
-                xmlXPathCompAddUnary(ctxt, XPATH_OP_PLUS, XPATH_NUMBER,
+                xmlXPathCompAddUnary(ctxt, XPATH_OP_NUMBER, XPATH_NUMBER,
                                      argIndex);
 
                 xmlXPathCompOpSetMode(ctxt, argIndex, XPATH_EVAL_FIRST);
@@ -1448,18 +1449,8 @@ xmlXPathCompGetArg(xmlXPathParserContextPtr ctxt, xmlXPathObjectType type) {
             break;
         case XPATH_STRING:
             if (op->type != XPATH_STRING) {
-                xmlXPathStepOpPtr funcOp;
-
-                xmlXPathCompAddBinary(ctxt, XPATH_OP_ARG, op->type, -1,
-                                      ctxt->comp->last);
-                funcOp = xmlXPathCompAddUnary(ctxt, XPATH_OP_SFUNC,
-                                              XPATH_STRING, argIndex);
-                if (funcOp != NULL) {
-                    funcOp->nbArgs = 1;
-                    funcOp->as.func = xmlXPathStringFunction;
-                    funcOp->qname.name = NULL;
-                    funcOp->qname.ns.prefix = NULL;
-                }
+                xmlXPathCompAddUnary(ctxt, XPATH_OP_STRING, XPATH_STRING,
+                                     argIndex);
 
                 xmlXPathCompOpSetMode(ctxt, argIndex, XPATH_EVAL_FIRST);
             }
@@ -1696,6 +1687,10 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	    fprintf(output, "END"); break;
         case XPATH_OP_BOOL:
 	    fprintf(output, "BOOL"); break;
+        case XPATH_OP_NUMBER:
+	    fprintf(output, "NUMBER"); break;
+        case XPATH_OP_STRING:
+	    fprintf(output, "STRING"); break;
         case XPATH_OP_NOT:
 	    fprintf(output, "NOT"); break;
         case XPATH_OP_AND:
@@ -9809,8 +9804,9 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
     if ((sfunc != NULL) && (sfunc->compiler != NULL)) {
         sfunc->compiler(ctxt, sfunc, nbargs);
     } else if ((sfunc == NULL) ||
-               ((sfunc->op != XPATH_OP_CAST) &&
-                (sfunc->op != XPATH_OP_BOOL)) ||
+               ((sfunc->op != XPATH_OP_BOOL) &&
+                (sfunc->op != XPATH_OP_NUMBER) &&
+                (sfunc->op != XPATH_OP_STRING)) ||
                (nbargs == 0)) {
         int opval;
         int type;
@@ -9824,7 +9820,11 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
             opval = sfunc->op;
             type = sfunc->retType;
 
-            if (opval == XPATH_OP_CAST)
+            /*
+             * TODO: Create extra ops for number() and string()
+             * without args.
+             */
+            if ((opval == XPATH_OP_NUMBER) || (opval == XPATH_OP_STRING))
                 opval = XPATH_OP_SFUNC_FIRST;
         } else {
             opval = XPATH_OP_FUNCTION;
@@ -11570,21 +11570,51 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
         case XPATH_OP_END:
             break;
 
-        case XPATH_OP_BOOL:
+        case XPATH_OP_BOOL: {
+            int boolval;
+
+            xmlXPathCompOpEval(ctxt, XPATH_EVAL_ANY, op->ch1);
+            CHECK_ERROR;
+
+            boolval = xmlXPathCastToBoolean(ctxt->value);
+            xmlXPathReleaseObject(ctxt->context, valuePop(ctxt));
+            valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, boolval));
+            break;
+        }
+
+        case XPATH_OP_NUMBER: {
+            double floatval;
+
+            xmlXPathCompOpEval(ctxt, XPATH_EVAL_FIRST, op->ch1);
+            CHECK_ERROR;
+
+            floatval = xmlXPathCastToNumberInternal(ctxt, ctxt->value);
+            xmlXPathReleaseObject(ctxt->context, valuePop(ctxt));
+            valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, floatval));
+            break;
+        }
+
+        case XPATH_OP_STRING: {
+            xmlChar *stringval;
+
+            xmlXPathCompOpEval(ctxt, XPATH_EVAL_FIRST, op->ch1);
+            CHECK_ERROR;
+
+            stringval = xmlXPathCastToString(ctxt->value);
+            if (stringval == NULL) {
+                xmlXPathPErrMemory(ctxt);
+                break;
+            }
+            xmlXPathReleaseObject(ctxt->context, valuePop(ctxt));
+            valuePush(ctxt, xmlXPathCacheWrapString(ctxt, stringval));
+            break;
+        }
+
         case XPATH_OP_NOT:
             xmlXPathCompOpEval(ctxt, XPATH_EVAL_ANY, op->ch1);
             CHECK_ERROR;
 
-            /* Convert arg 1 to bool */
-            if ((ctxt->value == NULL) ||
-                (ctxt->value->type != XPATH_BOOLEAN)) {
-                xmlXPathBooleanFuncInternal(ctxt);
-                CHECK_ERROR;
-            }
-
-            if (op->op == XPATH_OP_NOT)
-                ctxt->value->boolval = !ctxt->value->boolval;
-
+            ctxt->value->boolval = !ctxt->value->boolval;
             break;
 
         case XPATH_OP_AND:
