@@ -212,7 +212,10 @@ typedef enum {
 
     /* Compiled to XPATH_OP_VAR */
     XPATH_OP_TRUE,
-    XPATH_OP_FALSE
+    XPATH_OP_FALSE,
+
+    /* Eliminated or converted */
+    XPATH_OP_CAST
 } xmlXPathOp;
 
 typedef enum {
@@ -283,13 +286,13 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
     { "normalize-space", xmlXPathNormalizeFunction, NULL,
         XPATH_OP_SFUNC_FIRST, XPATH_STRING, 0, 1, XPATH_STRING, 0 },
     { "number", xmlXPathNumberFunction, NULL,
-        XPATH_OP_SFUNC_FIRST, XPATH_NUMBER, 0, 1, XPATH_NUMBER, 0 },
+        XPATH_OP_CAST, XPATH_NUMBER, 0, 1, XPATH_NUMBER, 0 },
     { "position", NULL, NULL,
         XPATH_OP_POSITION, XPATH_NUMBER, 0, 0, 0, 0 },
     { "round", NULL, NULL,
         XPATH_OP_ROUND, XPATH_NUMBER, 1, 1, XPATH_NUMBER, 0 },
     { "string", xmlXPathStringFunction, NULL,
-        XPATH_OP_SFUNC_FIRST, XPATH_STRING, 0, 1, XPATH_STRING, 0 },
+        XPATH_OP_CAST, XPATH_STRING, 0, 1, XPATH_STRING, 0 },
     { "string-length", xmlXPathStringLengthFunction, NULL,
         XPATH_OP_SFUNC_FIRST, XPATH_NUMBER, 0, 1, XPATH_STRING, 0 },
     { "starts-with", xmlXPathStartsWithFunction, NULL,
@@ -9805,7 +9808,10 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
 
     if ((sfunc != NULL) && (sfunc->compiler != NULL)) {
         sfunc->compiler(ctxt, sfunc, nbargs);
-    } else {
+    } else if ((sfunc == NULL) ||
+               ((sfunc->op != XPATH_OP_CAST) &&
+                (sfunc->op != XPATH_OP_BOOL)) ||
+               (nbargs == 0)) {
         int opval;
         int type;
 
@@ -9817,6 +9823,9 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
 
             opval = sfunc->op;
             type = sfunc->retType;
+
+            if (opval == XPATH_OP_CAST)
+                opval = XPATH_OP_SFUNC_FIRST;
         } else {
             opval = XPATH_OP_FUNCTION;
             type = XPATH_UNDEFINED;
