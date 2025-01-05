@@ -24,7 +24,7 @@
 
 #include <limits.h>
 #include <string.h>
-#include <stddef.h>
+#include <stdlib.h>
 #include <math.h>
 #include <float.h>
 #include <ctype.h>
@@ -2906,6 +2906,20 @@ xmlXPathCmpNodes(xmlNodePtr node1, xmlNodePtr node2) {
     return(-1); /* assume there is no sibling list corruption */
 }
 
+#ifndef WITH_TIM_SORT
+static int
+xmlXPathCmpNodesQSort(const void *v1, const void *v2) {
+    xmlNode *const *node1 = v1;
+    xmlNode *const *node2 = v2;
+
+#ifdef XP_OPTIMIZED_NON_ELEM_COMPARISON
+    return(xmlXPathCmpNodesExt(*node2, *node1));
+#else
+    return(xmlXPathCmpNodes(*node2, *node1));
+#endif
+}
+#endif
+
 /**
  * xmlXPathNodeSetSort:
  * @set:  the node set
@@ -2914,41 +2928,12 @@ xmlXPathCmpNodes(xmlNodePtr node1, xmlNodePtr node2) {
  */
 void
 xmlXPathNodeSetSort(xmlNodeSetPtr set) {
-#ifndef WITH_TIM_SORT
-    int i, j, incr, len;
-    xmlNodePtr tmp;
-#endif
-
     if (set == NULL)
 	return;
 
 #ifndef WITH_TIM_SORT
-    /*
-     * Use the old Shell's sort implementation to sort the node-set
-     * Timsort ought to be quite faster
-     */
-    len = set->nodeNr;
-    for (incr = len / 2; incr > 0; incr /= 2) {
-	for (i = incr; i < len; i++) {
-	    j = i - incr;
-	    while (j >= 0) {
-#ifdef XP_OPTIMIZED_NON_ELEM_COMPARISON
-		if (xmlXPathCmpNodesExt(set->nodeTab[j],
-			set->nodeTab[j + incr]) == -1)
-#else
-		if (xmlXPathCmpNodes(set->nodeTab[j],
-			set->nodeTab[j + incr]) == -1)
-#endif
-		{
-		    tmp = set->nodeTab[j];
-		    set->nodeTab[j] = set->nodeTab[j + incr];
-		    set->nodeTab[j + incr] = tmp;
-		    j -= incr;
-		} else
-		    break;
-	    }
-	}
-    }
+    qsort(set->nodeTab, set->nodeNr, sizeof(set->nodeTab[0]),
+          xmlXPathCmpNodesQSort);
 #else /* WITH_TIM_SORT */
     libxml_domnode_tim_sort(set->nodeTab, set->nodeNr);
 #endif /* WITH_TIM_SORT */
