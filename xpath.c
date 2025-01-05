@@ -166,6 +166,8 @@ typedef enum {
     XPATH_OP_BOOL,
     XPATH_OP_NUMBER,
     XPATH_OP_STRING,
+    XPATH_OP_NODESET,
+    XPATH_OP_XSLT_TREE,
 
     /* unary bool ops */
     XPATH_OP_NOT,
@@ -252,13 +254,24 @@ static void
 xmlXPathTrueCompiler(xmlXPathParserContextPtr ctxt,
                      const xmlXPathStandardFunction *sfunc, int nargs);
 
+/*
+ * Note that we allow XSLT result tree fragments (XPATH_XSLT_TREE)
+ * as nodeset function arguments. This seems to violate the XSLT 1.0
+ * spec which says:
+ *
+ * > An operation is permitted on a result tree fragment only if that
+ * > operation would be permitted on a string.
+ *
+ * For example count($var) should be illegal. But allowing RTFs has
+ * been long-standing behavior.
+ */
 static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
     { "boolean", NULL, NULL,
         XPATH_OP_BOOL, XPATH_BOOLEAN, 1, 1, XPATH_BOOLEAN, 0 },
     { "ceiling", NULL, NULL,
         XPATH_OP_CEIL, XPATH_NUMBER, 1, 1, XPATH_NUMBER, 0 },
     { "count", xmlXPathCountFunction, NULL,
-        XPATH_OP_SFUNC, XPATH_NUMBER, 1, 1, XPATH_NODESET, 0 },
+        XPATH_OP_SFUNC, XPATH_NUMBER, 1, 1, XPATH_XSLT_TREE, 0 },
     { "concat", xmlXPathConcatFunction, NULL,
         XPATH_OP_SFUNC_FIRST, XPATH_STRING,
         2, INT_MAX, XPATH_STRING, XPATH_STRING },
@@ -276,13 +289,13 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
     { "lang", xmlXPathLangFunction, NULL,
         XPATH_OP_SFUNC_FIRST, XPATH_BOOLEAN, 1, 1, XPATH_STRING, 0 },
     { "local-name", xmlXPathLocalNameFunction, NULL,
-        XPATH_OP_SFUNC_FIRST, XPATH_STRING, 0, 1, XPATH_NODESET, 0 },
+        XPATH_OP_SFUNC_FIRST, XPATH_STRING, 0, 1, XPATH_XSLT_TREE, 0 },
     { "not", NULL, NULL,
         XPATH_OP_NOT, XPATH_BOOLEAN, 1, 1, XPATH_BOOLEAN, 0 },
     { "name", xmlXPathNameFunction, NULL,
-        XPATH_OP_SFUNC_FIRST, XPATH_STRING, 0, 1, XPATH_NODESET, 0 },
+        XPATH_OP_SFUNC_FIRST, XPATH_STRING, 0, 1, XPATH_XSLT_TREE, 0 },
     { "namespace-uri", xmlXPathNamespaceURIFunction, NULL,
-        XPATH_OP_SFUNC_FIRST, XPATH_STRING, 0, 1, XPATH_NODESET, 0 },
+        XPATH_OP_SFUNC_FIRST, XPATH_STRING, 0, 1, XPATH_XSLT_TREE, 0 },
     { "normalize-space", xmlXPathNormalizeFunction, NULL,
         XPATH_OP_SFUNC_FIRST, XPATH_STRING, 0, 1, XPATH_STRING, 0 },
     { "number", xmlXPathNumberFunction, NULL,
@@ -308,7 +321,7 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
         XPATH_OP_SFUNC_FIRST, XPATH_STRING,
         2, 2, XPATH_STRING, XPATH_STRING },
     { "sum", xmlXPathSumFunction, NULL,
-        XPATH_OP_SFUNC, XPATH_NUMBER, 1, 1, XPATH_NODESET, 0 },
+        XPATH_OP_SFUNC, XPATH_NUMBER, 1, 1, XPATH_XSLT_TREE, 0 },
     { "true", NULL, xmlXPathTrueCompiler,
         XPATH_OP_TRUE, XPATH_BOOLEAN, 0, 0, 0, 0 },
     { "translate", xmlXPathTranslateFunction, NULL,
@@ -1455,12 +1468,22 @@ xmlXPathCompGetArg(xmlXPathParserContextPtr ctxt, xmlXPathObjectType type) {
             }
             break;
         case XPATH_NODESET:
-            /*
-             * TODO: add nodeset check op for undefined types
-             */
-            if ((op->type != XPATH_NODESET) &&
-                (op->type != XPATH_UNDEFINED))
-                xmlXPathErr(ctxt, XPATH_INVALID_TYPE);
+            if (op->type != XPATH_NODESET) {
+                if (op->type == XPATH_UNDEFINED)
+                    xmlXPathCompAddUnary(ctxt, XPATH_OP_NODESET, XPATH_NODESET,
+                                         argIndex);
+                else
+                    xmlXPathErr(ctxt, XPATH_INVALID_TYPE);
+            }
+            break;
+        case XPATH_XSLT_TREE:
+            if ((op->type != XPATH_NODESET) && (op->type != XPATH_XSLT_TREE)) {
+                if (op->type == XPATH_UNDEFINED)
+                    xmlXPathCompAddUnary(ctxt, XPATH_OP_XSLT_TREE,
+                                         XPATH_NODESET, argIndex);
+                else
+                    xmlXPathErr(ctxt, XPATH_INVALID_TYPE);
+            }
             break;
         case XPATH_UNDEFINED:
         default:
@@ -1690,6 +1713,10 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	    fprintf(output, "NUMBER"); break;
         case XPATH_OP_STRING:
 	    fprintf(output, "STRING"); break;
+        case XPATH_OP_XSLT_TREE:
+	    fprintf(output, "XSLT_TREE"); break;
+        case XPATH_OP_NODESET:
+	    fprintf(output, "NODESET"); break;
         case XPATH_OP_NOT:
 	    fprintf(output, "NOT"); break;
         case XPATH_OP_AND:
@@ -9618,7 +9645,6 @@ xmlXPathCompVariableReference(xmlXPathParserContextPtr ctxt) {
             nsUri = NULL;
     }
 
-    ctxt->comp->last = -1;
     op = xmlXPathCompAdd(ctxt, XPATH_OP_VARIABLE, XPATH_UNDEFINED);
     if (op == NULL)
         goto error;
@@ -10102,12 +10128,16 @@ xmlXPathCompPathExpr(xmlXPathParserContextPtr ctxt) {
 	CHECK_ERROR;
 	if ((CUR == '/') && (NXT(1) == '/')) {
             xmlXPathStepOpPtr op;
+            int ch1;
 
 	    SKIP(2);
 	    SKIP_BLANKS;
 
-            op = xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
-                                     AXIS_DESCENDANT_OR_SELF, TYPE_MASK_NODE);
+            ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
+            CHECK_ERROR;
+
+            op = xmlXPathCompAddStep(ctxt, ch1, -1, AXIS_DESCENDANT_OR_SELF,
+                                     TYPE_MASK_NODE);
             if (op == NULL)
                 return;
 
@@ -10135,14 +10165,19 @@ xmlXPathCompUnionExpr(xmlXPathParserContextPtr ctxt) {
     CHECK_ERROR;
     SKIP_BLANKS;
     while (CUR == '|') {
-	int ch1 = ctxt->comp->last;
+	int ch1, ch2;
+
+        ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
+        CHECK_ERROR;
 
 	NEXT;
 	SKIP_BLANKS;
 	xmlXPathCompPathExpr(ctxt);
 
-        xmlXPathCompAddBinary(ctxt, XPATH_OP_UNION, XPATH_NODESET, ch1,
-                              ctxt->comp->last);
+        ch2 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
+        CHECK_ERROR;
+
+        xmlXPathCompAddBinary(ctxt, XPATH_OP_UNION, XPATH_NODESET, ch1, ch2);
 
 	SKIP_BLANKS;
     }
@@ -10482,7 +10517,10 @@ xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter) {
     xmlXPathStepOpPtr pred;
     xmlXPathEvalMode mode = XPATH_EVAL_ALL;
     xmlXPathOp opval;
-    int ch1 = ctxt->comp->last;
+    int ch1;
+
+    ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
+    CHECK_ERROR;
 
     SKIP_BLANKS;
     if (CUR != '[') {
@@ -10755,10 +10793,15 @@ static void
 xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
     SKIP_BLANKS;
     if ((CUR == '.') && (NXT(1) == '.')) {
+	int ch1;
+
 	SKIP(2);
 	SKIP_BLANKS;
-	xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
-                            AXIS_PARENT, TYPE_MASK_NODE);
+
+        ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
+        CHECK_ERROR;
+
+	xmlXPathCompAddStep(ctxt, ch1, -1, AXIS_PARENT, TYPE_MASK_NODE);
     } else if (CUR == '.') {
 	NEXT;
 	SKIP_BLANKS;
@@ -10769,8 +10812,11 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
         const xmlChar *nsUri = NULL;
 	xmlXPathAxisVal axis = (xmlXPathAxisVal) 0;
 	int type = 0;
-	int ch1 = ctxt->comp->last;
+	int ch1;
         int stepIndex, predIndex;
+
+        ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
+        CHECK_ERROR;
 
 	if (CUR == '*') {
 	    axis = AXIS_CHILD;
@@ -10880,11 +10926,16 @@ xmlXPathCompRelativeLocationPath
     SKIP_BLANKS;
     if ((CUR == '/') && (NXT(1) == '/')) {
         xmlXPathStepOpPtr op;
+        int ch1;
 
 	SKIP(2);
 	SKIP_BLANKS;
-	op = xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
-                                 AXIS_DESCENDANT_OR_SELF, TYPE_MASK_NODE);
+
+        ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
+        CHECK_ERROR;
+
+	op = xmlXPathCompAddStep(ctxt, ch1, -1, AXIS_DESCENDANT_OR_SELF,
+                                 TYPE_MASK_NODE);
         if (op == NULL)
             return;
     } else if (CUR == '/') {
@@ -10897,12 +10948,16 @@ xmlXPathCompRelativeLocationPath
     while (CUR == '/') {
 	if ((CUR == '/') && (NXT(1) == '/')) {
             xmlXPathStepOpPtr op;
+            int ch1;
 
 	    SKIP(2);
 	    SKIP_BLANKS;
 
-            op = xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
-                                     AXIS_DESCENDANT_OR_SELF, TYPE_MASK_NODE);
+            ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
+            CHECK_ERROR;
+
+            op = xmlXPathCompAddStep(ctxt, ch1, -1, AXIS_DESCENDANT_OR_SELF,
+                                     TYPE_MASK_NODE);
             if (op == NULL)
                 return;
 
@@ -11258,7 +11313,6 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
     xmlXPathContextPtr xpctxt = ctxt->context;
 
 
-    CHECK_TYPE(XPATH_NODESET);
     obj = ctxt->value;
     contextSize = obj->nodesetval->nodeNr;
     if (contextSize <= 0)
@@ -11603,6 +11657,23 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
             break;
         }
 
+        case XPATH_OP_NODESET:
+            xmlXPathCompOpEval(ctxt, XPATH_EVAL_FIRST, op->ch1);
+            CHECK_ERROR;
+
+            if (ctxt->value->type != XPATH_NODESET)
+                xmlXPathErr(ctxt, XPATH_INVALID_TYPE);
+            break;
+
+        case XPATH_OP_XSLT_TREE:
+            xmlXPathCompOpEval(ctxt, XPATH_EVAL_FIRST, op->ch1);
+            CHECK_ERROR;
+
+            if ((ctxt->value->type != XPATH_NODESET) &&
+                (ctxt->value->type != XPATH_XSLT_TREE))
+                xmlXPathErr(ctxt, XPATH_INVALID_TYPE);
+            break;
+
         case XPATH_OP_NOT:
             xmlXPathCompOpEval(ctxt, XPATH_EVAL_ANY, op->ch1);
             CHECK_ERROR;
@@ -11730,8 +11801,6 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
 	    CHECK_ERROR;
 
             arg2 = ctxt->value;
-            if ((arg2 == NULL) || (arg2->type != XPATH_NODESET))
-                XP_ERROR(XPATH_INVALID_TYPE);
             if ((mode == XPATH_EVAL_ANY) && (arg2->nodesetval->nodeNr > 0))
                 break;
             valuePop(ctxt);
@@ -11743,10 +11812,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
             }
 
             arg1 = ctxt->value;
-            if ((arg1 == NULL) || (arg1->type != XPATH_NODESET)) {
-	        xmlXPathReleaseObject(xpctxt, arg2);
-                XP_ERROR(XPATH_INVALID_TYPE);
-            }
+
             if ((xpctxt->opLimit != 0) &&
                 (((arg1->nodesetval != NULL) &&
                   (xmlXPathCheckOpLimit(ctxt,
@@ -11984,7 +12050,6 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
             */
             xmlXPathCompOpEval(ctxt, XPATH_EVAL_ALL, op->ch1);
             CHECK_ERROR;
-            CHECK_TYPE(XPATH_NODESET);
 
             set = ctxt->value->nodesetval;
             if (set != NULL)
@@ -11996,12 +12061,10 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
         case XPATH_OP_SORT:
             xmlXPathCompOpEval(ctxt, mode, op->ch1);
 	    CHECK_ERROR;
-            if ((ctxt->value != NULL) &&
-                (ctxt->value->type == XPATH_NODESET) &&
-                (ctxt->value->nodesetval != NULL) &&
+
+            if ((ctxt->value->type == XPATH_NODESET) &&
 		(ctxt->value->nodesetval->nodeNr > 1) &&
-                (mode != XPATH_EVAL_ANY))
-	    {
+                (mode != XPATH_EVAL_ANY)) {
                 xmlXPathNodeSetSort(ctxt->value->nodesetval);
                 xmlXPathNodeSetRemoveDups(ctxt->value->nodesetval);
 	    }
