@@ -216,10 +216,12 @@ typedef enum {
 } xmlXPathOp;
 
 typedef enum {
-    XPATH_EVAL_ALL,
-    XPATH_EVAL_ANY,
-    XPATH_EVAL_FIRST,
-    XPATH_EVAL_LAST
+    XPATH_EVAL_ALL = 0,
+    XPATH_EVAL_FIRST = 1,
+    /* values 2-249 mean the specific index */
+    XPATH_EVAL_LAST = 250,
+    XPATH_EVAL_ANY = 251,
+    XPATH_EVAL_NONE = 252
 } xmlXPathEvalMode;
 
 typedef struct _xmlXPathStandardFunction xmlXPathStandardFunction;
@@ -1032,6 +1034,7 @@ typedef struct _xmlXPathStepOp xmlXPathStepOp;
 typedef xmlXPathStepOp *xmlXPathStepOpPtr;
 struct _xmlXPathStepOp {
     unsigned char op;
+    unsigned char mode;
     unsigned char type; /* only used during compilation */
     int ch1; /* first child */
     int ch2; /* second child */
@@ -1229,6 +1232,59 @@ xmlXPathCompOpSetQName(xmlXPathParserContextPtr ctxt, xmlXPathOpQName *qname,
     return(0);
 }
 
+static void
+xmlXPathCompOpSetMode(xmlXPathParserContextPtr ctxt, int opIndex,
+                      xmlXPathEvalMode mode) {
+    xmlXPathStepOpPtr op = &ctxt->comp->steps[opIndex];
+
+    if ((op->op != XPATH_OP_COLLECT) &&
+        (op->op != XPATH_OP_FILTER) &&
+        (op->op != XPATH_OP_PREDICATE) &&
+        (op->op != XPATH_OP_UNION) &&
+        (op->op != XPATH_OP_SORT))
+        return;
+
+    /*
+     * Mode applies to unions, filters, sorts or steps.
+     */
+
+    /* Shouldn't happen? */
+    if (op->mode == XPATH_EVAL_ANY)
+        return;
+
+    if (op->mode == XPATH_EVAL_NONE)
+        return;
+
+    if ((mode != XPATH_EVAL_ANY) && (op->mode != XPATH_EVAL_ALL)) {
+        /*
+         * Both old and new mode select a single node
+         */
+
+        if ((mode == XPATH_EVAL_FIRST) || (mode == XPATH_EVAL_LAST)) {
+            /* [n][1], [n][last()]: Ignore second filter. */
+            return;
+        } else {
+            /*
+             * [n][2]: Can't match
+             *
+             * We could propagate XPATH_EVAL_NONE and eliminate
+             * whole operations but this shouldn't be a common case.
+             */
+            op->mode = XPATH_EVAL_NONE;
+            return;
+        }
+    }
+
+    op->mode = mode;
+
+    if (op->op == XPATH_OP_UNION) {
+        xmlXPathCompOpSetMode(ctxt, op->ch1, mode);
+        xmlXPathCompOpSetMode(ctxt, op->ch2, mode);
+    } else if (op->op == XPATH_OP_SORT) {
+        xmlXPathCompOpSetMode(ctxt, op->ch1, mode);
+    }
+}
+
 /**
  * xmlXPathCompAdd:
  * @comp:  the compiled expression
@@ -1273,6 +1329,7 @@ xmlXPathCompAdd(xmlXPathParserContextPtr ctxt, xmlXPathOp opval,
 
     op = &comp->steps[comp->nbStep++];
     op->op = opval;
+    op->mode = 0;
     op->type = retType;
     op->ch1 = -1;
     op->ch2 = -1;
@@ -1362,14 +1419,20 @@ xmlXPathCompGetArg(xmlXPathParserContextPtr ctxt, xmlXPathObjectType type) {
          * TODO: create casts depending on source type
          */
         case XPATH_BOOLEAN:
-            if (op->type != XPATH_BOOLEAN)
+            if (op->type != XPATH_BOOLEAN) {
                 xmlXPathCompAddUnary(ctxt, XPATH_OP_BOOL, XPATH_BOOLEAN,
                                      argIndex);
+
+                xmlXPathCompOpSetMode(ctxt, argIndex, XPATH_EVAL_ANY);
+            }
             break;
         case XPATH_NUMBER:
-            if (op->type != XPATH_NUMBER)
+            if (op->type != XPATH_NUMBER) {
                 xmlXPathCompAddUnary(ctxt, XPATH_OP_PLUS, XPATH_NUMBER,
                                      argIndex);
+
+                xmlXPathCompOpSetMode(ctxt, argIndex, XPATH_EVAL_FIRST);
+            }
             break;
         case XPATH_STRING:
             if (op->type != XPATH_STRING) {
@@ -1385,6 +1448,8 @@ xmlXPathCompGetArg(xmlXPathParserContextPtr ctxt, xmlXPathObjectType type) {
                     funcOp->qname.name = NULL;
                     funcOp->qname.ns.prefix = NULL;
                 }
+
+                xmlXPathCompOpSetMode(ctxt, argIndex, XPATH_EVAL_FIRST);
             }
             break;
         case XPATH_NODESET:
@@ -1765,7 +1830,39 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	default:
             fprintf(output, "UNKNOWN %d\n", op->op); return;
     }
+
+    switch (op->op) {
+        case XPATH_OP_COLLECT:
+        case XPATH_OP_FILTER:
+        case XPATH_OP_PREDICATE:
+        case XPATH_OP_UNION:
+        case XPATH_OP_SORT:
+            switch (op->mode) {
+                case XPATH_EVAL_NONE:
+                    fprintf(output, " mode=NONE");
+                    break;
+                case XPATH_EVAL_ANY:
+                    fprintf(output, " mode=ANY");
+                    break;
+                case XPATH_EVAL_FIRST:
+                    fprintf(output, " mode=FIRST");
+                    break;
+                case XPATH_EVAL_LAST:
+                    fprintf(output, " mode=LAST");
+                    break;
+                case XPATH_EVAL_ALL:
+                    break;
+                default:
+                    fprintf(output, " mode=%d", op->mode);
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+
     fprintf(output, "\n");
+
 finish:
     if (op->ch1 >= 0)
 	xmlXPathDebugDumpStepOp(output, comp, &comp->steps[op->ch1], depth + 1);
@@ -10356,6 +10453,8 @@ error:
  */
 static void
 xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter) {
+    xmlXPathStepOpPtr pred;
+    xmlXPathEvalMode mode = XPATH_EVAL_ALL;
     xmlXPathOp opval;
     int ch1 = ctxt->comp->last;
 
@@ -10374,12 +10473,36 @@ xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter) {
 	XP_ERROR(XPATH_INVALID_PREDICATE_ERROR);
     }
 
+    xmlXPathCompOpSetMode(ctxt, ctxt->comp->last, XPATH_EVAL_ANY);
+
+    pred = &ctxt->comp->steps[ctxt->comp->last];
+
+    if ((pred->op == XPATH_OP_VALUE) &&
+        (pred->as.obj->type == XPATH_NUMBER)) {
+        double floatval = pred->as.obj->floatval;
+
+        if ((floatval > 0.0) && (floatval < XPATH_EVAL_LAST)) {
+            int index = floatval;
+
+            /* Check whether floatval is an integer */
+            if (index == floatval)
+                mode = index;
+        }
+    } else if (pred->op == XPATH_OP_LAST) {
+        mode = XPATH_EVAL_LAST;
+    }
+
+    if (mode != XPATH_EVAL_ALL) {
+        xmlXPathCompOpSetMode(ctxt, ch1, mode);
+    }
+
     if (filter)
         opval = XPATH_OP_FILTER;
     else
         opval = XPATH_OP_PREDICATE;
 
-    xmlXPathCompAddBinary(ctxt, opval, XPATH_NODESET, ch1, ctxt->comp->last);
+    xmlXPathCompAddBinary(ctxt, opval, XPATH_NODESET,
+                          ch1, ctxt->comp->last);
 
     NEXT;
     SKIP_BLANKS;
@@ -10621,6 +10744,7 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 	xmlXPathAxisVal axis = (xmlXPathAxisVal) 0;
 	int type = 0;
 	int ch1 = ctxt->comp->last;
+        int stepIndex, predIndex;
 
 	if (CUR == '*') {
 	    axis = AXIS_CHILD;
@@ -10680,14 +10804,7 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
                 nsUri = NULL;
 	}
 
-	ctxt->comp->last = -1;
-
-	SKIP_BLANKS;
-	while (CUR == '[') {
-	    xmlXPathCompPredicate(ctxt, 0);
-	}
-
-        op = xmlXPathCompAddStep(ctxt, ch1, ctxt->comp->last, axis, type);
+        op = xmlXPathCompAddStep(ctxt, ch1, -1, axis, type);
         if (op == NULL)
             goto error;
         if ((name != NULL) &&
@@ -10696,6 +10813,23 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
             prefix = NULL;
             name = NULL;
         }
+        stepIndex = ctxt->comp->last;
+
+	SKIP_BLANKS;
+        predIndex = -1;
+	while (CUR == '[') {
+	    xmlXPathCompPredicate(ctxt, 0);
+
+            /* Unlink predicate chain */
+            if (predIndex == -1)
+	        ctxt->comp->steps[ctxt->comp->last].ch1 = -1;
+
+            predIndex = ctxt->comp->last;
+	}
+
+        /* Relink predicate chain */
+        ctxt->comp->steps[stepIndex].ch2 = predIndex;
+        ctxt->comp->last = stepIndex;
 
 error:
         xmlFree(prefix);
