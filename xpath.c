@@ -2954,6 +2954,42 @@ xmlXPathNodeSetSort(xmlNodeSetPtr set) {
 #endif /* WITH_TIM_SORT */
 }
 
+static void
+xmlXPathNodeSetRemoveDups(xmlNodeSetPtr set) {
+    xmlNodePtr prev;
+    int nodeNr, i, j;
+
+    nodeNr = set->nodeNr;
+    if (nodeNr < 2)
+        return;
+
+    prev = set->nodeTab[0];
+    j = 1;
+    for (i = 1; i < nodeNr; i++) {
+        xmlNodePtr node = set->nodeTab[i];
+
+        if (node == prev)
+            continue;
+
+        if ((node->type == XML_NAMESPACE_DECL) &&
+            (prev->type == XML_NAMESPACE_DECL)) {
+            xmlNsPtr ns = (xmlNsPtr) node;
+            xmlNsPtr prevNs = (xmlNsPtr) prev;
+
+            if ((ns->next == prevNs->next) &&
+                (xmlStrEqual(ns->prefix, prevNs->prefix))) {
+                xmlFreeNs(ns);
+                continue;
+            }
+        }
+
+        set->nodeTab[j++] = node;
+        prev = node;
+    }
+
+    set->nodeNr = j;
+}
+
 #define XML_NODESET_DEFAULT	10
 /**
  * xmlXPathNodeSetDupNs:
@@ -3334,7 +3370,7 @@ error:
  */
 static int
 xmlXPathNodeSetMergeAndClear(xmlNodeSetPtr set1, xmlNodeSetPtr set2,
-                             xmlXPathEvalMode mode, int checkDupls) {
+                             xmlXPathEvalMode mode) {
     if (set1->nodeNr <= 0) {
         xmlNodeSet tmp = *set1;
 
@@ -3378,37 +3414,11 @@ xmlXPathNodeSetMergeAndClear(xmlNodeSetPtr set1, xmlNodeSetPtr set2,
 
         xmlXPathNodeSetClear(set2, 1);
     } else {
-	int i, j, initNbSet1;
-	xmlNodePtr n1, n2;
+	int i;
+	xmlNodePtr n2;
 
-	initNbSet1 = set1->nodeNr;
 	for (i = 0;i < set2->nodeNr;i++) {
 	    n2 = set2->nodeTab[i];
-
-            if (checkDupls) {
-                /*
-                * Skip duplicates.
-                */
-                for (j = 0; j < initNbSet1; j++) {
-                    n1 = set1->nodeTab[j];
-                    if (n1 == n2) {
-                        goto skip_node;
-                    } else if ((n1->type == XML_NAMESPACE_DECL) &&
-                        (n2->type == XML_NAMESPACE_DECL))
-                    {
-                        if ((((xmlNsPtr) n1)->next == ((xmlNsPtr) n2)->next) &&
-                            (xmlStrEqual(((xmlNsPtr) n1)->prefix,
-                            ((xmlNsPtr) n2)->prefix)))
-                        {
-                            /*
-                            * Free the namespace node.
-                            */
-                            xmlXPathNodeSetFreeNs((xmlNsPtr) n2);
-                            goto skip_node;
-                        }
-                    }
-                }
-            }
 
 	    /*
 	    * grow the nodeTab if needed
@@ -3420,7 +3430,6 @@ xmlXPathNodeSetMergeAndClear(xmlNodeSetPtr set1, xmlNodeSetPtr set2,
                 }
             }
 	    set1->nodeTab[set1->nodeNr++] = n2;
-skip_node:
             set2->nodeTab[i] = NULL;
 	}
 
@@ -7685,7 +7694,7 @@ xmlXPathAddElementsByIds(xmlNodeSetPtr set, xmlDocPtr doc,
             else
                 elem = NULL;
             if (elem != NULL) {
-                if (xmlXPathNodeSetAdd(set, elem) < 0)
+                if (xmlXPathNodeSetAddUnique(set, elem) < 0)
                     return(-1);
             }
         }
@@ -7763,8 +7772,10 @@ xmlXPathIdFunction(xmlXPathParserContextPtr ctxt, int nargs) {
         }
     }
 
-    if (set->nodeNr > 1)
+    if (set->nodeNr > 1) {
         xmlXPathNodeSetSort(set);
+        xmlXPathNodeSetRemoveDups(set);
+    }
 
 error:
 
@@ -9610,7 +9621,6 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
     const xmlXPathStandardFunction *sfunc = NULL;
     xmlXPathFunction func = NULL;
     int nbargs = 0;
-    int sort = 1;
 
     name = xmlXPathParseQName(ctxt, &prefix);
     if (name == NULL) {
@@ -9626,15 +9636,6 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
     }
     NEXT;
     SKIP_BLANKS;
-
-    /*
-    * Optimization for count(): we don't need the node-set to be sorted.
-    */
-    if ((prefix == NULL) && (name[0] == 'c') &&
-	xmlStrEqual(name, BAD_CAST "count"))
-    {
-	sort = 0;
-    }
 
     if (prefix != NULL) {
         if ((ctxt->comp->flags & XML_XPATH_CHECKNS) ||
@@ -9673,8 +9674,7 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
             xmlXPathObjectType type;
 
 	    xmlXPathCompileExpr(ctxt);
-            if (sort)
-                xmlXPathCompAddSort(ctxt);
+            xmlXPathCompAddSort(ctxt);
 	    if (ctxt->error != XPATH_EXPRESSION_OK)
                 goto error;
 
@@ -11109,7 +11109,6 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
     int hasPredicateRange, hasAxisRange;
     int breakOnFirstHit;
     int direction;
-    int checkDupls;
 
     xmlXPathContextPtr xpctxt = ctxt->context;
 
@@ -11143,21 +11142,6 @@ xmlXPathNodeCollectAndTest(xmlXPathParserContextPtr ctxt,
                 goto error;
             }
         }
-    }
-
-    /*
-    * Setup axis.
-    */
-    switch (axis) {
-        case AXIS_ATTRIBUTE:
-        case AXIS_CHILD:
-        case AXIS_NAMESPACE:
-        case AXIS_SELF:
-            checkDupls = 0;
-            break;
-        default:
-            checkDupls = 1;
-            break;
     }
 
     /*
@@ -11383,7 +11367,7 @@ no_match:
         /*
         * Add to result set.
         */
-        if (xmlXPathNodeSetMergeAndClear(outSeq, &seq, mode, checkDupls) < 0)
+        if (xmlXPathNodeSetMergeAndClear(outSeq, &seq, mode) < 0)
             xmlXPathPErrMemory(ctxt);
 
         if (mode == XPATH_EVAL_ANY)
@@ -11612,8 +11596,8 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
                     arg2->nodesetval = tmp;
                 } else {
                     if (xmlXPathNodeSetMergeAndClear(arg1->nodesetval,
-                                                     arg2->nodesetval, mode,
-                                                     /* checkDupls */ 1) < 0)
+                                                     arg2->nodesetval,
+                                                     mode) < 0)
                         xmlXPathPErrMemory(ctxt);
                 }
 	    }
@@ -11850,6 +11834,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
                 (mode != XPATH_EVAL_ANY))
 	    {
                 xmlXPathNodeSetSort(ctxt->value->nodesetval);
+                xmlXPathNodeSetRemoveDups(ctxt->value->nodesetval);
 	    }
             break;
 
