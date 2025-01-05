@@ -183,7 +183,6 @@ typedef enum {
     XPATH_OP_GE,
 
     /* unary math ops */
-    XPATH_OP_PLUS,
     XPATH_OP_NEG,
     XPATH_OP_FLOOR,
     XPATH_OP_CEIL,
@@ -1709,8 +1708,6 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	    fprintf(output, "LE"); break;
         case XPATH_OP_GE:
 	    fprintf(output, "GE"); break;
-        case XPATH_OP_PLUS:
-	    fprintf(output, "PLUS"); break;
         case XPATH_OP_NEG:
 	    fprintf(output, "NEG"); break;
         case XPATH_OP_FLOOR:
@@ -10164,28 +10161,24 @@ xmlXPathCompUnionExpr(xmlXPathParserContextPtr ctxt) {
 static void
 xmlXPathCompUnaryExpr(xmlXPathParserContextPtr ctxt) {
     int minus = 0;
-    int found = 0;
 
     SKIP_BLANKS;
     while (CUR == '-') {
         minus = 1 - minus;
-	found = 1;
 	NEXT;
 	SKIP_BLANKS;
     }
 
     xmlXPathCompUnionExpr(ctxt);
     CHECK_ERROR;
-    if (found) {
+    if (minus) {
         xmlXPathStepOpPtr op;
-        xmlXPathOp opval;
+        int ch1;
 
-        if (minus)
-            opval = XPATH_OP_NEG;
-        else
-            opval = XPATH_OP_PLUS;
+        ch1 = xmlXPathCompGetArg(ctxt, XPATH_NUMBER);
+        CHECK_ERROR;
 
-        op = xmlXPathCompAddUnary(ctxt, opval, XPATH_NUMBER, ctxt->comp->last);
+        op = xmlXPathCompAddUnary(ctxt, XPATH_OP_NEG, XPATH_NUMBER, ch1);
         if (op == NULL)
             return;
     }
@@ -11664,17 +11657,11 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathEvalMode mode,
             break;
         }
 
-        case XPATH_OP_PLUS:
         case XPATH_OP_NEG:
         case XPATH_OP_FLOOR:
         case XPATH_OP_CEIL:
         case XPATH_OP_ROUND:
             xmlXPathCompOpEval(ctxt, XPATH_EVAL_FIRST, op->ch1);
-            CHECK_ERROR;
-
-            /* Convert arg 1 to number */
-            if ((ctxt->value == NULL) || (ctxt->value->type != XPATH_NUMBER))
-                xmlXPathNumberFuncInternal(ctxt);
             CHECK_ERROR;
 
             arg1 = ctxt->value;
