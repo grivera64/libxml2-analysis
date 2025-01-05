@@ -505,8 +505,17 @@ xmlXPathCmpNodesExt(xmlNodePtr node1, xmlNodePtr node2) {
 		    goto turtle_comparison;
 	    }
 	    break;
-	case XML_ATTRIBUTE_NODE:
+	case XML_NAMESPACE_DECL: {
+            xmlNsPtr ns = (xmlNsPtr) node1;
+
 	    precedence1 = 1; /* element is owner */
+	    miscNode1 = node1;
+	    node1 = (xmlNodePtr) ns->next;
+	    misc = 1;
+	    break;
+        }
+	case XML_ATTRIBUTE_NODE:
+	    precedence1 = 2; /* element is owner */
 	    miscNode1 = node1;
 	    node1 = node1->parent;
 	    misc = 1;
@@ -523,11 +532,11 @@ xmlXPathCmpNodesExt(xmlNodePtr node1, xmlNodePtr node2) {
 		do {
 		    node1 = node1->prev;
 		    if (node1->type == XML_ELEMENT_NODE) {
-			precedence1 = 3; /* element in prev-sibl axis */
+			precedence1 = 4; /* element in prev-sibl axis */
 			break;
 		    }
 		    if (node1->prev == NULL) {
-			precedence1 = 2; /* element is parent */
+			precedence1 = 3; /* element is parent */
 			/*
 			* URGENT TODO: Are there any cases, where the
 			* parent of such a node is not an element node?
@@ -537,7 +546,7 @@ xmlXPathCmpNodesExt(xmlNodePtr node1, xmlNodePtr node2) {
 		    }
 		} while (1);
 	    } else {
-		precedence1 = 2; /* element is parent */
+		precedence1 = 3; /* element is parent */
 		node1 = node1->parent;
 	    }
 	    if ((node1 == NULL) || (node1->type != XML_ELEMENT_NODE) ||
@@ -551,19 +560,23 @@ xmlXPathCmpNodesExt(xmlNodePtr node1, xmlNodePtr node2) {
 		misc = 1;
 	}
 	    break;
-	case XML_NAMESPACE_DECL:
-	    /*
-	    * TODO: why do we return 1 for namespace nodes?
-	    */
-	    return(1);
 	default:
 	    break;
     }
     switch (node2->type) {
 	case XML_ELEMENT_NODE:
 	    break;
-	case XML_ATTRIBUTE_NODE:
+	case XML_NAMESPACE_DECL: {
+            xmlNsPtr ns = (xmlNsPtr) node2;
+
 	    precedence2 = 1; /* element is owner */
+	    miscNode2 = node2;
+	    node2 = (xmlNodePtr) ns->next;
+	    misc = 1;
+	    break;
+        }
+	case XML_ATTRIBUTE_NODE:
+	    precedence2 = 2; /* element is owner */
 	    miscNode2 = node2;
 	    node2 = node2->parent;
 	    misc = 1;
@@ -577,17 +590,17 @@ xmlXPathCmpNodesExt(xmlNodePtr node1, xmlNodePtr node2) {
 		do {
 		    node2 = node2->prev;
 		    if (node2->type == XML_ELEMENT_NODE) {
-			precedence2 = 3; /* element in prev-sibl axis */
+			precedence2 = 4; /* element in prev-sibl axis */
 			break;
 		    }
 		    if (node2->prev == NULL) {
-			precedence2 = 2; /* element is parent */
+			precedence2 = 3; /* element is parent */
 			node2 = node2->parent;
 			break;
 		    }
 		} while (1);
 	    } else {
-		precedence2 = 2; /* element is parent */
+		precedence2 = 3; /* element is parent */
 		node2 = node2->parent;
 	    }
 	    if ((node2 == NULL) || (node2->type != XML_ELEMENT_NODE) ||
@@ -599,14 +612,19 @@ xmlXPathCmpNodesExt(xmlNodePtr node1, xmlNodePtr node2) {
 		misc = 1;
 	}
 	    break;
-	case XML_NAMESPACE_DECL:
-	    return(1);
 	default:
 	    break;
     }
     if (misc) {
 	if (node1 == node2) {
 	    if (precedence1 == precedence2) {
+                if (precedence1 == 1) {
+                    xmlNsPtr ns1 = (xmlNsPtr) miscNode1;
+                    xmlNsPtr ns2 = (xmlNsPtr) miscNode2;
+
+                    return(xmlStrcmp(ns2->prefix, ns1->prefix));
+                }
+
 		/*
 		* The ugly case; but normally there aren't many
 		* adjacent non-element nodes around.
@@ -623,8 +641,6 @@ xmlXPathCmpNodesExt(xmlNodePtr node1, xmlNodePtr node2) {
 	    } else {
 		/*
 		* Evaluate based on higher precedence wrt to the element.
-		* TODO: This assumes attributes are sorted before content.
-		*   Is this 100% correct?
 		*/
 		if (precedence1 < precedence2)
 		    return(1);
@@ -636,12 +652,12 @@ xmlXPathCmpNodesExt(xmlNodePtr node1, xmlNodePtr node2) {
 	* Special case: One of the helper-elements is contained by the other.
 	* <foo>
 	*   <node2>
-	*     <node1>Text-1(precedence1 == 2)</node1>
+	*     <node1>Text-1(precedence1 == 3)</node1>
 	*   </node2>
-	*   Text-6(precedence2 == 3)
+	*   Text-6(precedence2 == 4)
 	* </foo>
 	*/
-	if ((precedence2 == 3) && (precedence1 > 1)) {
+	if ((precedence2 == 4) && (precedence1 > 2)) {
 	    cur = node1->parent;
 	    while (cur) {
 		if (cur == node2)
@@ -649,7 +665,7 @@ xmlXPathCmpNodesExt(xmlNodePtr node1, xmlNodePtr node2) {
 		cur = cur->parent;
 	    }
 	}
-	if ((precedence1 == 3) && (precedence2 > 1)) {
+	if ((precedence1 == 4) && (precedence2 > 2)) {
 	    cur = node2->parent;
 	    while (cur) {
 		if (cur == node1)
@@ -2742,8 +2758,8 @@ xmlXPathOrderDocElems(xmlDocPtr doc) {
 int
 xmlXPathCmpNodes(xmlNodePtr node1, xmlNodePtr node2) {
     int depth1, depth2;
-    int attr1 = 0, attr2 = 0;
-    xmlNodePtr attrNode1 = NULL, attrNode2 = NULL;
+    int precedence1 = 0, precedence2 = 0;
+    xmlNodePtr miscNode1 = NULL, miscNode2 = NULL;
     xmlNodePtr cur, root;
 
     if ((node1 == NULL) || (node2 == NULL))
@@ -2753,37 +2769,51 @@ xmlXPathCmpNodes(xmlNodePtr node1, xmlNodePtr node2) {
      */
     if (node1 == node2)		/* trivial case */
 	return(0);
-    if (node1->type == XML_ATTRIBUTE_NODE) {
-	attr1 = 1;
-	attrNode1 = node1;
+    if (node1->type == XML_NAMESPACE_DECL) {
+        xmlNsPtr ns = (xmlNsPtr) node1;
+
+        precedence1 = 1;
+        miscNode1 = node1;
+        node1 = (xmlNodePtr) ns->next;
+    } else if (node1->type == XML_ATTRIBUTE_NODE) {
+        precedence1 = 2;
+	miscNode1 = node1;
 	node1 = node1->parent;
     }
-    if (node2->type == XML_ATTRIBUTE_NODE) {
-	attr2 = 1;
-	attrNode2 = node2;
+    if (node2->type == XML_NAMESPACE_DECL) {
+        xmlNsPtr ns = (xmlNsPtr) node2;
+
+        precedence2 = 1;
+        miscNode2 = node2;
+        node2 = (xmlNodePtr) ns->next;
+    } else if (node2->type == XML_ATTRIBUTE_NODE) {
+	precedence2 = 2;
+	miscNode2 = node2;
 	node2 = node2->parent;
     }
     if (node1 == node2) {
-	if (attr1 == attr2) {
-	    /* not required, but we keep attributes in order */
-	    if (attr1 != 0) {
-	        cur = attrNode2->prev;
+	if (precedence1 == precedence2) {
+            if (precedence1 == 1) {
+                xmlNsPtr ns1 = (xmlNsPtr) miscNode1;
+                xmlNsPtr ns2 = (xmlNsPtr) miscNode2;
+
+                return(xmlStrcmp(ns2->prefix, ns1->prefix));
+            } else {
+	        cur = miscNode2->prev;
 		while (cur != NULL) {
-		    if (cur == attrNode1)
+		    if (cur == miscNode1)
 		        return (1);
 		    cur = cur->prev;
 		}
 		return (-1);
 	    }
 	    return(0);
-	}
-	if (attr2 == 1)
-	    return(1);
-	return(-1);
+	} else if (precedence1 < precedence2) {
+            return(1);
+        } else {
+            return(-1);
+        }
     }
-    if ((node1->type == XML_NAMESPACE_DECL) ||
-        (node2->type == XML_NAMESPACE_DECL))
-	return(1);
     if (node1 == node2->prev)
 	return(1);
     if (node1 == node2->next)
