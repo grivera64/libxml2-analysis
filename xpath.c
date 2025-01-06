@@ -10090,6 +10090,8 @@ xmlXPathCompFilterExpr(xmlXPathParserContextPtr ctxt) {
 
     while (CUR == '[') {
 	xmlXPathCompPredicate(ctxt, 1);
+        if (ctxt->error)
+            break;
 	SKIP_BLANKS;
     }
 
@@ -10308,6 +10310,7 @@ xmlXPathCompUnionExpr(xmlXPathParserContextPtr ctxt) {
 	NEXT;
 	SKIP_BLANKS;
 	xmlXPathCompPathExpr(ctxt);
+        CHECK_ERROR;
 
         ch2 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
         CHECK_ERROR;
@@ -11042,6 +11045,8 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 
                 predIndex = ctxt->comp->last;
             }
+            if (ctxt->error)
+                goto error;
 	}
 
         /* Relink predicate chain */
