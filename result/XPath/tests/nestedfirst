@@ -476,6 +476,21 @@ Set contains 1 nodes:
 1  ELEMENT e333
 
 ========================
+Expression: (/doc/*)[2]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e2
+    ATTRIBUTE a21
+      TEXT
+        content=a21
+    ATTRIBUTE a22
+      TEXT
+        content=a22
+    ATTRIBUTE a23
+      TEXT
+        content=a23
+
+========================
 Expression: (/doc/e3/e33/preceding::*[1])[last()]
 Object is a Node Set :
 Set contains 1 nodes:
