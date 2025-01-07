@@ -11523,6 +11523,7 @@ xmlXPathCompOpEvalStep(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
     xmlXPathEvalMode stepMode, predMode;
     int breakPos; /* The requested position() (when a "[n]" predicate) */
     int reverse;
+    int duplMaxSize;
 
     obj = ctxt->value;
     inputSize = obj->nodesetval->nodeNr;
@@ -11585,6 +11586,26 @@ xmlXPathCompOpEvalStep(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
                    (predMode != XPATH_EVAL_NONE)) {
             breakPos = predMode;
         }
+    }
+
+    /*
+     * Deduplication
+     */
+    if ((op->as.step.axis == AXIS_CHILD) ||
+        (op->as.step.axis == AXIS_SELF) ||
+        (op->as.step.axis == AXIS_ATTRIBUTE) ||
+        (op->as.step.axis == AXIS_NAMESPACE)) {
+        /*
+         * These axes can't produce duplicates.
+         */
+        duplMaxSize = INT_MAX;
+    } else {
+        /*
+         * Allow twice the number of input nodes before removing
+         * duplicates. We have to loop over them anyway, so this
+         * stays linear.
+         */
+        duplMaxSize = inputSize * 2;
     }
 
     /*
@@ -11723,6 +11744,41 @@ no_match:
 
         if (stepMode == XPATH_EVAL_ANY)
             break;
+
+        /*
+         * Only remove duplicates if the result grows twice as large
+         * as the largest set to merge.
+         */
+        if (seq.nodeNr * 2 > duplMaxSize)
+            duplMaxSize = seq.nodeNr * 2;
+
+        /*
+         * Deduplicate result dynamically
+         *
+         * Note that we currently allow duplicate nodes being returned
+         * from step and union operations which can cause unnecessary
+         * work for later operations. But duplicates should be rare
+         * and are limited to less than 50% of a nodeset.
+         */
+        if (outSeq->nodeNr >= duplMaxSize) {
+            /*
+             * Note that we only sort to remove duplicates in
+             * xmlXPathNodeSetFinish.
+             */
+            xmlXPathNodeSetSort(outSeq);
+            xmlXPathNodeSetFinish(outSeq, XPATH_EVAL_ALL);
+
+            /*
+             * Doubling the threshold should result in amortized
+             * O(n*log(n)) for all sort operations if there are no
+             * duplicates.
+             *
+             * If there are duplicates, a step can take quadratic
+             * time no matter what.
+             */
+            if (outSeq->nodeNr * 2 > duplMaxSize)
+                duplMaxSize = outSeq->nodeNr * 2;
+        }
 
 empty_set:
         if (ctxt->error != XPATH_EXPRESSION_OK)
