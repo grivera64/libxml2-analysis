@@ -948,6 +948,11 @@ xmlXPathErr(xmlXPathParserContextPtr ctxt, int code)
         err->domain = XML_FROM_XPATH;
         err->code = code + XML_XPATH_EXPRESSION_OK - XPATH_EXPRESSION_OK;
         err->level = XML_ERR_ERROR;
+        err->message = xmlMemStrdup(xmlXPathErrorMessages[code]);
+        if (err->message == NULL) {
+            xmlXPathPErrMemory(ctxt);
+            return;
+        }
         if (ctxt->base != NULL) {
             err->str1 = (char *) xmlStrdup(ctxt->base);
             if (err->str1 == NULL) {
