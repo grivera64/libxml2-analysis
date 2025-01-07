@@ -1329,13 +1329,20 @@ xmlXPathCompOpSetEvalMode(xmlXPathParserContextPtr ctxt, int opIndex,
 
     /*
      * Some modes can be propagated to child ops.
+     *
+     * There's no benefit from setting modes on NODESET children.
      */
     if ((mode == XPATH_EVAL_ANY) ||
         (mode == XPATH_EVAL_FIRST) ||
         (mode == XPATH_EVAL_LAST)) {
         if (op->op == XPATH_OP_UNION) {
-            xmlXPathCompOpSetEvalMode(ctxt, op->ch1, mode, 0);
-            xmlXPathCompOpSetEvalMode(ctxt, op->ch2, mode, 0);
+            xmlXPathOpPtr childOp1 = &ctxt->comp->steps[op->ch1];
+            xmlXPathOpPtr childOp2 = &ctxt->comp->steps[op->ch2];
+
+            if (childOp1->op != XPATH_OP_NODESET)
+                xmlXPathCompOpSetEvalMode(ctxt, op->ch1, mode, 0);
+            if (childOp2->op != XPATH_OP_NODESET)
+                xmlXPathCompOpSetEvalMode(ctxt, op->ch2, mode, 0);
         } else if (op->op == XPATH_OP_SORT) {
             xmlXPathOpPtr childOp = &ctxt->comp->steps[op->ch1];
 
