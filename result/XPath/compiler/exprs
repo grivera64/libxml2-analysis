@@ -1,0 +1,274 @@
+
+========================
+Expression: 1 + 1
+Compiled Expression : 3 elements
+  ADD
+    VALUE Object is a number : 1
+    VALUE Object is a number : 1
+
+========================
+Expression: 1 + '1'
+Compiled Expression : 4 elements
+  ADD
+    VALUE Object is a number : 1
+    NUMBER
+      VALUE Object is a string : 1
+
+========================
+Expression: 1 + a
+Compiled Expression : 5 elements
+  ADD
+    VALUE Object is a number : 1
+    NUMBER
+      STEP child::a mode=FIRST predMode=FIRST
+        NODE
+
+========================
+Expression: true() and true()
+Compiled Expression : 3 elements
+  AND
+    VALUE Object is a Boolean : true
+    VALUE Object is a Boolean : true
+
+========================
+Expression: true() and 's'
+Compiled Expression : 4 elements
+  AND
+    VALUE Object is a Boolean : true
+    BOOL
+      VALUE Object is a string : s
+
+========================
+Expression: true() and a
+Compiled Expression : 5 elements
+  AND
+    VALUE Object is a Boolean : true
+    BOOL
+      STEP child::a mode=ANY predMode=ANY
+        NODE
+
+========================
+Expression: fn()[true()]
+Compiled Expression : 5 elements
+  FILTER
+    SORT
+      NODESET
+        FUNCTION fn (0 args)
+    VALUE Object is a Boolean : true
+
+========================
+Expression: fn()[1]
+Compiled Expression : 4 elements
+  SORT mode=FIRST
+    NODESET
+      FUNCTION fn (0 args)
+
+========================
+Expression: fn()[2]
+Compiled Expression : 4 elements
+  SORT mode=2
+    NODESET
+      FUNCTION fn (0 args)
+
+========================
+Expression: fn()[last()]
+Compiled Expression : 4 elements
+  SORT mode=LAST
+    NODESET
+      FUNCTION fn (0 args)
+
+========================
+Expression: $var[true()]
+Compiled Expression : 4 elements
+  FILTER
+    NODESET
+      VARIABLE var
+    VALUE Object is a Boolean : true
+
+========================
+Expression: $var[1]
+Compiled Expression : 3 elements
+  NODESET mode=FIRST
+    VARIABLE var
+
+========================
+Expression: $var[2]
+Compiled Expression : 3 elements
+  NODESET mode=2
+    VARIABLE var
+
+========================
+Expression: $var[last()]
+Compiled Expression : 3 elements
+  NODESET mode=LAST
+    VARIABLE var
+
+========================
+Expression: count(a)
+Compiled Expression : 5 elements
+  FUNCTION count (1 args)
+    ARG
+      SORT
+        STEP child::a
+          NODE
+
+========================
+Expression: count(1)
+Compilation failed: Invalid type
+
+
+========================
+Expression: count(fn())
+Compiled Expression : 5 elements
+  FUNCTION count (1 args)
+    ARG
+      XSLT_TREE
+        SORT
+          FUNCTION fn (0 args)
+
+========================
+Expression: count($var)
+Compiled Expression : 4 elements
+  FUNCTION count (1 args)
+    ARG
+      XSLT_TREE
+        VARIABLE var
+
+========================
+Expression: number(a)
+Compiled Expression : 5 elements
+  ARG
+    NUMBER
+      SORT mode=FIRST
+        STEP child::a mode=FIRST predMode=FIRST
+          NODE
+
+========================
+Expression: number(1)
+Compiled Expression : 2 elements
+  ARG
+    VALUE Object is a number : 1
+
+========================
+Expression: number(fn())
+Compiled Expression : 4 elements
+  ARG
+    NUMBER
+      SORT mode=FIRST
+        FUNCTION fn (0 args)
+
+========================
+Expression: number($var)
+Compiled Expression : 3 elements
+  ARG
+    NUMBER
+      VARIABLE var
+
+========================
+Expression: lang(a)
+Compiled Expression : 6 elements
+  FUNCTION lang (1 args)
+    ARG
+      STRING
+        SORT mode=FIRST
+          STEP child::a mode=FIRST predMode=FIRST
+            NODE
+
+========================
+Expression: lang(1)
+Compiled Expression : 4 elements
+  FUNCTION lang (1 args)
+    ARG
+      STRING
+        VALUE Object is a number : 1
+
+========================
+Expression: lang(fn())
+Compiled Expression : 5 elements
+  FUNCTION lang (1 args)
+    ARG
+      STRING
+        SORT mode=FIRST
+          FUNCTION fn (0 args)
+
+========================
+Expression: lang($var)
+Compiled Expression : 4 elements
+  FUNCTION lang (1 args)
+    ARG
+      STRING
+        VARIABLE var
+
+========================
+Expression: a | fn() | $var
+Compiled Expression : 9 elements
+  SORT
+    UNION
+      UNION
+        STEP child::a
+          NODE
+        NODESET
+          FUNCTION fn (0 args)
+      NODESET
+        VARIABLE var
+
+========================
+Expression: (a | fn() | $var)[1]
+Compiled Expression : 10 elements
+  SORT mode=FIRST
+    UNION mode=FIRST
+      UNION mode=FIRST
+        STEP child::a mode=FIRST predMode=FIRST
+          NODE
+        NODESET
+          FUNCTION fn (0 args)
+      NODESET
+        VARIABLE var
+
+========================
+Expression: (a | fn() | $var)[2]
+Compiled Expression : 10 elements
+  SORT mode=2
+    UNION
+      UNION
+        STEP child::a
+          NODE
+        NODESET
+          FUNCTION fn (0 args)
+      NODESET
+        VARIABLE var
+
+========================
+Expression: (a | fn() | $var)[last()]
+Compiled Expression : 10 elements
+  SORT mode=LAST
+    UNION mode=LAST
+      UNION mode=LAST
+        STEP child::a mode=LAST predMode=LAST
+          NODE
+        NODESET
+          FUNCTION fn (0 args)
+      NODESET
+        VARIABLE var
+
+========================
+Expression: (a[1])[last()]
+Compiled Expression : 5 elements
+  SORT mode=LAST
+    STEP child::a mode=LAST predMode=FIRST
+      NODE
+
+========================
+Expression: a[true()][1][true()][1][2][true()][last()][true()]
+Compiled Expression : 15 elements
+  SORT
+    STEP child::a
+      NODE
+      PREDICATE
+        PREDICATE mode=LAST
+          PREDICATE mode=NONE
+            PREDICATE mode=FIRST
+              VALUE Object is a Boolean : true
+            VALUE Object is a Boolean : true
+          VALUE Object is a Boolean : true
+        VALUE Object is a Boolean : true

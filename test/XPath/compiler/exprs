@@ -1,0 +1,40 @@
+1 + 1
+1 + '1'
+1 + a
+
+true() and true()
+true() and 's'
+true() and a
+
+fn()[true()]
+fn()[1]
+fn()[2]
+fn()[last()]
+
+$var[true()]
+$var[1]
+$var[2]
+$var[last()]
+
+count(a)
+count(1)
+count(fn())
+count($var)
+
+number(a)
+number(1)
+number(fn())
+number($var)
+
+lang(a)
+lang(1)
+lang(fn())
+lang($var)
+
+a | fn() | $var
+(a | fn() | $var)[1]
+(a | fn() | $var)[2]
+(a | fn() | $var)[last()]
+
+(a[1])[last()]
+a[true()][1][true()][1][2][true()][last()][true()]
