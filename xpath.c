@@ -1456,47 +1456,6 @@ xmlXPathCompAddBinary(xmlXPathParserContextPtr ctxt, xmlXPathOpcode opcode,
     return(op);
 }
 
-static xmlXPathOpPtr
-xmlXPathCompAddStep(xmlXPathParserContextPtr ctxt,
-                    int chNodeset, int chPredicate,
-                    xmlXPathAxisVal axis, int typeMask) {
-    xmlXPathOpPtr op;
-
-    op = xmlXPathCompAdd(ctxt, XPATH_OP_STEP, XPATH_NODESET);
-    if (op == NULL)
-        return(NULL);
-
-    op->ch1 = chNodeset;
-    op->ch2 = chPredicate;
-    op->predMode = 0;
-    op->as.step.axis = axis;
-    op->as.step.typeMask = typeMask;
-    op->qname.name = NULL;
-    op->qname.ns.prefix = NULL;
-
-    return(op);
-}
-
-static void
-xmlXPathCompAddSort(xmlXPathParserContextPtr ctxt) {
-    xmlXPathOpPtr op;
-    int opIndex = ctxt->comp->last;
-
-    if (opIndex < 0)
-        return;
-
-    op = &ctxt->comp->steps[opIndex];
-
-    if ((op->op == XPATH_OP_UNION) ||
-        (op->op == XPATH_OP_STEP) ||
-        (op->op == XPATH_OP_FUNCTION) ||
-        ((op->op == XPATH_OP_SFUNC) &&
-         (op->type == XPATH_NODESET)) ||
-        ((op->op == XPATH_OP_NODESET) &&
-         (ctxt->comp->steps[op->ch1].op == XPATH_OP_FUNCTION)))
-        xmlXPathCompAddUnary(ctxt, XPATH_OP_SORT, op->type, opIndex);
-}
-
 /**
  * xmlXPathCompGetArg:
  * @ctxt:  parser context
@@ -1508,9 +1467,9 @@ xmlXPathCompAddSort(xmlXPathParserContextPtr ctxt) {
  * Returns the index of final argument operation.
  */
 static int
-xmlXPathCompGetArg(xmlXPathParserContextPtr ctxt, xmlXPathObjectType type) {
+xmlXPathCompGetArg(xmlXPathParserContextPtr ctxt, int argIndex,
+                   xmlXPathObjectType type) {
     xmlXPathOpPtr op;
-    int argIndex = ctxt->comp->last;
 
     op = &ctxt->comp->steps[argIndex];
 
@@ -1569,6 +1528,54 @@ xmlXPathCompGetArg(xmlXPathParserContextPtr ctxt, xmlXPathObjectType type) {
         return(-1);
 
     return(ctxt->comp->last);
+}
+
+static int
+xmlXPathCompAddSort(xmlXPathParserContextPtr ctxt, int opIndex) {
+    xmlXPathOpPtr op;
+
+    if (opIndex < 0)
+        return(-1);
+
+    op = &ctxt->comp->steps[opIndex];
+
+    if ((op->op == XPATH_OP_UNION) ||
+        (op->op == XPATH_OP_STEP) ||
+        (op->op == XPATH_OP_FUNCTION) ||
+        ((op->op == XPATH_OP_SFUNC) &&
+         (op->type == XPATH_NODESET)) ||
+        ((op->op == XPATH_OP_NODESET) &&
+         (ctxt->comp->steps[op->ch1].op == XPATH_OP_FUNCTION))) {
+        xmlXPathCompAddUnary(ctxt, XPATH_OP_SORT, op->type, opIndex);
+        if (ctxt->error)
+            return(-1);
+        return(ctxt->comp->last);
+    } else {
+        return(opIndex);
+    }
+}
+
+static xmlXPathOpPtr
+xmlXPathCompAddStep(xmlXPathParserContextPtr ctxt,
+                    int chNodeset, int chPredicate,
+                    xmlXPathAxisVal axis, int typeMask) {
+    xmlXPathOpPtr op;
+
+    chNodeset = xmlXPathCompGetArg(ctxt, chNodeset, XPATH_NODESET);
+
+    op = xmlXPathCompAdd(ctxt, XPATH_OP_STEP, XPATH_NODESET);
+    if (op == NULL)
+        return(NULL);
+
+    op->ch1 = chNodeset;
+    op->ch2 = chPredicate;
+    op->predMode = 0;
+    op->as.step.axis = axis;
+    op->as.step.typeMask = typeMask;
+    op->qname.name = NULL;
+    op->qname.ns.prefix = NULL;
+
+    return(op);
 }
 
 /************************************************************************
@@ -10056,7 +10063,7 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
             int ch2;
 
 	    xmlXPathCompileExpr(ctxt);
-            xmlXPathCompAddSort(ctxt);
+            xmlXPathCompAddSort(ctxt, ctxt->comp->last);
 	    if (ctxt->error != XPATH_EXPRESSION_OK)
                 goto error;
 
@@ -10072,7 +10079,7 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
             /*
              * TODO: EVAL_FIRST for name(), local-name(), namespace-uri()
              */
-            ch2 = xmlXPathCompGetArg(ctxt, type);
+            ch2 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, type);
             if (ch2 == -1)
                 goto error;
 
@@ -10220,10 +10227,10 @@ xmlXPathCompFilterExpr(xmlXPathParserContextPtr ctxt) {
          * Filter input must be type-checked and sorted.
          */
 
-        xmlXPathCompGetArg(ctxt, XPATH_NODESET);
+        xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_NODESET);
         CHECK_ERROR;
 
-        xmlXPathCompAddSort(ctxt);
+        xmlXPathCompAddSort(ctxt, ctxt->comp->last);
     }
 
     while (CUR == '[') {
@@ -10403,16 +10410,12 @@ xmlXPathCompPathExpr(xmlXPathParserContextPtr ctxt) {
 	CHECK_ERROR;
 	if ((CUR == '/') && (NXT(1) == '/')) {
             xmlXPathOpPtr op;
-            int ch1;
 
 	    SKIP(2);
 	    SKIP_BLANKS;
 
-            ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
-            CHECK_ERROR;
-
-            op = xmlXPathCompAddStep(ctxt, ch1, -1, AXIS_DESCENDANT_OR_SELF,
-                                     TYPE_MASK_NODE);
+            op = xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
+                                     AXIS_DESCENDANT_OR_SELF, TYPE_MASK_NODE);
             if (op == NULL)
                 return;
 
@@ -10442,7 +10445,7 @@ xmlXPathCompUnionExpr(xmlXPathParserContextPtr ctxt) {
     while (CUR == '|') {
 	int ch1, ch2;
 
-        ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
+        ch1 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_NODESET);
         CHECK_ERROR;
 
 	NEXT;
@@ -10450,7 +10453,7 @@ xmlXPathCompUnionExpr(xmlXPathParserContextPtr ctxt) {
 	xmlXPathCompPathExpr(ctxt);
         CHECK_ERROR;
 
-        ch2 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
+        ch2 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_NODESET);
         CHECK_ERROR;
 
         xmlXPathCompAddBinary(ctxt, XPATH_OP_UNION, XPATH_NODESET, ch1, ch2);
@@ -10486,7 +10489,7 @@ xmlXPathCompUnaryExpr(xmlXPathParserContextPtr ctxt) {
         xmlXPathOpPtr op;
         int ch1;
 
-        ch1 = xmlXPathCompGetArg(ctxt, XPATH_NUMBER);
+        ch1 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_NUMBER);
         CHECK_ERROR;
 
         op = xmlXPathCompAddUnary(ctxt, XPATH_OP_NEG, XPATH_NUMBER, ch1);
@@ -10520,7 +10523,7 @@ xmlXPathCompMultiplicativeExpr(xmlXPathParserContextPtr ctxt) {
         xmlXPathOpcode opcode;
 	int ch1, ch2;
 
-        ch1 = xmlXPathCompGetArg(ctxt, XPATH_NUMBER);
+        ch1 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_NUMBER);
         CHECK_ERROR;
 
         if (CUR == '*') {
@@ -10537,7 +10540,7 @@ xmlXPathCompMultiplicativeExpr(xmlXPathParserContextPtr ctxt) {
         xmlXPathCompUnaryExpr(ctxt);
 	CHECK_ERROR;
 
-        ch2 = xmlXPathCompGetArg(ctxt, XPATH_NUMBER);
+        ch2 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_NUMBER);
         CHECK_ERROR;
 
         op = xmlXPathCompAddBinary(ctxt, opcode, XPATH_NUMBER, ch1, ch2);
@@ -10570,7 +10573,7 @@ xmlXPathCompAdditiveExpr(xmlXPathParserContextPtr ctxt) {
         xmlXPathOpcode opcode;
 	int ch1, ch2;
 
-        ch1 = xmlXPathCompGetArg(ctxt, XPATH_NUMBER);
+        ch1 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_NUMBER);
         CHECK_ERROR;
 
         if (CUR == '+') opcode = XPATH_OP_ADD;
@@ -10580,7 +10583,7 @@ xmlXPathCompAdditiveExpr(xmlXPathParserContextPtr ctxt) {
         xmlXPathCompMultiplicativeExpr(ctxt);
 	CHECK_ERROR;
 
-        ch2 = xmlXPathCompGetArg(ctxt, XPATH_NUMBER);
+        ch2 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_NUMBER);
         CHECK_ERROR;
 
         op = xmlXPathCompAddBinary(ctxt, opcode, XPATH_NUMBER, ch1, ch2);
@@ -10707,7 +10710,7 @@ xmlXPathCompAndExpr(xmlXPathParserContextPtr ctxt) {
     while ((CUR == 'a') && (NXT(1) == 'n') && (NXT(2) == 'd')) {
 	int ch1, ch2;
 
-        ch1 = xmlXPathCompGetArg(ctxt, XPATH_BOOLEAN);
+        ch1 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_BOOLEAN);
         CHECK_ERROR;
 
         SKIP(3);
@@ -10715,7 +10718,7 @@ xmlXPathCompAndExpr(xmlXPathParserContextPtr ctxt) {
         xmlXPathCompEqualityExpr(ctxt);
 	CHECK_ERROR;
 
-        ch2 = xmlXPathCompGetArg(ctxt, XPATH_BOOLEAN);
+        ch2 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_BOOLEAN);
         CHECK_ERROR;
 
         xmlXPathCompAddBinary(ctxt, XPATH_OP_AND, XPATH_BOOLEAN, ch1, ch2);
@@ -10755,7 +10758,7 @@ xmlXPathCompileExpr(xmlXPathParserContextPtr ctxt) {
         xmlXPathOpPtr op;
 	int ch1, ch2;
 
-        ch1 = xmlXPathCompGetArg(ctxt, XPATH_BOOLEAN);
+        ch1 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_BOOLEAN);
         CHECK_ERROR;
 
         SKIP(2);
@@ -10763,7 +10766,7 @@ xmlXPathCompileExpr(xmlXPathParserContextPtr ctxt) {
         xmlXPathCompAndExpr(ctxt);
 	CHECK_ERROR;
 
-        ch2 = xmlXPathCompGetArg(ctxt, XPATH_BOOLEAN);
+        ch2 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_BOOLEAN);
         CHECK_ERROR;
 
         op = xmlXPathCompAddBinary(ctxt, XPATH_OP_OR, XPATH_BOOLEAN, ch1, ch2);
@@ -10798,7 +10801,7 @@ xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter) {
     xmlXPathOpcode opcode;
     int ch1;
 
-    ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
+    ch1 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_NODESET);
     CHECK_ERROR0;
 
     SKIP_BLANKS;
@@ -11079,15 +11082,11 @@ static void
 xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
     SKIP_BLANKS;
     if ((CUR == '.') && (NXT(1) == '.')) {
-	int ch1;
-
 	SKIP(2);
 	SKIP_BLANKS;
 
-        ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
-        CHECK_ERROR;
-
-	xmlXPathCompAddStep(ctxt, ch1, -1, AXIS_PARENT, TYPE_MASK_NODE);
+	xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
+                            AXIS_PARENT, TYPE_MASK_NODE);
     } else if (CUR == '.') {
 	NEXT;
 	SKIP_BLANKS;
@@ -11101,8 +11100,7 @@ xmlXPathCompStep(xmlXPathParserContextPtr ctxt) {
 	int ch1;
         int stepIndex, predIndex;
 
-        ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
-        CHECK_ERROR;
+        ch1 = ctxt->comp->last;
 
 	if (CUR == '*') {
 	    axis = AXIS_CHILD;
@@ -11209,21 +11207,16 @@ error:
  * Compile a relative location path.
  */
 static void
-xmlXPathCompRelativeLocationPath
-(xmlXPathParserContextPtr ctxt) {
+xmlXPathCompRelativeLocationPath(xmlXPathParserContextPtr ctxt) {
     SKIP_BLANKS;
     if ((CUR == '/') && (NXT(1) == '/')) {
         xmlXPathOpPtr op;
-        int ch1;
 
 	SKIP(2);
 	SKIP_BLANKS;
 
-        ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
-        CHECK_ERROR;
-
-	op = xmlXPathCompAddStep(ctxt, ch1, -1, AXIS_DESCENDANT_OR_SELF,
-                                 TYPE_MASK_NODE);
+	op = xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
+                                 AXIS_DESCENDANT_OR_SELF, TYPE_MASK_NODE);
         if (op == NULL)
             return;
     } else if (CUR == '/') {
@@ -11236,16 +11229,12 @@ xmlXPathCompRelativeLocationPath
     while (CUR == '/') {
 	if ((CUR == '/') && (NXT(1) == '/')) {
             xmlXPathOpPtr op;
-            int ch1;
 
 	    SKIP(2);
 	    SKIP_BLANKS;
 
-            ch1 = xmlXPathCompGetArg(ctxt, XPATH_NODESET);
-            CHECK_ERROR;
-
-            op = xmlXPathCompAddStep(ctxt, ch1, -1, AXIS_DESCENDANT_OR_SELF,
-                                     TYPE_MASK_NODE);
+            op = xmlXPathCompAddStep(ctxt, ctxt->comp->last, -1,
+                                     AXIS_DESCENDANT_OR_SELF, TYPE_MASK_NODE);
             if (op == NULL)
                 return;
 
@@ -12955,7 +12944,7 @@ xmlXPathDoCompile(xmlXPathParserContext *pctxt) {
     oldDepth = ctxt->depth;
 
     xmlXPathCompileExpr(pctxt);
-    xmlXPathCompAddSort(pctxt);
+    xmlXPathCompAddSort(pctxt, pctxt->comp->last);
 
     if (*pctxt->cur != 0)
 	xmlXPathErr(pctxt, XPATH_EXPR_ERROR);
