@@ -105,12 +105,9 @@
 /*
  * XPATH_MAX_NODESET_LENGTH:
  * when evaluating an XPath expression nodesets are created and we
- * arbitrary limit the maximum length of those node set. 10000000 is
- * an insanely large value which should never be reached under normal
- * circumstances, one would first need to construct an in memory tree
- * with more than 10 millions nodes.
+ * arbitrary limit the maximum length of those node set.
  */
-#define XPATH_MAX_NODESET_LENGTH 10000000
+#define XPATH_MAX_NODESET_LENGTH 100000000
 
 /*
  * XPATH_MAX_RECRUSION_DEPTH:
