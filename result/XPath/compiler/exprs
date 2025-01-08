@@ -272,3 +272,24 @@ Compiled Expression : 15 elements
             VALUE Object is a Boolean : true
           VALUE Object is a Boolean : true
         VALUE Object is a Boolean : true
+
+========================
+Expression: a[position()=1]
+Compiled Expression : 6 elements
+  SORT
+    STEP child::a predMode=FIRST
+      NODE
+
+========================
+Expression: a[position()=100]
+Compiled Expression : 6 elements
+  SORT
+    STEP child::a predMode=100
+      NODE
+
+========================
+Expression: a[position()=last()]
+Compiled Expression : 6 elements
+  SORT
+    STEP child::a predMode=LAST
+      NODE

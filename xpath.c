@@ -10779,6 +10779,50 @@ error:
 }
 
 /**
+ * xmlXPathPredicateEvalMode:
+ * @ctxt:  parser context
+ * @opIndex:  index of predicate op
+ *
+ * Optimize evaluation of predicates [1], [n] or [last()].
+ *
+ * Returns the evaluation mode for a predicate.
+ */
+static xmlXPathEvalMode
+xmlXPathPredicateEvalMode(xmlXPathParserContextPtr ctxt, int opIndex) {
+    xmlXPathOpPtr pred;
+    xmlXPathEvalMode mode = XPATH_EVAL_ALL;
+
+    pred = &ctxt->comp->steps[opIndex];
+
+    /*
+     * Also check for [position()=x]
+     */
+    if (pred->op == XPATH_OP_EQ) {
+        if (ctxt->comp->steps[pred->ch1].op == XPATH_OP_POSITION)
+            pred = &ctxt->comp->steps[pred->ch2];
+        else if (ctxt->comp->steps[pred->ch2].op == XPATH_OP_POSITION)
+            pred = &ctxt->comp->steps[pred->ch1];
+    }
+
+    if ((pred->op == XPATH_OP_VALUE) &&
+        (pred->as.obj->type == XPATH_NUMBER)) {
+        double floatval = pred->as.obj->floatval;
+
+        if ((floatval > 0.0) && (floatval < XPATH_EVAL_LAST)) {
+            int index = floatval;
+
+            /* Check whether floatval is an integer */
+            if (index == floatval)
+                mode = index;
+        }
+    } else if (pred->op == XPATH_OP_LAST) {
+        mode = XPATH_EVAL_LAST;
+    }
+
+    return(mode);
+}
+
+/**
  * xmlXPathCompPredicate:
  * @ctxt:  the XPath Parser context
  * @filter:  act as a filter
@@ -10793,8 +10837,7 @@ error:
  */
 static int
 xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter) {
-    xmlXPathOpPtr pred;
-    xmlXPathEvalMode mode = XPATH_EVAL_ALL;
+    xmlXPathEvalMode mode;
     xmlXPathOpcode opcode;
     int ch1;
 
@@ -10821,22 +10864,7 @@ xmlXPathCompPredicate(xmlXPathParserContextPtr ctxt, int filter) {
 
     xmlXPathCompOpSetEvalMode(ctxt, ctxt->comp->last, XPATH_EVAL_ANY, 0);
 
-    pred = &ctxt->comp->steps[ctxt->comp->last];
-
-    if ((pred->op == XPATH_OP_VALUE) &&
-        (pred->as.obj->type == XPATH_NUMBER)) {
-        double floatval = pred->as.obj->floatval;
-
-        if ((floatval > 0.0) && (floatval < XPATH_EVAL_LAST)) {
-            int index = floatval;
-
-            /* Check whether floatval is an integer */
-            if (index == floatval)
-                mode = index;
-        }
-    } else if (pred->op == XPATH_OP_LAST) {
-        mode = XPATH_EVAL_LAST;
-    }
+    mode = xmlXPathPredicateEvalMode(ctxt, ctxt->comp->last);
 
     if (mode != XPATH_EVAL_ALL) {
         xmlXPathCompOpSetEvalMode(ctxt, ch1, mode, 1);
