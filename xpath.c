@@ -12917,7 +12917,8 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
     if ((op->op == XPATH_OP_STEP) &&
         (op->ch1 != -1) &&
         (op->ch2 == -1 /* no predicate */) &&
-        (op->predMode == 0))
+        ((op->predMode == XPATH_EVAL_ALL) ||
+         (op->predMode == XPATH_EVAL_ANY)))
     {
         xmlXPathOpPtr prevop = &comp->steps[op->ch1];
 
@@ -12925,7 +12926,8 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
             (prevop->as.step.axis == AXIS_DESCENDANT_OR_SELF) &&
             (prevop->as.step.typeMask == TYPE_MASK_NODE) &&
             (prevop->ch2 == -1) &&
-            (prevop->predMode == 0))
+            ((prevop->predMode == XPATH_EVAL_ALL) ||
+             (prevop->predMode == XPATH_EVAL_ANY)))
         {
             /*
             * This is a "descendant-or-self::node()" without predicates.

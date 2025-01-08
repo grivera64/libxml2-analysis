@@ -42,3 +42,5 @@ a[true()][1][true()][1][2][true()][last()][true()]
 a[position()=1]
 a[position()=100]
 a[position()=last()]
+
+a[.//b]

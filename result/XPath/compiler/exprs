@@ -293,3 +293,13 @@ Compiled Expression : 6 elements
   SORT
     STEP child::a predMode=LAST
       NODE
+
+========================
+Expression: a[.//b]
+Compiled Expression : 7 elements
+  SORT
+    STEP child::a
+      NODE
+      PREDICATE
+        STEP descendant::b mode=ANY predMode=ANY
+          NODE
