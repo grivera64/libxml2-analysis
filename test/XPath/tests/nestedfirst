@@ -69,6 +69,7 @@
 (/doc/*/*/* | /..)[last()]
 
 (/doc/*)[2]
+/doc/*/*[self::e11 or self::e12 or self::e21][true()][2]
 
 (/doc/e3/e33/preceding::*[1])[last()]
 (/doc/e3/e33/preceding::*[1][true()])[last()]

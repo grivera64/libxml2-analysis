@@ -3648,7 +3648,9 @@ error:
  * @set2:  the second NodeSet
  *
  * Merges two nodesets, all nodes from @set2 are added to @set1.
- * Checks for duplicate nodes. Clears set2.
+ * Does not check for duplicates. Clears set2.
+ *
+ * Assumes both sets are non-empty.
  *
  * Returns @set1 once extended or NULL in case of error.
  *
@@ -3657,22 +3659,12 @@ error:
 static int
 xmlXPathNodeSetMergeAndClear(xmlNodeSetPtr set1, xmlNodeSetPtr set2,
                              xmlXPathEvalMode mode) {
-    if (set1->nodeNr <= 0) {
-        xmlNodeSet tmp = *set1;
-
-        *set1 = *set2;
-        *set2 = tmp;
-        return(0);
-    }
-
     if ((mode == XPATH_EVAL_ANY) || (mode == XPATH_EVAL_NONE))
         return(0);
 
     if ((mode == XPATH_EVAL_FIRST) || (mode == XPATH_EVAL_LAST)) {
         int swap, index1, index2;
         xmlNodePtr node1, node2;
-
-        /* assert(set2->nodeNr > 0); */
 
         /*
          * Compare and swap first or last elements of node sets
@@ -11338,24 +11330,26 @@ xmlXPathCompLocationPath(xmlXPathParserContextPtr ctxt) {
  * xmlXPathNodeSetFilter:
  * @ctxt:  the XPath Parser context
  * @op:  the filter or predicate op
- * @set: the node set to filter
+ * @set:  the node set to filter
+ * @offset:  filter nodes starting at offset
  * @mode:  evaluation mode or XPATH_EVAL_DEFAULT
- * @hasNsNodes: true if the node set may contain namespace nodes
+ * @hasNsNodes:  true if the node set may contain namespace nodes
  *
  * Filter a node set, keeping only nodes for which the predicate expression
  * matches. This takes the evaluation mode into account.
  */
 static void
 xmlXPathNodeSetFilter(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
-		      xmlNodeSetPtr set, xmlXPathEvalMode mode,
+		      xmlNodeSetPtr set, int offset, xmlXPathEvalMode mode,
                       int hasNsNodes) {
     xmlXPathContextPtr xpctxt;
-    xmlNodePtr oldnode, hit;
+    xmlNodePtr oldnode, *nodes, hit;
     int oldcs, oldpp;
+    int numNodes;
     int i, j, pos, incr;
     int breakPos;
 
-    if ((set == NULL) || (set->nodeNr == 0))
+    if ((set == NULL) || (set->nodeNr <= offset))
         return;
 
     if (mode == XPATH_EVAL_DEFAULT)
@@ -11369,10 +11363,15 @@ xmlXPathNodeSetFilter(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
     oldcs = xpctxt->contextSize;
     oldpp = xpctxt->proximityPosition;
 
-    xpctxt->contextSize = set->nodeNr;
+    nodes = set->nodeTab + offset;
+    numNodes = set->nodeNr - offset;
+    xpctxt->contextSize = numNodes;
+
+    hit = NULL;
+    j = 0;
 
     if (mode == XPATH_EVAL_LAST) {
-        i = set->nodeNr - 1;
+        i = numNodes - 1;
         incr = -1;
         breakPos = 1;
     } else {
@@ -11391,18 +11390,15 @@ xmlXPathNodeSetFilter(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
             * Check if the node set contains a sufficient number of nodes for
             * the requested pos.
             */
-            if (set->nodeNr < breakPos) {
-                xmlXPathNodeSetClear(set, hasNsNodes);
-                return;
-            }
+            if (numNodes < breakPos)
+                goto done;
         }
     }
 
     pos = 1;
-    hit = NULL;
 
-    for (j = 0, pos = 1; (i >= 0) && (i < set->nodeNr); i += incr) {
-        xmlNodePtr node = set->nodeTab[i];
+    for (; (i >= 0) && (i < numNodes); i += incr) {
+        xmlNodePtr node = nodes[i];
         int res;
 
         if (ctxt->error != XPATH_EXPRESSION_OK) {
@@ -11423,8 +11419,8 @@ xmlXPathNodeSetFilter(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
                 }
 
                 if (i != j) {
-                    set->nodeTab[j] = node;
-                    set->nodeTab[i] = NULL;
+                    nodes[j] = node;
+                    nodes[i] = NULL;
                 }
 
                 j += 1;
@@ -11433,44 +11429,31 @@ xmlXPathNodeSetFilter(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
             pos += 1;
         } else {
             /* Remove the entry from the initial node set. */
-            set->nodeTab[i] = NULL;
+            nodes[i] = NULL;
             if (node->type == XML_NAMESPACE_DECL)
                 xmlXPathNodeSetFreeNs((xmlNsPtr) node);
         }
     }
 
+done:
     /* Free remaining nodes. */
     if (hasNsNodes) {
-        for (; (i >= 0) && (i < set->nodeNr); i += incr) {
-            xmlNodePtr node = set->nodeTab[i];
+        for (; (i >= 0) && (i < numNodes); i += incr) {
+            xmlNodePtr node = nodes[i];
             if ((node != NULL) && (node->type == XML_NAMESPACE_DECL))
                 xmlXPathNodeSetFreeNs((xmlNsPtr) node);
         }
     }
 
-    if (hit != NULL) {
-        set->nodeTab[0] = hit;
-        set->nodeNr = 1;
-    } else {
-        set->nodeNr = j;
-    }
-
-    /* If too many elements were removed, shrink table to preserve memory. */
-    if ((set->nodeMax > XML_NODESET_DEFAULT) &&
-        (set->nodeNr < set->nodeMax / 2)) {
-        xmlNodePtr *tmp;
-        int nodeMax = set->nodeNr;
-
-        if (nodeMax < XML_NODESET_DEFAULT)
-            nodeMax = XML_NODESET_DEFAULT;
-        tmp = (xmlNodePtr *) xmlRealloc(set->nodeTab,
-                nodeMax * sizeof(xmlNodePtr));
-        if (tmp == NULL) {
-            xmlXPathPErrMemory(ctxt);
+    if (breakPos != 0) {
+        if (hit != NULL) {
+            set->nodeTab[offset] = hit;
+            set->nodeNr = offset + 1;
         } else {
-            set->nodeTab = tmp;
-            set->nodeMax = nodeMax;
+            set->nodeNr = offset;
         }
+    } else {
+        set->nodeNr = offset + j;
     }
 
     xpctxt->node = oldnode;
@@ -11481,10 +11464,11 @@ xmlXPathNodeSetFilter(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
 /**
  * xmlXPathCompOpEvalPredicate:
  * @ctxt:  the XPath Parser context
- * @opIndex: the predicate op
- * @set: the node set to filter
+ * @opIndex:  the predicate op
+ * @set:  the node set to filter
+ * @offset:  filter nodes starting at offet
  * @mode:  evaluation mode or XPATH_EVAL_DEFAULT
- * @hasNsNodes: true if the node set may contain namespace nodes
+ * @hasNsNodes:  true if the node set may contain namespace nodes
  *
  * Filter a node set, keeping only nodes for which the sequence of predicate
  * expressions matches. Afterwards, keep only nodes between minPos and maxPos
@@ -11492,8 +11476,8 @@ xmlXPathNodeSetFilter(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
  */
 static void
 xmlXPathCompOpEvalPredicate(xmlXPathParserContextPtr ctxt, int opIndex,
-			    xmlNodeSetPtr set, xmlXPathEvalMode mode,
-                            int hasNsNodes) {
+			    xmlNodeSetPtr set, int offset,
+                            xmlXPathEvalMode mode, int hasNsNodes) {
     const xmlXPathOp *steps = ctxt->comp->steps;
     const xmlXPathOp *op = &steps[opIndex];
 
@@ -11507,13 +11491,13 @@ xmlXPathCompOpEvalPredicate(xmlXPathParserContextPtr ctxt, int opIndex,
         if (ctxt->context->depth >= XPATH_MAX_RECURSION_DEPTH)
             XP_ERROR(XPATH_RECURSION_LIMIT_EXCEEDED);
         ctxt->context->depth += 1;
-	xmlXPathCompOpEvalPredicate(ctxt, op->ch1, set, XPATH_EVAL_DEFAULT,
-                                    hasNsNodes);
+	xmlXPathCompOpEvalPredicate(ctxt, op->ch1, set, offset,
+                                    XPATH_EVAL_DEFAULT, hasNsNodes);
         ctxt->context->depth -= 1;
 	CHECK_ERROR;
     }
 
-    xmlXPathNodeSetFilter(ctxt, op, set, mode, hasNsNodes);
+    xmlXPathNodeSetFilter(ctxt, op, set, offset, mode, hasNsNodes);
 }
 
 /**
@@ -11540,11 +11524,7 @@ xmlXPathCompOpEvalStep(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
     int inputIdx;
     /* The final resulting node set wrt to all context nodes */
     xmlNodeSetPtr outSeq;
-    /*
-    * The temporary resulting node set wrt 1 context node.
-    * Used to feed predicate evaluation.
-    */
-    xmlNodeSet seq = { 0, 0, NULL };
+    int outOffset;
     xmlXPathEvalMode stepMode, predMode;
     int breakPos; /* The requested position() (when a "[n]" predicate) */
     int reverse;
@@ -11636,6 +11616,7 @@ xmlXPathCompOpEvalStep(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
     /*
      * Loop over input nodes
      */
+    outOffset = 0;
     while (inputIdx < inputSize) {
         xmlNodePtr start, cur;
         xmlIter iter;
@@ -11696,8 +11677,8 @@ xmlXPathCompOpEvalStep(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
             if (++pos < breakPos)
                 goto no_match;
 
-            if (seq.nodeNr >= seq.nodeMax) {
-                if (xmlXPathNodeSetGrow(&seq) < 0) {
+            if (outSeq->nodeNr >= outSeq->nodeMax) {
+                if (xmlXPathNodeSetGrow(outSeq) < 0) {
                     xmlXPathPErrMemory(ctxt);
                     break;
                 }
@@ -11727,7 +11708,7 @@ xmlXPathCompOpEvalStep(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
                 add = cur;
             }
 
-            seq.nodeTab[seq.nodeNr++] = add;
+            outSeq->nodeTab[outSeq->nodeNr++] = add;
 
 	    if (breakPos != 0)
                 break;
@@ -11748,62 +11729,92 @@ no_match:
 
         inputIdx++;
 
-        if (seq.nodeNr <= 0)
+        if (outSeq->nodeNr <= outOffset)
             goto empty_set;
 
         /*
 	* Apply predicates
 	*/
         if (op->ch2 != -1) {
-            xmlXPathCompOpEvalPredicate(ctxt, op->ch2, &seq, mode, hasNsNodes);
+            xmlXPathCompOpEvalPredicate(ctxt, op->ch2, outSeq, outOffset,
+                                        mode, hasNsNodes);
 
-            if (seq.nodeNr <= 0)
+            if (outSeq->nodeNr <= outOffset)
                 goto empty_set;
         }
-
-        /*
-        * Add to result set
-        */
-        if (xmlXPathNodeSetMergeAndClear(outSeq, &seq, stepMode) < 0)
-            xmlXPathPErrMemory(ctxt);
 
         if (stepMode == XPATH_EVAL_ANY)
             break;
 
-        /*
-         * Only remove duplicates if the result grows twice as large
-         * as the largest set to merge.
-         */
-        if (seq.nodeNr * 2 > duplMaxSize)
-            duplMaxSize = seq.nodeNr * 2;
+        if (outOffset > 0) {
+            if ((stepMode == XPATH_EVAL_FIRST) ||
+                (stepMode == XPATH_EVAL_LAST)) {
+                xmlNodePtr node1, node2;
+                int swap;
 
-        /*
-         * Deduplicate result dynamically
-         *
-         * Note that we currently allow duplicate nodes being returned
-         * from step and union operations which can cause unnecessary
-         * work for later operations. But duplicates should be rare
-         * and are limited to less than 50% of a nodeset.
-         */
-        if (outSeq->nodeNr >= duplMaxSize) {
-            /*
-             * Note that we only sort to remove duplicates in
-             * xmlXPathNodeSetFinish.
-             */
-            xmlXPathNodeSetSort(outSeq);
-            xmlXPathNodeSetFinish(outSeq, XPATH_EVAL_ALL);
+                /*
+                 * Keep first or last
+                 */
 
-            /*
-             * Doubling the threshold should result in amortized
-             * O(n*log(n)) for all sort operations if there are no
-             * duplicates.
-             *
-             * If there are duplicates, a step can take quadratic
-             * time no matter what.
-             */
-            if (outSeq->nodeNr * 2 > duplMaxSize)
-                duplMaxSize = outSeq->nodeNr * 2;
+                node1 = outSeq->nodeTab[0];
+                node2 = outSeq->nodeTab[1];
+                swap = ((stepMode == XPATH_EVAL_FIRST) ? -1 : 1);
+
+                if (
+#ifdef XP_OPTIMIZED_NON_ELEM_COMPARISON
+                     (xmlXPathCmpNodesExt(node1, node2))
+#else
+                     (xmlXPathCmpNodes(node1, node2))
+#endif
+                     == swap) {
+                    outSeq->nodeTab[0] = node2;
+                    node2 = node1;
+                }
+
+                outSeq->nodeNr = 1;
+                if (node2->type == XML_NAMESPACE_DECL)
+                    xmlFreeNs((xmlNsPtr) node2);
+            } else {
+                int numNodes = outSeq->nodeNr - outOffset;
+
+                /*
+                 * Only remove duplicates if the result grows twice as large
+                 * as the largest set to merge.
+                 */
+                if (numNodes * 2 > duplMaxSize)
+                    duplMaxSize = numNodes * 2;
+
+                /*
+                 * Deduplicate result dynamically
+                 *
+                 * Note that we currently allow duplicate nodes being returned
+                 * from step and union operations which can cause unnecessary
+                 * work for later operations. But duplicates should be rare
+                 * and are limited to less than 50% of a nodeset.
+                 */
+                if (outSeq->nodeNr >= duplMaxSize) {
+                    /*
+                     * Note that we only sort to remove duplicates in
+                     * xmlXPathNodeSetFinish.
+                     */
+                    xmlXPathNodeSetSort(outSeq);
+                    xmlXPathNodeSetFinish(outSeq, XPATH_EVAL_ALL);
+
+                    /*
+                     * Doubling the threshold should result in amortized
+                     * O(n*log(n)) for all sort operations if there are no
+                     * duplicates.
+                     *
+                     * If there are duplicates, a step can take quadratic
+                     * time no matter what.
+                     */
+                    if (outSeq->nodeNr * 2 > duplMaxSize)
+                        duplMaxSize = outSeq->nodeNr * 2;
+                }
+            }
         }
+
+        outOffset = outSeq->nodeNr;
 
 empty_set:
         if (ctxt->error != XPATH_EXPRESSION_OK)
@@ -11811,9 +11822,6 @@ empty_set:
     }
 
 done:
-    if (seq.nodeTab != NULL)
-	 xmlFree(seq.nodeTab);
-
     /*
      * Free remaining input nodes
      */
@@ -12280,7 +12288,8 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
             xmlXPathCompOpEval(ctxt, op->ch1, XPATH_EVAL_DEFAULT);
             CHECK_ERROR;
 
-            xmlXPathNodeSetFilter(ctxt, op, ctxt->value->nodesetval, mode, 1);
+            xmlXPathNodeSetFilter(ctxt, op, ctxt->value->nodesetval, 0,
+                                  mode, 1);
             break;
 
         case XPATH_OP_SORT:
