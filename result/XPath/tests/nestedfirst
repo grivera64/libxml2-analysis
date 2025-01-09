@@ -513,3 +513,21 @@ Expression: (/doc/e3/e33/preceding::*[true()][1])[last()]
 Object is a Node Set :
 Set contains 1 nodes:
 1  ELEMENT e323
+
+========================
+Expression: $var[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT a
+
+========================
+Expression: $var[2]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT b
+
+========================
+Expression: $var[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT c

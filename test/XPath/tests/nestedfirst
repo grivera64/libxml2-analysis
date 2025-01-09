@@ -74,3 +74,7 @@
 (/doc/e3/e33/preceding::*[1])[last()]
 (/doc/e3/e33/preceding::*[1][true()])[last()]
 (/doc/e3/e33/preceding::*[true()][1])[last()]
+
+$var[1]
+$var[2]
+$var[last()]

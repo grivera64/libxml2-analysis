@@ -2886,6 +2886,7 @@ static xmlDocPtr xpathDocument;
 static void
 testXPath(const char *str, int xptr, int expr, int flags) {
     xmlXPathContextPtr ctxt;
+    xmlDocPtr varDoc = NULL;
     xmlXPathCompExprPtr comp = NULL;
     xmlXPathObjectPtr res = NULL;
 
@@ -2898,13 +2899,24 @@ testXPath(const char *str, int xptr, int expr, int flags) {
     } else
 #endif
     {
+        xmlNodePtr cur;
+        xmlXPathObjectPtr set;
+
 	ctxt = xmlXPathNewContext(xpathDocument);
-        if (flags & XPATH_TEST_CACHE) {
+
+        if (flags & XPATH_TEST_CACHE)
             xmlXPathContextSetCache(ctxt, 1, -1, 0);
-        }
+
         xmlXPathSetErrorHandler(ctxt, testStructuredErrorHandler, NULL);
         xmlXPathRegisterNs(ctxt, BAD_CAST "a", BAD_CAST "urn:a");
         xmlXPathRegisterNs(ctxt, BAD_CAST "b", BAD_CAST "urn:b");
+
+        varDoc = xmlReadDoc(BAD_CAST "<d><a/><b/><c/></d>", NULL, NULL, 0);
+        set = xmlXPathNewNodeSet(NULL);
+        for (cur = varDoc->children->children; cur; cur = cur->next)
+            xmlXPathNodeSetAddUnique(set->nodesetval, cur);
+        xmlXPathRegisterVariable(ctxt, BAD_CAST "var", set);
+
         ctxt->flags = flags;
 	ctxt->node = xmlDocGetRootElement(xpathDocument);
         if (flags & XPATH_TEST_COMPILER) {
@@ -2932,6 +2944,8 @@ testXPath(const char *str, int xptr, int expr, int flags) {
     xmlXPathFreeObject(res);
     xmlXPathFreeCompExpr(comp);
     xmlXPathFreeContext(ctxt);
+    if (varDoc != NULL)
+        xmlFreeDoc(varDoc);
 }
 
 /**
@@ -5257,7 +5271,7 @@ testDesc testDescriptions[] = {
     { "XPath expressions regression tests" ,
       xpathExprTest, "./test/XPath/expr/*", "result/XPath/expr/", "", NULL,
       0 },
-    { "XPath document queries regression tests" ,
+    { "XPath document queries regression tests without cache" ,
       xpathDocTest, "./test/XPath/docs/*", NULL, NULL, NULL,
       0 },
     { "XPath document queries regression tests with cache" ,
