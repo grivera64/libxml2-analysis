@@ -136,33 +136,29 @@ Compiled Expression : 4 elements
 
 ========================
 Expression: number(a)
-Compiled Expression : 5 elements
-  ARG
-    NUMBER
-      SORT mode=FIRST
-        STEP child::a mode=FIRST predMode=FIRST
-          NODE
+Compiled Expression : 4 elements
+  NUMBER
+    SORT mode=FIRST
+      STEP child::a mode=FIRST predMode=FIRST
+        NODE
 
 ========================
 Expression: number(1)
-Compiled Expression : 2 elements
-  ARG
-    VALUE Object is a number : 1
+Compiled Expression : 1 elements
+  VALUE Object is a number : 1
 
 ========================
 Expression: number(fn())
-Compiled Expression : 4 elements
-  ARG
-    NUMBER
-      SORT mode=FIRST
-        FUNCTION fn (0 args)
+Compiled Expression : 3 elements
+  NUMBER
+    SORT mode=FIRST
+      FUNCTION fn (0 args)
 
 ========================
 Expression: number($var)
-Compiled Expression : 3 elements
-  ARG
-    NUMBER
-      VARIABLE var
+Compiled Expression : 2 elements
+  NUMBER
+    VARIABLE var
 
 ========================
 Expression: lang(a)

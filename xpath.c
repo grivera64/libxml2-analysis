@@ -10124,11 +10124,13 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
             if (ch2 == -1)
                 goto error;
 
-            op = xmlXPathCompAddBinary(ctxt, XPATH_OP_ARG, type, ch1, ch2);
+            if ((sfunc == NULL) || (sfunc->op == XPATH_OP_SFUNC)) {
+                op = xmlXPathCompAddBinary(ctxt, XPATH_OP_ARG, type, ch1, ch2);
 
-            if (op == NULL)
-                goto error;
-            ch1 = ctxt->comp->last;
+                if (op == NULL)
+                    goto error;
+                ch1 = ctxt->comp->last;
+            }
 
 	    nbargs++;
 	    if (CUR == ')') break;
