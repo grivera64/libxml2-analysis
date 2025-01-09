@@ -12284,8 +12284,9 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
             xmlXPathCompOpEval(ctxt, op->ch1, XPATH_EVAL_DEFAULT);
             CHECK_ERROR;
 
-            xmlXPathNodeSetFilter(ctxt, op, ctxt->value->nodesetval, 0,
-                                  mode, 1);
+            arg1 = valuePop(ctxt);
+            xmlXPathNodeSetFilter(ctxt, op, arg1->nodesetval, 0, mode, 1);
+            valuePush(ctxt, arg1);
             break;
 
         case XPATH_OP_SORT:
