@@ -11518,6 +11518,7 @@ xmlXPathCompOpEvalStep(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
 
     /* The popped object holding the context nodes */
     xmlXPathObjectPtr obj;
+    xmlXPathObjectPtr result;
     /* The set of input nodes for the node tests */
     xmlNodePtr *inputNodes;
     int inputSize;
@@ -11537,13 +11538,14 @@ xmlXPathCompOpEvalStep(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
     inputNodes = obj->nodesetval->nodeTab;
     inputIdx = 0;
 
-    /*
-     * Reuse object for output
-     */
-    outSeq = obj->nodesetval;
-    outSeq->nodeNr = 0;
-    outSeq->nodeMax = 0;
-    outSeq->nodeTab = NULL;
+    valuePop(ctxt);
+
+    result = xmlXPathCacheNewNodeSet(ctxt, NULL);
+    if (result == NULL) {
+        xmlXPathPErrMemory(ctxt);
+        return;
+    }
+    outSeq = result->nodesetval;
 
     if ((op->mode == XPATH_EVAL_NONE) ||
         (op->predMode == XPATH_EVAL_NONE))
@@ -11831,7 +11833,11 @@ done:
         if (cur->type == XML_NAMESPACE_DECL)
             xmlFreeNs((xmlNsPtr) cur);
     }
-    xmlFree(inputNodes);
+
+    obj->nodesetval->nodeNr = 0;
+    xmlXPathReleaseObject(ctxt->context, obj);
+
+    valuePush(ctxt, result);
 }
 
 /**
