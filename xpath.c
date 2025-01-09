@@ -2504,6 +2504,54 @@ xmlXPathCastToNumberInternal(xmlXPathParserContextPtr ctxt,
     return(ret);
 }
 
+static int
+xmlXPathGrowValueTable(xmlXPathParserContextPtr ctxt) {
+    xmlXPathObjectPtr *tmp;
+    int newSize;
+
+    newSize = xmlGrowCapacity(ctxt->valueMax, sizeof(tmp[0]),
+                              10, XPATH_MAX_STACK_DEPTH);
+    if (newSize < 0) {
+        xmlXPathPErrMemory(ctxt);
+        return(-1);
+    }
+    tmp = xmlRealloc(ctxt->valueTab, newSize * sizeof(tmp[0]));
+    if (tmp == NULL) {
+        xmlXPathPErrMemory(ctxt);
+        return(-1);
+    }
+    ctxt->valueTab = tmp;
+    ctxt->valueMax = newSize;
+
+    return(0);
+}
+
+static void
+xmlXPathValuePushInternal(xmlXPathParserContextPtr ctxt,
+                          xmlXPathObjectPtr value) {
+    if (ctxt->valueNr >= ctxt->valueMax) {
+        if (xmlXPathGrowValueTable(ctxt) < 0) {
+            xmlXPathFreeObject(value);
+            return;
+        }
+    }
+
+    ctxt->valueTab[ctxt->valueNr++] = value;
+    ctxt->value = value;
+}
+
+static xmlXPathObjectPtr
+xmlXPathValuePopInternal(xmlXPathParserContextPtr ctxt) {
+    ctxt->valueNr--;
+
+    if (ctxt->valueNr > 0)
+        ctxt->value = ctxt->valueTab[ctxt->valueNr - 1];
+    else
+        ctxt->value = NULL;
+
+    return(ctxt->valueTab[ctxt->valueNr]);
+}
+
 /**
  * valuePop:
  * @ctxt: an XPath evaluation context
@@ -2528,6 +2576,7 @@ valuePop(xmlXPathParserContextPtr ctxt)
     ret = ctxt->valueTab[ctxt->valueNr];
     return (ret);
 }
+
 /**
  * valuePush:
  * @ctxt:  an XPath evaluation context
@@ -2552,24 +2601,10 @@ valuePush(xmlXPathParserContextPtr ctxt, xmlXPathObjectPtr value)
         return(-1);
     }
     if (ctxt->valueNr >= ctxt->valueMax) {
-        xmlXPathObjectPtr *tmp;
-        int newSize;
-
-        newSize = xmlGrowCapacity(ctxt->valueMax, sizeof(tmp[0]),
-                                  10, XPATH_MAX_STACK_DEPTH);
-        if (newSize < 0) {
-            xmlXPathPErrMemory(ctxt);
+        if (xmlXPathGrowValueTable(ctxt) < 0) {
             xmlXPathFreeObject(value);
-            return (-1);
+            return(-1);
         }
-        tmp = xmlRealloc(ctxt->valueTab, newSize * sizeof(tmp[0]));
-        if (tmp == NULL) {
-            xmlXPathPErrMemory(ctxt);
-            xmlXPathFreeObject(value);
-            return (-1);
-        }
-	ctxt->valueTab = tmp;
-        ctxt->valueMax = newSize;
     }
     ctxt->valueTab[ctxt->valueNr] = value;
     ctxt->value = value;
@@ -11529,7 +11564,7 @@ xmlXPathCompOpEvalStep(xmlXPathParserContextPtr ctxt, const xmlXPathOp *op,
     inputNodes = obj->nodesetval->nodeTab;
     inputIdx = 0;
 
-    valuePop(ctxt);
+    xmlXPathValuePopInternal(ctxt);
 
     result = xmlXPathCacheNewNodeSet(ctxt, NULL);
     if (result == NULL) {
@@ -11828,7 +11863,7 @@ done:
     obj->nodesetval->nodeNr = 0;
     xmlXPathReleaseObject(ctxt->context, obj);
 
-    valuePush(ctxt, result);
+    xmlXPathValuePushInternal(ctxt, result);
 }
 
 /**
@@ -11845,7 +11880,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
                    xmlXPathEvalMode mode) {
     const xmlXPathOp *op;
     xmlXPathContextPtr xpctxt = ctxt->context;
-    xmlXPathObjectPtr arg1, arg2;
+    xmlXPathObjectPtr arg1, arg2, result;
     xmlXPathEvalMode opMode;
 
     if (OP_LIMIT_EXCEEDED(ctxt, 1))
@@ -11971,7 +12006,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
             CHECK_ERROR;
             if (ctxt->value->boolval == breakVal)
                 break;
-            xmlXPathReleaseObject(xpctxt, valuePop(ctxt));
+            xmlXPathReleaseObject(xpctxt, xmlXPathValuePopInternal(ctxt));
 
             xmlXPathCompOpEval(ctxt, op->ch2, XPATH_EVAL_DEFAULT);
             CHECK_ERROR;
@@ -11988,7 +12023,10 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
 	    CHECK_ERROR;
 
 	    ret = xmlXPathEqualValuesInternal(ctxt, (op->op == XPATH_OP_NE));
-	    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, ret));
+            result = xmlXPathCacheNewBoolean(ctxt, ret);
+            if (result == NULL)
+                break;
+	    xmlXPathValuePushInternal(ctxt, result);
             break;
         }
 
@@ -12006,7 +12044,10 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
             inf = ((op->op == XPATH_OP_LT) || (op->op == XPATH_OP_LE));
             strict = ((op->op == XPATH_OP_LT) || (op->op == XPATH_OP_GT));
             ret = xmlXPathCompareValues(ctxt, inf, strict);
-	    valuePush(ctxt, xmlXPathCacheNewBoolean(ctxt, ret));
+            result = xmlXPathCacheNewBoolean(ctxt, ret);
+            if (result == NULL)
+                break;
+	    xmlXPathValuePushInternal(ctxt, result);
             break;
         }
 
@@ -12051,7 +12092,8 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
             CHECK_ERROR;
 
             val2 = ctxt->value->floatval;
-            xmlXPathReleaseObject(ctxt->context, valuePop(ctxt));
+            xmlXPathReleaseObject(ctxt->context,
+                                  xmlXPathValuePopInternal(ctxt));
 
             arg1 = ctxt->value;
 
@@ -12091,7 +12133,7 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
             if ((opMode == XPATH_EVAL_ANY) &&
                 (arg2->nodesetval->nodeNr > 0))
                 break;
-            valuePop(ctxt);
+            xmlXPathValuePopInternal(ctxt);
 
             xmlXPathCompOpEval(ctxt, op->ch2, mode);
             if (ctxt->error) {
@@ -12127,12 +12169,18 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
             break;
 
         case XPATH_OP_ROOT:
-	    valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt,
-                    (xmlNodePtr) xmlXPathGetRoot(ctxt->context)));
+	    result = xmlXPathCacheNewNodeSet(ctxt,
+                    (xmlNodePtr) xmlXPathGetRoot(ctxt->context));
+            if (result == NULL)
+                break;
+	    xmlXPathValuePushInternal(ctxt, result);
             break;
+
         case XPATH_OP_NODE:
-	    valuePush(ctxt, xmlXPathCacheNewNodeSet(ctxt,
-                    xpctxt->node));
+	    result = xmlXPathCacheNewNodeSet(ctxt, xpctxt->node);
+            if (result == NULL)
+                break;
+	    xmlXPathValuePushInternal(ctxt, result);
             break;
 
         case XPATH_OP_STEP:
@@ -12143,11 +12191,13 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
             break;
 
         case XPATH_OP_VALUE:
-            valuePush(ctxt, xmlXPathCacheObjectCopy(ctxt, op->as.obj));
+            result = xmlXPathCacheObjectCopy(ctxt, op->as.obj);
+            if (result == NULL)
+                break;
+	    xmlXPathValuePushInternal(ctxt, result);
             break;
 
         case XPATH_OP_VARIABLE: {
-            xmlXPathObjectPtr val = NULL;
             const xmlChar *URI = NULL;
 
             if (ctxt->comp->flags & XML_XPATH_COMPILE_NS) {
@@ -12161,26 +12211,28 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
             }
 
             if (xpctxt->varLookupFunc != NULL)
-                val = xpctxt->varLookupFunc(xpctxt->varLookupData,
-                                            op->qname.name, URI);
+                result = xpctxt->varLookupFunc(xpctxt->varLookupData,
+                                               op->qname.name, URI);
+            else
+                result = NULL;
 
-            if ((val == NULL) && (xpctxt->varHash != NULL)) {
-                val = xmlHashLookup2(xpctxt->varHash, op->qname.name, URI);
-                if (val != NULL) {
-                    val = xmlXPathCacheObjectCopy(ctxt, val);
-                    if (val == NULL) {
+            if ((result == NULL) && (xpctxt->varHash != NULL)) {
+                result = xmlHashLookup2(xpctxt->varHash, op->qname.name, URI);
+                if (result != NULL) {
+                    result = xmlXPathCacheObjectCopy(ctxt, result);
+                    if (result == NULL) {
                         xmlXPathPErrMemory(ctxt);
                         break;
                     }
                 }
             }
 
-            if (val == NULL) {
+            if (result == NULL) {
                 xmlXPathErr(ctxt, XPATH_UNDEF_VARIABLE_ERROR);
                 break;
             }
 
-            valuePush(ctxt, val);
+	    xmlXPathValuePushInternal(ctxt, result);
             break;
         }
 
@@ -12284,9 +12336,9 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
             xmlXPathCompOpEval(ctxt, op->ch1, XPATH_EVAL_DEFAULT);
             CHECK_ERROR;
 
-            arg1 = valuePop(ctxt);
+            arg1 = xmlXPathValuePopInternal(ctxt);
             xmlXPathNodeSetFilter(ctxt, op, arg1->nodesetval, 0, mode, 1);
-            valuePush(ctxt, arg1);
+            xmlXPathValuePushInternal(ctxt, arg1);
             break;
 
         case XPATH_OP_SORT:
@@ -12335,22 +12387,30 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, int opIndex,
         case XPATH_OP_LAST: {
             int contextSize = xpctxt->contextSize;
 
-            if (contextSize >= 0) {
-                valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, contextSize));
-            } else {
-                XP_ERROR(XPATH_INVALID_CTXT_SIZE);
+            if (contextSize < 0) {
+                xmlXPathErr(ctxt, XPATH_INVALID_CTXT_SIZE);
+                break;
             }
+
+            result = xmlXPathCacheNewFloat(ctxt, contextSize);
+            if (result == NULL)
+                break;
+            xmlXPathValuePushInternal(ctxt, result);
             break;
         }
 
         case XPATH_OP_POSITION: {
             int position = xpctxt->proximityPosition;
 
-            if (position >= 0) {
-                valuePush(ctxt, xmlXPathCacheNewFloat(ctxt, position));
-            } else {
-                XP_ERROR(XPATH_INVALID_CTXT_SIZE);
+            if (position < 0) {
+                xmlXPathErr(ctxt, XPATH_INVALID_CTXT_SIZE);
+                break;
             }
+
+            result = xmlXPathCacheNewFloat(ctxt, position);
+            if (result == NULL)
+                break;
+            xmlXPathValuePushInternal(ctxt, result);
             break;
         }
 
@@ -12381,7 +12441,7 @@ xmlXPathCompOpEvalToBoolean(xmlXPathParserContextPtr ctxt, int opIndex,
     if (ctxt->error)
         return(-1);
 
-    resObj = valuePop(ctxt);
+    resObj = xmlXPathValuePopInternal(ctxt);
     if (resObj == NULL)
         return(-1);
 
@@ -12689,7 +12749,7 @@ xmlXPathRunEval(xmlXPathParserContextPtr ctxt, int toBool)
 	    res = xmlXPathRunStreamEval(ctxt, ctxt->comp->stream, &resObj, 0);
 
 	    if ((res != -1) && (resObj != NULL)) {
-		valuePush(ctxt, resObj);
+		xmlXPathValuePushInternal(ctxt, resObj);
 		return(0);
 	    }
 	    if (resObj != NULL)
@@ -12725,7 +12785,8 @@ xmlXPathRunEval(xmlXPathParserContextPtr ctxt, int toBool)
 
     if (ctxt->error) {
         while (ctxt->valueNr > frame)
-            xmlXPathReleaseObject(ctxt->context, valuePop(ctxt));
+            xmlXPathReleaseObject(ctxt->context,
+                                  xmlXPathValuePopInternal(ctxt));
 
         return(-1);
     }
@@ -13160,7 +13221,7 @@ xmlXPathCompiledEvalInternal(xmlXPathCompExprPtr comp,
     res = xmlXPathRunEval(pctxt, toBool);
 
     if ((res >= 0) && (!toBool)) {
-        resObj = valuePop(pctxt);
+        resObj = xmlXPathValuePopInternal(pctxt);
 
         if (resObjPtr)
             *resObjPtr = resObj;
@@ -13276,7 +13337,7 @@ xmlXPathEval(const xmlChar *str, xmlXPathContextPtr ctx) {
         xmlXPathErr(ctxt, XPATH_STACK_ERROR);
 	res = NULL;
     } else {
-	res = valuePop(ctxt);
+	res = xmlXPathValuePopInternal(ctxt);
     }
 
     xmlXPathFreeCompExpr(ctxt->comp);
