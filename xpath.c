@@ -3802,34 +3802,6 @@ xmlXPathFreeNodeSet(xmlNodeSetPtr obj) {
 }
 
 /**
- * xmlXPathNodeSetClearFromPos:
- * @set: the node set to be cleared
- * @pos: the start position to clear from
- *
- * Clears the list from temporary XPath objects (e.g. namespace nodes
- * are feed) starting with the entry at @pos, but does *not* free the list
- * itself. Sets the length of the list to @pos.
- */
-static void
-xmlXPathNodeSetClearFromPos(xmlNodeSetPtr set, int pos, int hasNsNodes)
-{
-    if ((set == NULL) || (pos >= set->nodeNr))
-	return;
-    else if ((hasNsNodes)) {
-	int i;
-	xmlNodePtr node;
-
-	for (i = pos; i < set->nodeNr; i++) {
-	    node = set->nodeTab[i];
-	    if ((node != NULL) &&
-		(node->type == XML_NAMESPACE_DECL))
-		xmlXPathNodeSetFreeNs((xmlNsPtr) node);
-	}
-    }
-    set->nodeNr = pos;
-}
-
-/**
  * xmlXPathNodeSetClear:
  * @set:  the node set to clear
  *
@@ -3840,7 +3812,21 @@ xmlXPathNodeSetClearFromPos(xmlNodeSetPtr set, int pos, int hasNsNodes)
 static void
 xmlXPathNodeSetClear(xmlNodeSetPtr set, int hasNsNodes)
 {
-    xmlXPathNodeSetClearFromPos(set, 0, hasNsNodes);
+    if (set == NULL)
+	return;
+    if (hasNsNodes) {
+	int i;
+	xmlNodePtr node;
+
+	for (i = 0; i < set->nodeNr; i++) {
+	    node = set->nodeTab[i];
+	    if ((node != NULL) &&
+		(node->type == XML_NAMESPACE_DECL))
+		xmlXPathNodeSetFreeNs((xmlNsPtr) node);
+	}
+    }
+
+    set->nodeNr = 0;
 }
 
 /**
