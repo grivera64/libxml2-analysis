@@ -2878,6 +2878,7 @@ streamMemParseTest(const char *filename, const char *result, const char *err,
  ************************************************************************/
 
 #define XPATH_TEST_COMPILER (1 << 30)
+#define XPATH_TEST_CACHE (1 << 29)
 
 static FILE *xpathOutput;
 static xmlDocPtr xpathDocument;
@@ -2898,6 +2899,9 @@ testXPath(const char *str, int xptr, int expr, int flags) {
 #endif
     {
 	ctxt = xmlXPathNewContext(xpathDocument);
+        if (flags & XPATH_TEST_CACHE) {
+            xmlXPathContextSetCache(ctxt, 1, -1, 0);
+        }
         xmlXPathSetErrorHandler(ctxt, testStructuredErrorHandler, NULL);
         xmlXPathRegisterNs(ctxt, BAD_CAST "a", BAD_CAST "urn:a");
         xmlXPathRegisterNs(ctxt, BAD_CAST "b", BAD_CAST "urn:b");
@@ -5256,6 +5260,9 @@ testDesc testDescriptions[] = {
     { "XPath document queries regression tests" ,
       xpathDocTest, "./test/XPath/docs/*", NULL, NULL, NULL,
       0 },
+    { "XPath document queries regression tests with cache" ,
+      xpathDocTest, "./test/XPath/docs/*", NULL, NULL, NULL,
+      XPATH_TEST_CACHE },
     { "XPath document queries regression tests (COMPILE_NS)" ,
       xpathDocTest, "./test/XPath/docs/*", NULL, NULL, NULL,
       XML_XPATH_COMPILE_NS },
