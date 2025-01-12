@@ -171,24 +171,24 @@ typedef enum {
     XPATH_OP_END=0,
 
     /* conversion */
-    XPATH_OP_BOOL,
-    XPATH_OP_NUMBER,
-    XPATH_OP_STRING,
-    XPATH_OP_NODESET,
-    XPATH_OP_XSLT_TREE,
+    XPATH_OP_BOOL,          /*  2,900,000 - 1*/
+    XPATH_OP_NUMBER,        /*    700,000 */
+    XPATH_OP_STRING,        /*  1,500,000 */
+    XPATH_OP_NODESET,       /*  3,900,000 */
+    XPATH_OP_XSLT_TREE,     /*    100,000 */
 
     /* unary bool ops */
-    XPATH_OP_NOT,
+    XPATH_OP_NOT,           /*    900,000 - 6 */
 
     /* binary bool ops */
-    XPATH_OP_AND,
-    XPATH_OP_OR,
+    XPATH_OP_AND,           /*  1,600,000 - 7 */
+    XPATH_OP_OR,            /*  1,900,000 */
 
     /* relational ops */
-    XPATH_OP_EQ,
-    XPATH_OP_NE,
+    XPATH_OP_EQ,            /*  5,500,000 - 9 */
+    XPATH_OP_NE,            /*  2,100,000 */
     XPATH_OP_LT,
-    XPATH_OP_GT,
+    XPATH_OP_GT,            /*  5,500,000 */
     XPATH_OP_LE,
     XPATH_OP_GE,
 
@@ -199,34 +199,34 @@ typedef enum {
     XPATH_OP_ROUND,
 
     /* binary math ops */
-    XPATH_OP_ADD,
+    XPATH_OP_ADD,           /*    600,000 - 19 */
     XPATH_OP_SUB,
     XPATH_OP_MULT,
     XPATH_OP_DIV,
     XPATH_OP_MOD,
 
-    XPATH_OP_UNION,
+    XPATH_OP_UNION,         /*  1,700,000 - 24 */
     XPATH_OP_ROOT,
-    XPATH_OP_NODE,
-    XPATH_OP_STEP,
+    XPATH_OP_NODE,          /*  7,200,000 */
+    XPATH_OP_STEP,          /*  9,700,000 */
     XPATH_OP_VALUE_BOOL,
-    XPATH_OP_VALUE_NUMBER,
-    XPATH_OP_VALUE_STRING,
-    XPATH_OP_VARIABLE,
-    XPATH_OP_SFUNC,
-    XPATH_OP_FUNCTION,
-    XPATH_OP_ARG,
+    XPATH_OP_VALUE_NUMBER,  /*  6,900,000 */
+    XPATH_OP_VALUE_STRING,  /*  5,900,000 */
+    XPATH_OP_VARIABLE,      /* 17,200,000 */
+    XPATH_OP_SFUNC,         /*  1,100,000 */
+    XPATH_OP_FUNCTION,      /*  1,300,000 */
+    XPATH_OP_ARG,           /*  2,600,000 */
     XPATH_OP_PREDICATE,
-    XPATH_OP_FILTER,
-    XPATH_OP_SORT,
+    XPATH_OP_FILTER,        /*    600,000 */
+    XPATH_OP_SORT,          /*  6,500,000 */
 
     /* nullary ops */
-    XPATH_OP_POSITION,
+    XPATH_OP_POSITION,      /*  5,000,000 - 38 */
     XPATH_OP_LAST,
 
     /* name ops */
     XPATH_OP_LOCAL_NAME,
-    XPATH_OP_LOCAL_NAME_CTXT,
+    XPATH_OP_LOCAL_NAME_CTXT,   /* 4,200,000 - 41 */
     XPATH_OP_NAME,
     XPATH_OP_NAME_CTXT,
     XPATH_OP_NAMESPACE_URI,
