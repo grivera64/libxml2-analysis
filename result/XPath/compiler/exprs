@@ -1,14 +1,14 @@
 
 ========================
 Expression: 1 + 1
-Compiled Expression : 3 elements
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
   ADD
     VALUE_NUMBER 1
     VALUE_NUMBER 1
 
 ========================
 Expression: 1 + '1'
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
   ADD
     VALUE_NUMBER 1
     NUMBER
@@ -16,7 +16,7 @@ Compiled Expression : 4 elements
 
 ========================
 Expression: 1 + a
-Compiled Expression : 5 elements
+Compiled Expression: nbStep = 5, maxEvalDepth = 4
   ADD
     VALUE_NUMBER 1
     NUMBER
@@ -25,14 +25,14 @@ Compiled Expression : 5 elements
 
 ========================
 Expression: true() and true()
-Compiled Expression : 3 elements
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
   AND
     VALUE_BOOL true
     VALUE_BOOL true
 
 ========================
 Expression: true() and 's'
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
   AND
     VALUE_BOOL true
     BOOL
@@ -40,7 +40,7 @@ Compiled Expression : 4 elements
 
 ========================
 Expression: true() and a
-Compiled Expression : 5 elements
+Compiled Expression: nbStep = 5, maxEvalDepth = 4
   AND
     VALUE_BOOL true
     BOOL
@@ -49,7 +49,7 @@ Compiled Expression : 5 elements
 
 ========================
 Expression: fn()[true()]
-Compiled Expression : 5 elements
+Compiled Expression: nbStep = 5, maxEvalDepth = 4
   FILTER
     SORT
       NODESET
@@ -58,28 +58,28 @@ Compiled Expression : 5 elements
 
 ========================
 Expression: fn()[1]
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
   SORT mode=FIRST
     NODESET
       FUNCTION fn (0 args)
 
 ========================
 Expression: fn()[2]
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
   SORT mode=2
     NODESET
       FUNCTION fn (0 args)
 
 ========================
 Expression: fn()[last()]
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
   SORT mode=LAST
     NODESET
       FUNCTION fn (0 args)
 
 ========================
 Expression: $var[true()]
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
   FILTER
     NODESET
       VARIABLE var
@@ -87,25 +87,25 @@ Compiled Expression : 4 elements
 
 ========================
 Expression: $var[1]
-Compiled Expression : 3 elements
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
   NODESET mode=FIRST
     VARIABLE var
 
 ========================
 Expression: $var[2]
-Compiled Expression : 3 elements
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
   NODESET mode=2
     VARIABLE var
 
 ========================
 Expression: $var[last()]
-Compiled Expression : 3 elements
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
   NODESET mode=LAST
     VARIABLE var
 
 ========================
 Expression: count(a)
-Compiled Expression : 5 elements
+Compiled Expression: nbStep = 5, maxEvalDepth = 5
   FUNCTION count (1 args)
     ARG
       SORT
@@ -119,7 +119,7 @@ Compilation failed: Invalid type
 
 ========================
 Expression: count(fn())
-Compiled Expression : 5 elements
+Compiled Expression: nbStep = 5, maxEvalDepth = 5
   FUNCTION count (1 args)
     ARG
       XSLT_TREE
@@ -128,7 +128,7 @@ Compiled Expression : 5 elements
 
 ========================
 Expression: count($var)
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
   FUNCTION count (1 args)
     ARG
       XSLT_TREE
@@ -136,7 +136,7 @@ Compiled Expression : 4 elements
 
 ========================
 Expression: number(a)
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
   NUMBER
     SORT mode=FIRST
       STEP child::a mode=FIRST predMode=FIRST
@@ -144,25 +144,25 @@ Compiled Expression : 4 elements
 
 ========================
 Expression: number(1)
-Compiled Expression : 1 elements
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
   VALUE_NUMBER 1
 
 ========================
 Expression: number(fn())
-Compiled Expression : 3 elements
+Compiled Expression: nbStep = 3, maxEvalDepth = 3
   NUMBER
     SORT mode=FIRST
       FUNCTION fn (0 args)
 
 ========================
 Expression: number($var)
-Compiled Expression : 2 elements
+Compiled Expression: nbStep = 2, maxEvalDepth = 2
   NUMBER
     VARIABLE var
 
 ========================
 Expression: lang(a)
-Compiled Expression : 6 elements
+Compiled Expression: nbStep = 6, maxEvalDepth = 6
   FUNCTION lang (1 args)
     ARG
       STRING
@@ -172,7 +172,7 @@ Compiled Expression : 6 elements
 
 ========================
 Expression: lang(1)
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
   FUNCTION lang (1 args)
     ARG
       STRING
@@ -180,7 +180,7 @@ Compiled Expression : 4 elements
 
 ========================
 Expression: lang(fn())
-Compiled Expression : 5 elements
+Compiled Expression: nbStep = 5, maxEvalDepth = 5
   FUNCTION lang (1 args)
     ARG
       STRING
@@ -189,7 +189,7 @@ Compiled Expression : 5 elements
 
 ========================
 Expression: lang($var)
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
   FUNCTION lang (1 args)
     ARG
       STRING
@@ -197,17 +197,17 @@ Compiled Expression : 4 elements
 
 ========================
 Expression: local-name()
-Compiled Expression : 1 elements
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
   LOCAL_NAME_CTXT
 
 ========================
 Expression: local-name(.)
-Compiled Expression : 2 elements
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
   LOCAL_NAME_CTXT
 
 ========================
 Expression: local-name(*)
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
   LOCAL_NAME
     SORT
       STEP child::*
@@ -215,17 +215,17 @@ Compiled Expression : 4 elements
 
 ========================
 Expression: name()
-Compiled Expression : 1 elements
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
   NAME_CTXT
 
 ========================
 Expression: name(.)
-Compiled Expression : 2 elements
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
   NAME_CTXT
 
 ========================
 Expression: name(*)
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
   NAME
     SORT
       STEP child::*
@@ -233,17 +233,17 @@ Compiled Expression : 4 elements
 
 ========================
 Expression: namespace-uri()
-Compiled Expression : 1 elements
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
   NAMESPACE_URI_CTXT
 
 ========================
 Expression: namespace-uri(.)
-Compiled Expression : 2 elements
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
   NAMESPACE_URI_CTXT
 
 ========================
 Expression: namespace-uri(*)
-Compiled Expression : 4 elements
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
   NAMESPACE_URI
     SORT
       STEP child::*
@@ -251,7 +251,7 @@ Compiled Expression : 4 elements
 
 ========================
 Expression: a | fn() | $var
-Compiled Expression : 9 elements
+Compiled Expression: nbStep = 9, maxEvalDepth = 5
   SORT
     UNION
       UNION
@@ -264,7 +264,7 @@ Compiled Expression : 9 elements
 
 ========================
 Expression: (a | fn() | $var)[1]
-Compiled Expression : 10 elements
+Compiled Expression: nbStep = 10, maxEvalDepth = 5
   SORT mode=FIRST
     UNION mode=FIRST
       UNION mode=FIRST
@@ -277,7 +277,7 @@ Compiled Expression : 10 elements
 
 ========================
 Expression: (a | fn() | $var)[2]
-Compiled Expression : 10 elements
+Compiled Expression: nbStep = 10, maxEvalDepth = 5
   SORT mode=2
     UNION
       UNION
@@ -290,7 +290,7 @@ Compiled Expression : 10 elements
 
 ========================
 Expression: (a | fn() | $var)[last()]
-Compiled Expression : 10 elements
+Compiled Expression: nbStep = 10, maxEvalDepth = 5
   SORT mode=LAST
     UNION mode=LAST
       UNION mode=LAST
@@ -303,14 +303,14 @@ Compiled Expression : 10 elements
 
 ========================
 Expression: (a[1])[last()]
-Compiled Expression : 5 elements
+Compiled Expression: nbStep = 5, maxEvalDepth = 3
   SORT mode=LAST
     STEP child::a mode=LAST predMode=FIRST
       NODE
 
 ========================
 Expression: a[true()][1][true()][1][2][true()][last()][true()]
-Compiled Expression : 15 elements
+Compiled Expression: nbStep = 15, maxEvalDepth = 12
   SORT
     STEP child::a
       NODE
@@ -325,28 +325,28 @@ Compiled Expression : 15 elements
 
 ========================
 Expression: a[position()=1]
-Compiled Expression : 6 elements
+Compiled Expression: nbStep = 6, maxEvalDepth = 3
   SORT
     STEP child::a predMode=FIRST
       NODE
 
 ========================
 Expression: a[position()=100]
-Compiled Expression : 6 elements
+Compiled Expression: nbStep = 6, maxEvalDepth = 3
   SORT
     STEP child::a predMode=100
       NODE
 
 ========================
 Expression: a[position()=last()]
-Compiled Expression : 6 elements
+Compiled Expression: nbStep = 6, maxEvalDepth = 3
   SORT
     STEP child::a predMode=LAST
       NODE
 
 ========================
 Expression: a[.//b]
-Compiled Expression : 7 elements
+Compiled Expression: nbStep = 7, maxEvalDepth = 10
   SORT
     STEP child::a
       NODE

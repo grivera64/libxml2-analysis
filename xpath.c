@@ -114,9 +114,10 @@
 #define XPATH_MAX_NODESET_LENGTH 100000000
 
 /*
- * XPATH_MAX_RECRUSION_DEPTH:
+ * XPATH_MAX_RECURSION_DEPTH:
  * Maximum amount of nested functions calls when parsing or evaluating
- * expressions
+ * expressions. Each increase should represent roughly 100 bytes of
+ * stack space. Sanitizers have much higher stack usage.
  */
 #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 #define XPATH_MAX_RECURSION_DEPTH 500
@@ -1109,6 +1110,7 @@ struct _xmlXPathCompExpr {
     xmlXPathOp *steps;	/* ops for computation of this expression */
     int last;			/* index of last step in expression */
     int flags;
+    int maxEvalDepth;
     xmlChar *expr;		/* the expression being computed */
     xmlDictPtr dict;		/* the dictionary to use if any */
 #ifdef XPATH_STREAMING
@@ -1126,11 +1128,11 @@ static xmlNodePtr
 xmlXPathNodeSetDupNs(xmlNodePtr node, xmlNsPtr ns);
 static void
 xmlXPathReleaseObject(xmlXPathContextPtr ctxt, xmlXPathObjectPtr obj);
-static int
-xmlXPathCompOpEvalToBoolean(xmlXPathContextPtr ctxt, int opIndex,
-			    int isPredicate);
 static void
 xmlXPathFreeObjectEntry(void *obj, const xmlChar *name);
+static int
+xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
+                   int opIndex, xmlXPathEvalMode mode);
 
 /************************************************************************
  *									*
@@ -2057,8 +2059,9 @@ xmlXPathDebugDumpCompExpr(FILE *output, xmlXPathCompExprPtr comp,
     } else
 #endif
     {
-        fprintf(output, "Compiled Expression : %d elements\n",
-                comp->nbStep);
+        fprintf(output,
+                "Compiled Expression: nbStep = %d, maxEvalDepth = %d\n",
+                comp->nbStep, comp->maxEvalDepth);
         i = comp->last;
         xmlXPathDebugDumpStepOp(output, comp, &comp->steps[i], depth + 1);
     }
@@ -11215,10 +11218,25 @@ xmlXPathCompileExpr(xmlXPathContextPtr ctxt) {
     }
 
     /*
-     * Parsing a single '(' pushes about 10 functions on the call stack
+     * Parsing subexpressions can result in more than 10 function calls
      * before recursing!
+     *
+     * Expr (48) ->
+     * AndExp (48) ->
+     * EqualityExpr (64) ->
+     * RelationalExpr (80) ->
+     * AdditiveExpr (64) ->
+     * MultiplicativeExpr (64) ->
+     * UnaryExpr (64) ->
+     * UnionExpr (0 if inlined) ->
+     * PathExpr (128) ->
+     * LocationPath (0) ->
+     * RelactiveLocationPath (64) ->
+     * Step (96) ->
+     * Predicate (64) ->
+     * Expr
      */
-    ctxt->depth += 10;
+    ctxt->depth += 8;
 
     xmlXPathCompAndExpr(ctxt);
     if (ctxt->pctxt.error)
@@ -11944,10 +11962,19 @@ xmlXPathNodeSetFilter(xmlXPathContextPtr ctxt, const xmlXPathOp *op,
         if (ctxt->pctxt.error != XPATH_EXPRESSION_OK) {
             res = 0;
         } else {
+            xmlXPathItem item;
+
             ctxt->node = node;
             ctxt->proximityPosition = i + 1;
 
-            res = xmlXPathCompOpEvalToBoolean(ctxt, op->ch2, 1);
+            if (xmlXPathCompOpEval(ctxt, &item, op->ch2,
+                                   XPATH_EVAL_ANY) < 0) {
+                res = -1;
+            } else if (item.type == XPATH_NUMBER) {
+                res = (item.as.number == ctxt->proximityPosition);
+            } else {
+                res = xmlXPathItemToBoolean(ctxt, &item);
+            }
         }
 
         if (res > 0) {
@@ -12028,14 +12055,8 @@ xmlXPathCompOpEvalPredicate(xmlXPathContextPtr ctxt, int opIndex,
 	/*
 	* Process inner predicates first.
 	*/
-        if (ctxt->depth >= XPATH_MAX_RECURSION_DEPTH) {
-            xmlXPathCErr(ctxt, XPATH_RECURSION_LIMIT_EXCEEDED);
-            return;
-        }
-        ctxt->depth += 1;
 	xmlXPathCompOpEvalPredicate(ctxt, op->ch1, set, offset,
                                     XPATH_EVAL_DEFAULT, hasNsNodes);
-        ctxt->depth -= 1;
 
         if (ctxt->pctxt.error)
             return;
@@ -12496,12 +12517,6 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
 
     if (OP_LIMIT_EXCEEDED(ctxt, 1))
         return(-1);
-
-    if (ctxt->depth >= XPATH_MAX_RECURSION_DEPTH) {
-        xmlXPathCErr(ctxt, XPATH_RECURSION_LIMIT_EXCEEDED);
-        return(-1);
-    }
-    ctxt->depth += 1;
 
     op = &ctxt->pctxt.comp->steps[opIndex];
 
@@ -13085,38 +13100,10 @@ func_cleanup:
             break;
     }
 
-    ctxt->depth -= 1;
-
     if (ctxt->pctxt.error)
         return(-1);
 
     return(0);
-}
-
-/**
- * xmlXPathCompOpEvalToBoolean:
- * @ctxt:  the XPath parser context
- *
- * Evaluates if the expression evaluates to true.
- *
- * Returns 1 if true, 0 if false and -1 on API or internal errors.
- */
-static int
-xmlXPathCompOpEvalToBoolean(xmlXPathContextPtr ctxt, int opIndex,
-			    int isPredicate)
-{
-    xmlXPathItem item;
-    int res;
-
-    if (xmlXPathCompOpEval(ctxt, &item, opIndex, XPATH_EVAL_ANY) < 0)
-        return(-1);
-
-    if ((isPredicate) && (item.type == XPATH_NUMBER))
-	res = (item.as.number == ctxt->proximityPosition);
-    else
-        res = xmlXPathItemToBoolean(ctxt, &item);
-
-    return(res);
 }
 
 #ifdef XPATH_STREAMING
@@ -13381,10 +13368,21 @@ xmlXPathRunEval(xmlXPathContextPtr ctxt, xmlXPathObjectPtr *resObjPtr,
 	return(-1);
     }
 
+    if (comp->maxEvalDepth > XPATH_MAX_RECURSION_DEPTH - ctxt->depth) {
+        xmlXPathCErr(ctxt, XPATH_RECURSION_LIMIT_EXCEEDED);
+        return(-1);
+    }
+
     oldDepth = ctxt->depth;
+    ctxt->depth += comp->maxEvalDepth;
 
     if (toBool) {
-	res = xmlXPathCompOpEvalToBoolean(ctxt, comp->last, 0);
+        xmlXPathItem item;
+
+        if (xmlXPathCompOpEval(ctxt, &item, comp->last, XPATH_EVAL_ANY) < 0)
+            res = -1;
+        else
+            res = xmlXPathItemToBoolean(ctxt, &item);
     } else {
         xmlXPathItem item;
 
@@ -13587,10 +13585,11 @@ xmlXPathTryStreamCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
 }
 #endif /* XPATH_STREAMING */
 
-static void
+static int
 xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
                            int opIndex) {
     xmlXPathOpPtr op = &comp->steps[opIndex];
+    int maxEvalDepth;
 
     /*
     * Try to rewrite "descendant-or-self::node()/foo" to an optimized
@@ -13646,16 +13645,48 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
 
     /* Recurse */
 
-    if (ctxt->depth >= XPATH_MAX_RECURSION_DEPTH)
-        return;
+    if (ctxt->depth >= XPATH_MAX_RECURSION_DEPTH) {
+        xmlXPathCErr(ctxt, XPATH_RECURSION_LIMIT_EXCEEDED);
+        return(0);
+    }
+
     ctxt->depth += 1;
 
+    maxEvalDepth = 0;
+
     if (op->ch1 != -1)
-        xmlXPathOptimizeExpression(ctxt, comp, op->ch1);
-    if (op->ch2 != -1)
-	xmlXPathOptimizeExpression(ctxt, comp, op->ch2);
+        maxEvalDepth = xmlXPathOptimizeExpression(ctxt, comp, op->ch1);
+
+    if (op->ch2 != -1) {
+	int tmp = xmlXPathOptimizeExpression(ctxt, comp, op->ch2);
+
+        if (op->op == XPATH_OP_PREDICATE) {
+            /*
+             * Stack usage of recursive callchain:
+             *
+             * Eval (112) ->
+             * EvalStep (224) ->
+             * EvalPredicate (80) ->
+             * Filter (192) ->
+             * Eval
+             */
+            tmp += 5;
+        } else if (op->op == XPATH_OP_FILTER) {
+            /*
+             * Eval (112) ->
+             * Filter (192) ->
+             * Eval
+             */
+            tmp += 2;
+        }
+
+        if (tmp > maxEvalDepth)
+            maxEvalDepth = tmp;
+    }
 
     ctxt->depth -= 1;
+
+    return(maxEvalDepth + 1);
 }
 
 static void
@@ -13711,8 +13742,13 @@ xmlXPathDoCompile(xmlXPathContext *ctxt) {
 	xmlXPathCErr(ctxt, XPATH_EXPR_ERROR);
 
     if (ctxt->pctxt.error == XPATH_EXPRESSION_OK) {
-        if ((comp->nbStep > 1) && (comp->last >= 0))
-            xmlXPathOptimizeExpression(ctxt, comp, comp->last);
+        int maxEvalDepth;
+
+        maxEvalDepth = xmlXPathOptimizeExpression(ctxt, comp, comp->last);
+        comp->maxEvalDepth = maxEvalDepth;
+
+        if (maxEvalDepth >= XPATH_MAX_RECURSION_DEPTH)
+            xmlXPathCErr(ctxt, XPATH_RECURSION_LIMIT_EXCEEDED);
     }
 
     ctxt->depth = oldDepth;
