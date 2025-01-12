@@ -31,6 +31,18 @@ lang(1)
 lang(fn())
 lang($var)
 
+local-name()
+local-name(.)
+local-name(*)
+
+name()
+name(.)
+name(*)
+
+namespace-uri()
+namespace-uri(.)
+namespace-uri(*)
+
 a | fn() | $var
 (a | fn() | $var)[1]
 (a | fn() | $var)[2]

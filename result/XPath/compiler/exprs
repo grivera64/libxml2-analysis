@@ -196,6 +196,60 @@ Compiled Expression : 4 elements
         VARIABLE var
 
 ========================
+Expression: local-name()
+Compiled Expression : 1 elements
+  LOCAL_NAME_CTXT
+
+========================
+Expression: local-name(.)
+Compiled Expression : 2 elements
+  LOCAL_NAME_CTXT
+
+========================
+Expression: local-name(*)
+Compiled Expression : 4 elements
+  LOCAL_NAME
+    SORT
+      STEP child::*
+        NODE
+
+========================
+Expression: name()
+Compiled Expression : 1 elements
+  NAME_CTXT
+
+========================
+Expression: name(.)
+Compiled Expression : 2 elements
+  NAME_CTXT
+
+========================
+Expression: name(*)
+Compiled Expression : 4 elements
+  NAME
+    SORT
+      STEP child::*
+        NODE
+
+========================
+Expression: namespace-uri()
+Compiled Expression : 1 elements
+  NAMESPACE_URI_CTXT
+
+========================
+Expression: namespace-uri(.)
+Compiled Expression : 2 elements
+  NAMESPACE_URI_CTXT
+
+========================
+Expression: namespace-uri(*)
+Compiled Expression : 4 elements
+  NAMESPACE_URI
+    SORT
+      STEP child::*
+        NODE
+
+========================
 Expression: a | fn() | $var
 Compiled Expression : 9 elements
   SORT

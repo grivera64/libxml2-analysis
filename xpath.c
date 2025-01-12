@@ -217,6 +217,14 @@ typedef enum {
     XPATH_OP_POSITION,
     XPATH_OP_LAST,
 
+    /* name ops */
+    XPATH_OP_LOCAL_NAME,
+    XPATH_OP_LOCAL_NAME_CTXT,
+    XPATH_OP_NAME,
+    XPATH_OP_NAME_CTXT,
+    XPATH_OP_NAMESPACE_URI,
+    XPATH_OP_NAMESPACE_URI_CTXT,
+
     /* Compiled to XPATH_OP_VAR */
     XPATH_OP_TRUE,
     XPATH_OP_FALSE
@@ -265,12 +273,12 @@ struct _xmlXPathStandardFunction {
 };
 
 static void
-xmlXPathNameFunction(xmlXPathParserContextPtr ctxt, int nargs);
-
-static void
 xmlXPathTrueCompiler(xmlXPathParserContextPtr ctxt,
                      const xmlXPathStandardFunction *sfunc, int nargs);
 
+static void
+xmlXPathNameCompiler(xmlXPathParserContextPtr ctxt,
+                     const xmlXPathStandardFunction *sfunc, int nargs);
 /*
  * Note that we allow XSLT result tree fragments (XPATH_XSLT_TREE)
  * as nodeset function arguments. This seems to violate the XSLT 1.0
@@ -305,14 +313,14 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
         XPATH_OP_LAST, XPATH_NUMBER, 0, 0, 0, 0 },
     { "lang", xmlXPathLangFunction, NULL,
         XPATH_OP_SFUNC, XPATH_BOOLEAN, 1, 1, XPATH_STRING, 0 },
-    { "local-name", xmlXPathLocalNameFunction, NULL,
-        XPATH_OP_SFUNC, XPATH_STRING, 0, 1, XPATH_XSLT_TREE, 0 },
+    { "local-name", NULL, xmlXPathNameCompiler,
+        XPATH_OP_LOCAL_NAME, XPATH_STRING, 0, 1, XPATH_XSLT_TREE, 0 },
     { "not", NULL, NULL,
         XPATH_OP_NOT, XPATH_BOOLEAN, 1, 1, XPATH_BOOLEAN, 0 },
-    { "name", xmlXPathNameFunction, NULL,
-        XPATH_OP_SFUNC, XPATH_STRING, 0, 1, XPATH_XSLT_TREE, 0 },
-    { "namespace-uri", xmlXPathNamespaceURIFunction, NULL,
-        XPATH_OP_SFUNC, XPATH_STRING, 0, 1, XPATH_XSLT_TREE, 0 },
+    { "name", NULL, xmlXPathNameCompiler,
+        XPATH_OP_NAME, XPATH_STRING, 0, 1, XPATH_XSLT_TREE, 0 },
+    { "namespace-uri", NULL, xmlXPathNameCompiler,
+        XPATH_OP_NAMESPACE_URI, XPATH_STRING, 0, 1, XPATH_XSLT_TREE, 0 },
     { "normalize-space", xmlXPathNormalizeFunction, NULL,
         XPATH_OP_SFUNC, XPATH_STRING, 0, 1, XPATH_STRING, 0 },
     { "number", xmlXPathNumberFunction, NULL,
@@ -1986,6 +1994,18 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
             fprintf(output, "POSITION"); break;
         case XPATH_OP_LAST:
             fprintf(output, "LAST"); break;
+        case XPATH_OP_LOCAL_NAME:
+            fprintf(output, "LOCAL_NAME"); break;
+        case XPATH_OP_LOCAL_NAME_CTXT:
+            fprintf(output, "LOCAL_NAME_CTXT"); break;
+        case XPATH_OP_NAME:
+            fprintf(output, "NAME"); break;
+        case XPATH_OP_NAME_CTXT:
+            fprintf(output, "NAME_CTXT"); break;
+        case XPATH_OP_NAMESPACE_URI:
+            fprintf(output, "NAMESPACE_URI"); break;
+        case XPATH_OP_NAMESPACE_URI_CTXT:
+            fprintf(output, "NAMESPACE_URI_CTXT"); break;
 	default:
             fprintf(output, "UNKNOWN %d\n", op->op); return;
     }
@@ -8591,6 +8611,36 @@ xmlXPathGetNodeArg(xmlXPathParserContextPtr ctxt, int nargs) {
     return(node);
 }
 
+static const xmlChar *
+xmlXPathLocalName(xmlNodePtr node) {
+    const xmlChar *name = BAD_CAST "";
+
+    switch (node->type) {
+        case XML_ELEMENT_NODE:
+        case XML_ATTRIBUTE_NODE:
+            if (node->name[0] != ' ')
+                name = node->name;
+            break;
+
+        case XML_PI_NODE:
+            name = node->name;
+            break;
+
+        case XML_NAMESPACE_DECL: {
+            xmlNsPtr ns = (xmlNsPtr) node;
+
+            if (ns->prefix != NULL)
+                name = ns->prefix;
+            break;
+        }
+
+        default:
+            break;
+    }
+
+    return(name);
+}
+
 /**
  * xmlXPathLocalNameFunction:
  * @ctxt:  the XPath Parser context
@@ -8616,29 +8666,21 @@ xmlXPathLocalNameFunction(xmlXPathParserContextPtr ctxt, int nargs)
         return;
 
     node = xmlXPathGetNodeArg(ctxt, nargs);
-    if (node == NULL)
-        goto error;
+    if (node != NULL)
+        name = xmlXPathLocalName(node);
 
-    switch (node->type) {
-        case XML_ELEMENT_NODE:
-        case XML_ATTRIBUTE_NODE:
-            if (node->name[0] == ' ')
-                break;
-
-            name = node->name;
-            break;
-        case XML_PI_NODE:
-            name = node->name;
-            break;
-        case XML_NAMESPACE_DECL:
-            name = ((xmlNsPtr) node)->prefix;
-            break;
-        default:
-            break;
-    }
-
-error:
     valuePush(ctxt, xmlXPathCacheNewString(ctxt, name));
+}
+
+static const xmlChar *
+xmlXPathNamespaceUri(xmlNodePtr node) {
+    if ((node != NULL) &&
+        ((node->type == XML_ELEMENT_NODE) ||
+         (node->type == XML_ATTRIBUTE_NODE)) &&
+        (node->ns != NULL))
+        return(node->ns->href);
+    else
+        return BAD_CAST "";
 }
 
 /**
@@ -8666,62 +8708,17 @@ xmlXPathNamespaceURIFunction(xmlXPathParserContextPtr ctxt, int nargs) {
         return;
 
     node = xmlXPathGetNodeArg(ctxt, nargs);
-    if (node == NULL)
-        goto error;
+    if (node != NULL)
+        uri = xmlXPathNamespaceUri(node);
 
-    switch (node->type) {
-	case XML_ELEMENT_NODE:
-	case XML_ATTRIBUTE_NODE:
-	    if (node->ns == NULL)
-                break;
-
-	    uri = node->ns->href;
-	    break;
-	default:
-            break;
-    }
-
-error:
     valuePush(ctxt, xmlXPathCacheNewString(ctxt, uri));
 }
 
-/**
- * xmlXPathNameFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * DEPRECATED: Internal function, don't use.
- *
- * Implement the name() XPath function
- *    string name(node-set?)
- * The name function returns a string containing a QName representing
- * the name of the node in the argument node-set that is first in document
- * order. The QName must represent the name with respect to the namespace
- * declarations in effect on the node whose name is being represented.
- * Typically, this will be the form in which the name occurred in the XML
- * source. This need not be the case if there are namespace declarations
- * in effect on the node that associate multiple prefixes with the same
- * namespace. However, an implementation may include information about
- * the original prefix in its representation of nodes; in this case, an
- * implementation can ensure that the returned string is always the same
- * as the QName used in the XML source. If the argument it omitted it
- * defaults to the context node.
- * Libxml keep the original prefix so the "real qualified name" used is
- * returned.
- */
-static void
-xmlXPathNameFunction(xmlXPathParserContextPtr ctxt, int nargs)
-{
-    xmlXPathObjectPtr res = NULL;
-    xmlNodePtr node;
-    const xmlChar *name = BAD_CAST "";
-
-    if ((ctxt == NULL) || (ctxt->context == NULL))
-        return;
-
-    node = xmlXPathGetNodeArg(ctxt, nargs);
-    if (node == NULL)
-        goto error;
+static int
+xmlXPathName(xmlXPathParserContextPtr ctxt, xmlXPathItem *result,
+             xmlNodePtr node) {
+    xmlChar *name = BAD_CAST "";
+    int isCopy = 1;
 
     switch (node->type) {
         case XML_ELEMENT_NODE:
@@ -8730,35 +8727,41 @@ xmlXPathNameFunction(xmlXPathParserContextPtr ctxt, int nargs)
                 break;
 
             if ((node->ns == NULL) || (node->ns->prefix == NULL)) {
-                name = node->name;
+                name = (xmlChar *) node->name;
             } else {
-                xmlChar *fullname;
-
-                fullname = xmlBuildQName(node->name, node->ns->prefix,
+                name = xmlBuildQName(node->name, node->ns->prefix,
                                      NULL, 0);
-                if (fullname == node->name)
-                    fullname = xmlStrdup(node->name);
-                if (fullname == NULL)
+                if (name == NULL) {
                     xmlXPathPErrMemory(ctxt);
-                res = xmlXPathCacheWrapString(ctxt, fullname);
+                    return(-1);
+                }
+
+                isCopy = 0;
             }
             break;
+
         case XML_PI_NODE:
-            name = node->name;
+            name = (xmlChar *) node->name;
             break;
-        case XML_NAMESPACE_DECL:
-            name = ((xmlNsPtr) node)->prefix;
+
+        case XML_NAMESPACE_DECL: {
+            xmlNsPtr ns = (xmlNsPtr) node;
+
+            if (ns->prefix != NULL)
+                name = (xmlChar *) ns->prefix;
             break;
+        }
+
         default:
             break;
     }
 
-error:
-    if (res == NULL)
-        res = xmlXPathCacheNewString(ctxt, name);
-    valuePush(ctxt, res);
-}
+    result->type = XPATH_STRING;
+    result->isCopy = isCopy;
+    result->as.string = name;
 
+    return(0);
+}
 
 /**
  * xmlXPathStringFunction:
@@ -10407,12 +10410,10 @@ xmlXPathIsNodeType(const xmlChar *name) {
 
 static void
 xmlXPathTrueCompiler(xmlXPathParserContextPtr ctxt,
-                     const xmlXPathStandardFunction *sfunc, int nargs) {
+                     const xmlXPathStandardFunction *sfunc,
+                     int nargs ATTRIBUTE_UNUSED) {
     xmlXPathOpPtr op;
     xmlXPathObjectPtr lit;
-
-    if (nargs != 0)
-        XP_ERROR(XPATH_INVALID_ARITY);
 
     lit = xmlXPathNewBoolean(sfunc->op == XPATH_OP_TRUE);
     if (lit == NULL) {
@@ -10425,6 +10426,29 @@ xmlXPathTrueCompiler(xmlXPathParserContextPtr ctxt,
         return;
     }
     op->as.obj = lit;
+}
+
+static void
+xmlXPathNameCompiler(xmlXPathParserContextPtr ctxt,
+                     const xmlXPathStandardFunction *sfunc, int nargs) {
+    if (nargs == 0) {
+        xmlXPathCompAdd(ctxt, sfunc->op + 1, XPATH_STRING);
+    } else {
+        int argIndex;
+
+        /*
+         * TODO: EVAL_FIRST optimization
+         */
+        argIndex = xmlXPathCompGetArg(ctxt, ctxt->comp->last, XPATH_XSLT_TREE);
+        if (argIndex != -1) {
+            xmlXPathOpPtr argOp = &ctxt->comp->steps[argIndex];
+
+            if (argOp->op == XPATH_OP_NODE)
+                xmlXPathCompAdd(ctxt, sfunc->op + 1, XPATH_STRING);
+            else
+                xmlXPathCompAddUnary(ctxt, sfunc->op, XPATH_STRING, argIndex);
+        }
+    }
 }
 
 /**
@@ -10513,9 +10537,6 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
                 type = XPATH_UNDEFINED;
             }
 
-            /*
-             * TODO: EVAL_FIRST for name(), local-name(), namespace-uri()
-             */
             ch2 = xmlXPathCompGetArg(ctxt, ctxt->comp->last, type);
             if (ch2 == -1)
                 goto error;
@@ -10539,6 +10560,12 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
 	}
     }
 
+    if ((sfunc != NULL) &&
+        ((nbargs < sfunc->minArgs) || (nbargs > sfunc->maxArgs))) {
+        xmlXPathErr(ctxt, XPATH_INVALID_ARITY);
+        goto error;
+    }
+
     if ((sfunc != NULL) && (sfunc->compiler != NULL)) {
         sfunc->compiler(ctxt, sfunc, nbargs);
     } else if ((sfunc == NULL) ||
@@ -10550,11 +10577,6 @@ xmlXPathCompFunctionCall(xmlXPathParserContextPtr ctxt) {
         int type;
 
         if (sfunc != NULL) {
-            if ((nbargs < sfunc->minArgs) || (nbargs > sfunc->maxArgs)) {
-                xmlXPathErr(ctxt, XPATH_INVALID_ARITY);
-                goto error;
-            }
-
             opcode = sfunc->op;
             type = sfunc->retType;
 
@@ -12930,6 +12952,91 @@ func_cleanup:
 
             result->type = XPATH_NUMBER;
             result->as.number = position;
+            break;
+        }
+
+        case XPATH_OP_LOCAL_NAME: {
+            const xmlChar *name;
+
+            if (xmlXPathCompOpEval(ctxt, result, op->ch1,
+                                   XPATH_EVAL_DEFAULT) < 0)
+                break;
+
+            if (result->as.nodeset.nodeNr <= 0)
+                name = BAD_CAST "";
+            else
+                name = xmlXPathLocalName(result->as.nodeset.nodeTab[0]);
+
+            xmlXPathItemReleaseNodeSet(ctxt, result);
+
+            result->type = XPATH_STRING;
+            result->isCopy = 1;
+            result->as.string = (xmlChar *) name;
+            break;
+        }
+
+        case XPATH_OP_LOCAL_NAME_CTXT: {
+            const xmlChar *name;
+
+            name = xmlXPathLocalName(ctxt->context->node);
+
+            result->type = XPATH_STRING;
+            result->isCopy = 1;
+            result->as.string = (xmlChar *) name;
+            break;
+        }
+
+        case XPATH_OP_NAME: {
+            xmlXPathItem arg;
+
+            if (xmlXPathCompOpEval(ctxt, &arg, op->ch1,
+                                   XPATH_EVAL_DEFAULT) < 0)
+                break;
+
+            if (arg.as.nodeset.nodeNr <= 0) {
+                result->type = XPATH_STRING;
+                result->isCopy = 1;
+                result->as.string = BAD_CAST "";
+            } else {
+                xmlXPathName(ctxt, result, arg.as.nodeset.nodeTab[0]);
+            }
+
+            xmlXPathItemReleaseNodeSet(ctxt, &arg);
+            break;
+        }
+
+        case XPATH_OP_NAME_CTXT:
+            xmlXPathName(ctxt, result, ctxt->context->node);
+            break;
+
+        case XPATH_OP_NAMESPACE_URI: {
+            const xmlChar *uri;
+
+            if (xmlXPathCompOpEval(ctxt, result, op->ch1,
+                                   XPATH_EVAL_DEFAULT) < 0)
+                break;
+
+            if (result->as.nodeset.nodeNr <= 0)
+                uri = BAD_CAST "";
+            else
+                uri = xmlXPathNamespaceUri(result->as.nodeset.nodeTab[0]);
+
+            xmlXPathItemReleaseNodeSet(ctxt, result);
+
+            result->type = XPATH_STRING;
+            result->isCopy = 1;
+            result->as.string = (xmlChar *) uri;
+            break;
+        }
+
+        case XPATH_OP_NAMESPACE_URI_CTXT: {
+            const xmlChar *uri;
+
+            uri = xmlXPathNamespaceUri(ctxt->context->node);
+
+            result->type = XPATH_STRING;
+            result->isCopy = 1;
+            result->as.string = (xmlChar *) uri;
             break;
         }
 
