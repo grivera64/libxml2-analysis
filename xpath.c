@@ -204,7 +204,9 @@ typedef enum {
     XPATH_OP_ROOT,
     XPATH_OP_NODE,
     XPATH_OP_STEP,
-    XPATH_OP_VALUE,
+    XPATH_OP_VALUE_BOOL,
+    XPATH_OP_VALUE_NUMBER,
+    XPATH_OP_VALUE_STRING,
     XPATH_OP_VARIABLE,
     XPATH_OP_SFUNC,
     XPATH_OP_FUNCTION,
@@ -1102,7 +1104,11 @@ struct _xmlXPathOp {
     xmlXPathOpQName qname; /* for name tests, variables and functions */
 
     union {
-        xmlXPathObjectPtr obj; /* literal */
+        int boolean;
+
+        double number;
+
+        xmlChar *string;
 
         xmlXPathFunction func;
 
@@ -1194,8 +1200,8 @@ xmlXPathFreeCompExpr(xmlXPathCompExprPtr comp)
         op = &comp->steps[i];
 
         switch (op->op) {
-            case XPATH_OP_VALUE:
-                xmlXPathFreeObject(op->as.obj);
+            case XPATH_OP_VALUE_STRING:
+                xmlFree(op->as.string);
                 break;
 
             case XPATH_OP_STEP:
@@ -1954,13 +1960,16 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	    break;
 
         }
-	case XPATH_OP_VALUE: {
-	    xmlXPathObjectPtr object = op->as.obj;
-
-	    fprintf(output, "VALUE ");
-	    xmlXPathDebugDumpObject(output, object, 0);
-	    goto finish;
-	}
+	case XPATH_OP_VALUE_BOOL:
+	    fprintf(output, "VALUE_BOOL %s",
+                    (op->as.boolean) ? "true" : "false");
+            break;
+	case XPATH_OP_VALUE_NUMBER:
+	    fprintf(output, "VALUE_NUMBER %g", op->as.number);
+            break;
+	case XPATH_OP_VALUE_STRING:
+	    fprintf(output, "VALUE_STRING %s", op->as.string);
+            break;
 	case XPATH_OP_VARIABLE: {
 	    const xmlChar *prefix = op->qname.ns.prefix;
 	    const xmlChar *name = op->qname.name;
@@ -2007,7 +2016,7 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
         case XPATH_OP_NAMESPACE_URI_CTXT:
             fprintf(output, "NAMESPACE_URI_CTXT"); break;
 	default:
-            fprintf(output, "UNKNOWN %d\n", op->op); return;
+            fprintf(output, "UNKNOWN %d", op->op); return;
     }
 
     switch (op->op) {
@@ -2028,7 +2037,6 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 
     fprintf(output, "\n");
 
-finish:
     if (op->ch1 >= 0)
 	xmlXPathDebugDumpStepOp(output, comp, &comp->steps[op->ch1], depth + 1);
     if (op->ch2 >= 0)
@@ -10143,7 +10151,6 @@ xmlXPathCompNumber(xmlXPathParserContextPtr ctxt)
     int ok = 0;
     int exponent = 0;
     int is_exponent_negative = 0;
-    xmlXPathObjectPtr num;
 #ifdef __GNUC__
     unsigned long tmp = 0;
     double temp;
@@ -10216,17 +10223,10 @@ xmlXPathCompNumber(xmlXPathParserContextPtr ctxt)
             exponent = -exponent;
         ret *= pow(10.0, (double) exponent);
     }
-    num = xmlXPathCacheNewFloat(ctxt, ret);
-    if (num == NULL) {
-	ctxt->error = XPATH_MEMORY_ERROR;
+    op = xmlXPathCompAdd(ctxt, XPATH_OP_VALUE_NUMBER, XPATH_NUMBER);
+    if (op == NULL)
         return;
-    }
-    op = xmlXPathCompAdd(ctxt, XPATH_OP_VALUE, XPATH_NUMBER);
-    if (op == NULL) {
-        xmlXPathReleaseObject(ctxt->context, num);
-        return;
-    }
-    op->as.obj = num;
+    op->as.number = ret;
 }
 
 /**
@@ -10288,24 +10288,17 @@ xmlXPathParseLiteral(xmlXPathParserContextPtr ctxt) {
 static void
 xmlXPathCompLiteral(xmlXPathParserContextPtr ctxt) {
     xmlXPathOpPtr op;
-    xmlChar *ret = NULL;
-    xmlXPathObjectPtr lit;
+    xmlChar *string = NULL;
 
-    ret = xmlXPathParseLiteral(ctxt);
-    if (ret == NULL)
+    string = xmlXPathParseLiteral(ctxt);
+    if (string == NULL)
         return;
-    lit = xmlXPathCacheNewString(ctxt, ret);
-    xmlFree(ret);
-    if (lit == NULL) {
-        ctxt->error = XPATH_MEMORY_ERROR;
-        return;
-    }
-    op = xmlXPathCompAdd(ctxt, XPATH_OP_VALUE, XPATH_STRING);
+    op = xmlXPathCompAdd(ctxt, XPATH_OP_VALUE_STRING, XPATH_STRING);
     if (op == NULL) {
-        xmlXPathReleaseObject(ctxt->context, lit);
+        xmlFree(string);
         return;
     }
-    op->as.obj = lit;
+    op->as.string = string;
 }
 
 /**
@@ -10413,19 +10406,11 @@ xmlXPathTrueCompiler(xmlXPathParserContextPtr ctxt,
                      const xmlXPathStandardFunction *sfunc,
                      int nargs ATTRIBUTE_UNUSED) {
     xmlXPathOpPtr op;
-    xmlXPathObjectPtr lit;
 
-    lit = xmlXPathNewBoolean(sfunc->op == XPATH_OP_TRUE);
-    if (lit == NULL) {
-        xmlXPathPErrMemory(ctxt);
+    op = xmlXPathCompAdd(ctxt, XPATH_OP_VALUE_BOOL, XPATH_BOOLEAN);
+    if (op == NULL)
         return;
-    }
-    op = xmlXPathCompAdd(ctxt, XPATH_OP_VALUE, XPATH_BOOLEAN);
-    if (op == NULL) {
-        xmlXPathFreeObject(lit);
-        return;
-    }
-    op->as.obj = lit;
+    op->as.boolean = (sfunc->op == XPATH_OP_TRUE);
 }
 
 static void
@@ -11268,9 +11253,8 @@ xmlXPathPredicateEvalMode(xmlXPathParserContextPtr ctxt, int opIndex) {
             pred = &ctxt->comp->steps[pred->ch1];
     }
 
-    if ((pred->op == XPATH_OP_VALUE) &&
-        (pred->as.obj->type == XPATH_NUMBER)) {
-        double floatval = pred->as.obj->floatval;
+    if (pred->op == XPATH_OP_VALUE_NUMBER) {
+        double floatval = pred->as.number;
 
         if ((floatval > 0.0) && (floatval < XPATH_EVAL_LAST)) {
             int index = floatval;
@@ -12788,8 +12772,20 @@ xmlXPathCompOpEval(xmlXPathParserContextPtr ctxt, xmlXPathItem *result,
             break;
         }
 
-        case XPATH_OP_VALUE:
-            xmlXPathItemFromObj(ctxt, result, op->as.obj, 1);
+        case XPATH_OP_VALUE_BOOL:
+            result->type = XPATH_BOOLEAN;
+            result->as.boolean = op->as.boolean;
+            break;
+
+        case XPATH_OP_VALUE_NUMBER:
+            result->type = XPATH_NUMBER;
+            result->as.number = op->as.number;
+            break;
+
+        case XPATH_OP_VALUE_STRING:
+            result->type = XPATH_STRING;
+            result->isCopy = 1;
+            result->as.string = op->as.string;
             break;
 
         case XPATH_OP_VARIABLE: {
@@ -13607,10 +13603,6 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
             }
 	}
     }
-
-    /* OP_VALUE has invalid ch1. */
-    if (op->op == XPATH_OP_VALUE)
-        return;
 
     /* Recurse */
 
