@@ -384,7 +384,7 @@ struct _xmlXPathContext {
 
     /* error reporting mechanism */
     void *userData;                     /* user specific data block */
-    xmlStructuredErrorFunc error;       /* the callback in case of errors */
+    xmlStructuredErrorFunc serror;      /* the callback in case of errors */
     xmlError lastError;			/* the last error */
     xmlNodePtr debugNode;		/* the source node XSLT */
 

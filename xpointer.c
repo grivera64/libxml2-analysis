@@ -123,7 +123,7 @@ xmlXPtrErr(xmlXPtrEvalCtxt *ctxt, int code,
         }
         err->int1 = ctxt->cur - ctxt->base;
 
-        serror = ctxt->context->error;
+        serror = ctxt->context->serror;
         data = ctxt->context->userData;
     }
 

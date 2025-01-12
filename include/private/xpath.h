@@ -10,8 +10,6 @@ xmlInitXPathInternal(void);
 
 XML_HIDDEN void
 xmlXPathErrMemory(xmlXPathContextPtr ctxt);
-XML_HIDDEN void
-xmlXPathPErrMemory(xmlXPathParserContextPtr ctxt);
 
 XML_HIDDEN void
 xmlXPathNodeSetClear(xmlNodeSetPtr set, int hasNsNodes);
