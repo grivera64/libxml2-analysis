@@ -2103,8 +2103,8 @@ xmlXPathNewCache(void)
 	return(NULL);
     memset(ret, 0 , sizeof(xmlXPathContextCache));
     ret->maxNodeArrays = 100;
-    ret->maxNodeset = 100;
-    ret->maxMisc = 100;
+    ret->maxNodeset = 20;
+    ret->maxMisc = 20;
     return(ret);
 }
 
@@ -2192,8 +2192,6 @@ xmlXPathContextSetCache(xmlXPathContextPtr ctxt,
 	    if (value < 0)
 		value = 100;
             cache->maxNodeArrays = value;
-	    cache->maxNodeset = value;
-	    cache->maxMisc = value;
 	}
     } else if (ctxt->cache != NULL) {
 	xmlXPathFreeCache((xmlXPathContextCachePtr) ctxt->cache);
