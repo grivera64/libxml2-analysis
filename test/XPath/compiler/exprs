@@ -56,3 +56,7 @@ a[position()=100]
 a[position()=last()]
 
 a[.//b]
+
+not(true())
+not(1)
+not(boolean(boolean(a)))

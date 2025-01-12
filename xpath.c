@@ -172,13 +172,11 @@ typedef enum {
 
     /* conversion */
     XPATH_OP_BOOL,          /*  2,900,000 - 1*/
+    XPATH_OP_NOT,           /*    900,000 */
     XPATH_OP_NUMBER,        /*    700,000 */
     XPATH_OP_STRING,        /*  1,500,000 */
     XPATH_OP_NODESET,       /*  3,900,000 */
     XPATH_OP_XSLT_TREE,     /*    100,000 */
-
-    /* unary bool ops */
-    XPATH_OP_NOT,           /*    900,000 - 6 */
 
     /* binary bool ops */
     XPATH_OP_AND,           /*  1,600,000 - 7 */
@@ -286,6 +284,11 @@ xmlXPathTrueCompiler(xmlXPathContextPtr ctxt,
 static void
 xmlXPathNameCompiler(xmlXPathContextPtr ctxt,
                      const xmlXPathStandardFunction *sfunc, int nargs);
+
+static void
+xmlXPathNotCompiler(xmlXPathContextPtr ctxt,
+                    const xmlXPathStandardFunction *sfunc, int nargs);
+
 /*
  * Note that we allow XSLT result tree fragments (XPATH_XSLT_TREE)
  * as nodeset function arguments. This seems to violate the XSLT 1.0
@@ -322,8 +325,8 @@ static const xmlXPathStandardFunction xmlXPathStandardFunctions[] = {
         XPATH_OP_SFUNC, XPATH_BOOLEAN, 1, 1, XPATH_STRING, 0 },
     { "local-name", NULL, xmlXPathNameCompiler,
         XPATH_OP_LOCAL_NAME, XPATH_STRING, 0, 1, XPATH_XSLT_TREE, 0 },
-    { "not", NULL, NULL,
-        XPATH_OP_NOT, XPATH_BOOLEAN, 1, 1, XPATH_BOOLEAN, 0 },
+    { "not", NULL, xmlXPathNotCompiler,
+        XPATH_OP_NOT, XPATH_BOOLEAN, 1, 1, XPATH_UNDEFINED, 0 },
     { "name", NULL, xmlXPathNameCompiler,
         XPATH_OP_NAME, XPATH_STRING, 0, 1, XPATH_XSLT_TREE, 0 },
     { "namespace-uri", NULL, xmlXPathNameCompiler,
@@ -10398,6 +10401,21 @@ xmlXPathTrueCompiler(xmlXPathContextPtr ctxt,
 }
 
 static void
+xmlXPathNotCompiler(xmlXPathContextPtr ctxt,
+                    const xmlXPathStandardFunction *sfunc ATTRIBUTE_UNUSED,
+                    int nargs ATTRIBUTE_UNUSED) {
+    xmlXPathCompExprPtr comp = ctxt->pctxt.comp;
+    xmlXPathOpPtr lastOp;
+
+    lastOp = &comp->steps[comp->last];
+
+    if (lastOp->op == XPATH_OP_BOOL)
+        lastOp->op = XPATH_OP_NOT;
+    else
+        xmlXPathCompAddUnary(ctxt, XPATH_OP_NOT, XPATH_BOOLEAN, comp->last);
+}
+
+static void
 xmlXPathNameCompiler(xmlXPathContextPtr ctxt,
                      const xmlXPathStandardFunction *sfunc, int nargs) {
     if (nargs == 0) {
@@ -10442,6 +10460,7 @@ xmlXPathCompFunctionCall(xmlXPathContextPtr ctxt) {
     xmlXPathFunction func = NULL;
     int nbargs = 0;
     int flags;
+    int sortArgs = 1;
 
     name = xmlXPathParseQName(ctxt, &prefix);
     if (name == NULL) {
@@ -10485,6 +10504,10 @@ xmlXPathCompFunctionCall(xmlXPathContextPtr ctxt) {
 
         if (sfunc != NULL) {
             func = sfunc->func;
+
+            if ((sfunc->op == XPATH_OP_BOOL) ||
+                (sfunc->op == XPATH_OP_NOT))
+                sortArgs = 0;
         } else if (flags & XML_XPATH_COMPILE_FUNC) {
             func = xmlXPathFunctionLookupNS(ctxt, name, NULL);
             if (func == NULL)
@@ -10500,7 +10523,10 @@ xmlXPathCompFunctionCall(xmlXPathContextPtr ctxt) {
             int ch2;
 
 	    xmlXPathCompileExpr(ctxt);
-            xmlXPathCompAddSort(ctxt, comp->last);
+
+            if (sortArgs)
+                xmlXPathCompAddSort(ctxt, comp->last);
+
 	    if (ctxt->pctxt.error != XPATH_EXPRESSION_OK)
                 goto error;
 
@@ -12521,7 +12547,8 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
     op = &ctxt->pctxt.comp->steps[opIndex];
 
     switch (op->op) {
-        case XPATH_OP_BOOL: {
+        case XPATH_OP_BOOL:
+        case XPATH_OP_NOT: {
             int boolean;
 
             if (xmlXPathCompOpEval(ctxt, result, op->ch1,
@@ -12529,6 +12556,9 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
                 break;
 
             boolean = xmlXPathItemToBoolean(ctxt, result);
+            if (op->op == XPATH_OP_NOT)
+                boolean = !boolean;
+
             result->type = XPATH_BOOLEAN;
             result->as.boolean = boolean;
             break;
@@ -12579,14 +12609,6 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
             if ((result->type != XPATH_NODESET) &&
                 (result->type != XPATH_XSLT_TREE))
                 xmlXPathCErr(ctxt, XPATH_INVALID_TYPE);
-            break;
-
-        case XPATH_OP_NOT:
-            if (xmlXPathCompOpEval(ctxt, result, op->ch1,
-                                   XPATH_EVAL_DEFAULT) < 0)
-                break;
-
-            result->as.boolean = !result->as.boolean;
             break;
 
         case XPATH_OP_AND:

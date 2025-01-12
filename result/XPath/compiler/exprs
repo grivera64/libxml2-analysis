@@ -353,3 +353,22 @@ Compiled Expression: nbStep = 7, maxEvalDepth = 10
       PREDICATE
         STEP descendant::b mode=ANY predMode=ANY
           NODE
+
+========================
+Expression: not(true())
+Compiled Expression: nbStep = 2, maxEvalDepth = 2
+  NOT
+    VALUE_BOOL true
+
+========================
+Expression: not(1)
+Compiled Expression: nbStep = 2, maxEvalDepth = 2
+  NOT
+    VALUE_NUMBER 1
+
+========================
+Expression: not(boolean(boolean(a)))
+Compiled Expression: nbStep = 3, maxEvalDepth = 3
+  NOT
+    STEP child::a mode=ANY predMode=ANY
+      NODE
