@@ -223,7 +223,7 @@ typedef enum {
     XPATH_OP_ARG,           /*  2,700,000 */
     XPATH_OP_PREDICATE,
     XPATH_OP_FILTER,        /*    600,000 */
-    XPATH_OP_SORT,          /*  5,100,000 */
+    XPATH_OP_SORT,          /*  4,100,000 */
 
     /* nullary ops */
     XPATH_OP_POSITION,      /*  5,000,000 - 43 */
@@ -13807,11 +13807,16 @@ xmlXPathTryStreamCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
 }
 #endif /* XPATH_STREAMING */
 
+typedef struct {
+    int maxEvalDepth;
+    int maxNodes;
+} xmlXPathExprStats;
+
 static int
 xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
-                           int opIndex) {
+                           int opIndex, xmlXPathExprStats *stats) {
     xmlXPathOpPtr op = &comp->steps[opIndex];
-    int maxEvalDepth;
+    int maxEvalDepth, maxNodes, argIndex;
 
     /*
     * Try to rewrite "descendant-or-self::node()/foo" to an optimized
@@ -13872,18 +13877,65 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
 
     if (ctxt->depth >= XPATH_MAX_RECURSION_DEPTH) {
         xmlXPathCErr(ctxt, XPATH_RECURSION_LIMIT_EXCEEDED);
-        return(0);
+        return(-1);
     }
 
-    ctxt->depth += 1;
 
     maxEvalDepth = 0;
+    maxNodes = INT_MAX;
 
-    if (op->ch1 != -1)
-        maxEvalDepth = xmlXPathOptimizeExpression(ctxt, comp, op->ch1);
+    if ((op->op == XPATH_OP_NODE) ||
+        (op->op == XPATH_OP_ROOT) ||
+        (((op->op == XPATH_OP_STEP) ||
+          (op->op == XPATH_OP_STEP_CTXT) ||
+          (op->op == XPATH_OP_FILTER)) &&
+         (op->mode != XPATH_EVAL_ALL)) ||
+        (((op->op == XPATH_OP_NODESET) ||
+          (op->op == XPATH_OP_SORT)) &&
+         ((op->mode != XPATH_EVAL_ALL) &&
+          (op->mode != XPATH_EVAL_ANY))))
+        maxNodes = 1;
+
+    if (op->ch1 != -1) {
+        xmlXPathExprStats childStats;
+
+        ctxt->depth += 1;
+        argIndex = xmlXPathOptimizeExpression(ctxt, comp, op->ch1,
+                                              &childStats);
+        ctxt->depth -= 1;
+
+        if (argIndex < 0)
+            return(argIndex);
+
+        op->ch1 = argIndex;
+        maxEvalDepth = childStats.maxEvalDepth;
+
+        if (op->op == XPATH_OP_UNION)
+            maxNodes = childStats.maxNodes;
+
+        /*
+         * Eliminate OP_SORT on single nodes and with mode ANY
+         */
+        if ((op->op == XPATH_OP_SORT) &&
+            ((op->mode == XPATH_EVAL_ANY) ||
+             (childStats.maxNodes <= 1))) {
+            *stats = childStats;
+            return(op->ch1);
+        }
+    }
 
     if (op->ch2 != -1) {
-	int tmp = xmlXPathOptimizeExpression(ctxt, comp, op->ch2);
+        xmlXPathExprStats childStats;
+
+        ctxt->depth += 1;
+        argIndex = xmlXPathOptimizeExpression(ctxt, comp, op->ch2,
+                                              &childStats);
+        ctxt->depth -= 1;
+
+        if (argIndex < 0)
+            return(argIndex);
+
+        op->ch2 = argIndex;
 
         if (op->op == XPATH_OP_PREDICATE) {
             /*
@@ -13895,23 +13947,35 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
              * Filter (192) ->
              * Eval
              */
-            tmp += 5;
+            childStats.maxEvalDepth += 5;
         } else if (op->op == XPATH_OP_FILTER) {
             /*
              * Eval (112) ->
              * Filter (192) ->
              * Eval
              */
-            tmp += 2;
+            childStats.maxEvalDepth += 2;
         }
 
-        if (tmp > maxEvalDepth)
-            maxEvalDepth = tmp;
+        if (childStats.maxEvalDepth > maxEvalDepth)
+            maxEvalDepth = childStats.maxEvalDepth;
+
+        if (op->op == XPATH_OP_UNION) {
+            if ((op->mode == XPATH_EVAL_ANY) ||
+                (op->mode == XPATH_EVAL_FIRST) ||
+                (op->mode == XPATH_EVAL_LAST)) {
+                if (childStats.maxNodes > maxNodes)
+                    maxNodes = childStats.maxNodes;
+            } else {
+                maxNodes = INT_MAX;
+            }
+        }
     }
 
-    ctxt->depth -= 1;
+    stats->maxNodes = maxNodes;
+    stats->maxEvalDepth = maxEvalDepth + 1;
 
-    return(maxEvalDepth + 1);
+    return(opIndex);
 }
 
 static void
@@ -13967,12 +14031,13 @@ xmlXPathDoCompile(xmlXPathContext *ctxt) {
 	xmlXPathCErr(ctxt, XPATH_EXPR_ERROR);
 
     if (ctxt->pctxt.error == XPATH_EXPRESSION_OK) {
-        int maxEvalDepth;
+        xmlXPathExprStats stats = { 0, 0 };
 
-        maxEvalDepth = xmlXPathOptimizeExpression(ctxt, comp, comp->last);
-        comp->maxEvalDepth = maxEvalDepth;
+        comp->last = xmlXPathOptimizeExpression(ctxt, comp, comp->last,
+                                                &stats);
+        comp->maxEvalDepth = stats.maxEvalDepth;
 
-        if (maxEvalDepth >= XPATH_MAX_RECURSION_DEPTH)
+        if (stats.maxEvalDepth >= XPATH_MAX_RECURSION_DEPTH)
             xmlXPathCErr(ctxt, XPATH_RECURSION_LIMIT_EXCEEDED);
     }
 

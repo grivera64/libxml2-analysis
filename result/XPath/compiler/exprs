@@ -400,3 +400,35 @@ Compiled Expression: nbStep = 3, maxEvalDepth = 2
   NE_STR
     VALUE_STRING x
     LOCAL_NAME_CTXT
+
+========================
+Expression: (a | fn()[1] | $var[2])[1]
+Compiled Expression: nbStep = 13, maxEvalDepth = 5
+  UNION mode=FIRST
+    UNION mode=FIRST
+      STEP_CTXT child::a mode=FIRST predMode=FIRST
+      SORT mode=FIRST
+        NODESET
+          FUNCTION fn (0 args)
+    NODESET mode=2
+      VARIABLE var
+
+========================
+Expression: (a | fn()[1] | $var)[1]
+Compiled Expression: nbStep = 12, maxEvalDepth = 6
+  SORT mode=FIRST
+    UNION mode=FIRST
+      UNION mode=FIRST
+        STEP_CTXT child::a mode=FIRST predMode=FIRST
+        SORT mode=FIRST
+          NODESET
+            FUNCTION fn (0 args)
+      NODESET
+        VARIABLE var
+
+========================
+Expression: (ancestor::d:tgroup|ancestor::d:entrytbl)[position() = last()]
+Compiled Expression: nbStep = 9, maxEvalDepth = 2
+  UNION mode=LAST
+    STEP_CTXT ancestor::d:tgroup mode=LAST predMode=FIRST
+    STEP_CTXT ancestor::d:entrytbl mode=LAST predMode=FIRST
