@@ -2641,17 +2641,19 @@ xmlXPathGrowValueTable(xmlXPathContextPtr ctxt) {
     return(0);
 }
 
-static void
+static int
 xmlXPathValuePushInternal(xmlXPathContextPtr ctxt, xmlXPathObjectPtr value) {
     if (ctxt->pctxt.valueNr >= ctxt->pctxt.valueMax) {
         if (xmlXPathGrowValueTable(ctxt) < 0) {
             xmlXPathFreeObject(value);
-            return;
+            return(-1);
         }
     }
 
     ctxt->pctxt.valueTab[ctxt->pctxt.valueNr++] = value;
     ctxt->pctxt.value = value;
+
+    return(0);
 }
 
 static xmlXPathObjectPtr
@@ -10620,23 +10622,22 @@ xmlXPathCompFunctionCall(xmlXPathContextPtr ctxt) {
     ch2 = -1;
 
     if (CUR != ')') {
+        int tailIndex = -1;
+
+        /*
+         * Build a linked list of arguments front to back
+         */
 	while (1) {
             xmlXPathObjectType type;
+            int exprIndex;
 
-            if (ch1 != -1) {
-                ch2 = xmlXPathCompAddBinary(ctxt, NULL, XPATH_OP_ARG, type, 
-                                            ch1, ch2);
-                if (ch2 < 0)
-                    goto error;
-            }
-
-	    ch1 = xmlXPathCompileExpr(ctxt);
-            if (ch1 < 0)
+	    exprIndex = xmlXPathCompileExpr(ctxt);
+            if (exprIndex < 0)
                 goto error;
 
             if (sortArgs) {
-                ch1 = xmlXPathCompAddSort(ctxt, ch1);
-                if (ch1 < 0)
+                exprIndex = xmlXPathCompAddSort(ctxt, exprIndex);
+                if (exprIndex < 0)
                     goto error;
             }
 
@@ -10649,9 +10650,28 @@ xmlXPathCompFunctionCall(xmlXPathContextPtr ctxt) {
                 type = XPATH_UNDEFINED;
             }
 
-            ch1 = xmlXPathCompGetArg(ctxt, ch1, type);
-            if (ch1 < 0)
+            exprIndex = xmlXPathCompGetArg(ctxt, exprIndex, type);
+            if (exprIndex < 0)
                 goto error;
+
+            if (nbargs == 0) {
+                ch1 = exprIndex;
+            } else {
+                xmlXPathOpPtr argOp;
+                int argIndex;
+
+                argIndex = xmlXPathCompAddBinary(ctxt, &argOp, XPATH_OP_ARG,
+                                                 type, exprIndex, -1);
+                if (argIndex < 0)
+                    goto error;
+
+                if (tailIndex == -1)
+                    ch2 = argIndex;
+                else
+                    comp->steps[tailIndex].ch2 = argIndex;
+
+                tailIndex = argIndex;
+            }
 
 	    nbargs++;
 	    if (CUR == ')') break;
@@ -13132,20 +13152,17 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
         }
 
         case XPATH_OP_SFUNC: {
+            const xmlXPathOp *argOp;
             xmlXPathObjectPtr obj;
             int frame;
+            int argIndex;
 
             frame = ctxt->pctxt.valueNr;
-            if (op->ch2 != -1) {
-                /* next arg */
-                if (xmlXPathCompOpEval(ctxt, result, op->ch2,
-                                       XPATH_EVAL_DEFAULT) < 0)
-                    goto sfunc_cleanup;
-            }
 
-            if (op->ch1 != -1) {
-                /* last arg */
-                if (xmlXPathCompOpEval(ctxt, result, op->ch1,
+            argOp = op;
+            argIndex = op->ch1;
+            while (argIndex >= 0) {
+                if (xmlXPathCompOpEval(ctxt, result, argIndex,
                                        XPATH_EVAL_DEFAULT) < 0)
                     goto sfunc_cleanup;
 
@@ -13153,7 +13170,14 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
                 if (obj == NULL)
                     goto sfunc_cleanup;
 
-                xmlXPathValuePushInternal(ctxt, obj);
+                if (xmlXPathValuePushInternal(ctxt, obj) < 0)
+                    goto sfunc_cleanup;
+
+                if (argOp->ch2 < 0)
+                    break;
+
+                argOp = &ctxt->pctxt.comp->steps[argOp->ch2];
+                argIndex = argOp->ch1;
             }
 
             op->as.func(&ctxt->pctxt, op->nbArgs);
@@ -13175,20 +13199,17 @@ sfunc_cleanup:
         }
 
         case XPATH_OP_FUNCTION: {
+            const xmlXPathOp *argOp;
             xmlXPathObjectPtr obj;
             int frame;
+            int argIndex;
 
             frame = ctxt->pctxt.valueNr;
-            if (op->ch2 != -1) {
-                /* next arg */
-                if (xmlXPathCompOpEval(ctxt, result, op->ch2,
-                                       XPATH_EVAL_DEFAULT) < 0)
-                    goto func_cleanup;
-            }
 
-            if (op->ch1 != -1) {
-                /* last arg */
-                if (xmlXPathCompOpEval(ctxt, result, op->ch1,
+            argOp = op;
+            argIndex = op->ch1;
+            while (argIndex >= 0) {
+                if (xmlXPathCompOpEval(ctxt, result, argIndex,
                                        XPATH_EVAL_DEFAULT) < 0)
                     goto func_cleanup;
 
@@ -13196,7 +13217,14 @@ sfunc_cleanup:
                 if (obj == NULL)
                     goto func_cleanup;
 
-                xmlXPathValuePushInternal(ctxt, obj);
+                if (xmlXPathValuePushInternal(ctxt, obj) < 0)
+                    goto func_cleanup;
+
+                if (argOp->ch2 < 0)
+                    break;
+
+                argOp = &ctxt->pctxt.comp->steps[argOp->ch2];
+                argIndex = argOp->ch1;
             }
 
             if (xmlXPathCompOpEvalFunc(ctxt, op) < 0)
@@ -13215,28 +13243,6 @@ func_cleanup:
             while (ctxt->pctxt.valueNr > frame)
                 xmlXPathReleaseObject(ctxt,
                                       xmlXPathValuePopInternal(ctxt));
-            break;
-        }
-
-        case XPATH_OP_ARG: {
-            xmlXPathObjectPtr obj;
-
-            if (op->ch2 != -1) {
-                /* next arg */
-                if (xmlXPathCompOpEval(ctxt, result, op->ch2,
-                                       XPATH_EVAL_DEFAULT) < 0)
-                    break;
-            }
-            /* arg */
-            if (xmlXPathCompOpEval(ctxt, result, op->ch1,
-                                   XPATH_EVAL_DEFAULT) < 0)
-                break;
-
-            obj = xmlXPathItemToObj(ctxt, result);
-            if (obj == NULL)
-                break;
-
-            xmlXPathValuePushInternal(ctxt, obj);
             break;
         }
 

@@ -84,3 +84,5 @@ position() != 1
 self::node()
 ././self::node()/.
 self::node()[self::a]
+
+concat(a, b, c)

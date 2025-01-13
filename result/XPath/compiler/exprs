@@ -466,3 +466,16 @@ Compiled Expression: nbStep = 5, maxEvalDepth = 8
   STEP_CTXT self::node()
     PREDICATE
       STEP_CTXT self::a mode=ANY predMode=ANY
+
+========================
+Expression: concat(a, b, c)
+Compiled Expression: nbStep = 12, maxEvalDepth = 5
+  FUNCTION concat (3 args)
+    STRING
+      STEP_CTXT child::a mode=FIRST predMode=FIRST
+    ARG
+      STRING
+        STEP_CTXT child::b mode=FIRST predMode=FIRST
+      ARG
+        STRING
+          STEP_CTXT child::c mode=FIRST predMode=FIRST
