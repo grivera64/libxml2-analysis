@@ -1,4 +1,4 @@
-<a:doc xmlns:a="urn:a" xmlns:b="urn:b">
+<a:doc xmlns:a="urn:a" xmlns:b="urn:b" xmlns:c="urn:c">
     <b:group>
         <a:elem/>
         <b:elem/>

@@ -7689,16 +7689,27 @@ xmlIterStartPreceding(xmlIter *ctxt, xmlNodePtr node, int reverse,
     }
 }
 
+static int
+xmlIterCmpNsNodes(const void *v1, const void *v2) {
+    const xmlNsPtr *ns1 = v1;
+    const xmlNsPtr *ns2 = v2;
+
+    return(xmlStrcmp((*ns2)->prefix, (*ns1)->prefix));
+}
+
+static int
+xmlIterCmpNsNodesReverse(const void *v1, const void *v2) {
+    const xmlNsPtr *ns1 = v1;
+    const xmlNsPtr *ns2 = v2;
+
+    return(xmlStrcmp((*ns1)->prefix, (*ns2)->prefix));
+}
+
 static xmlNodePtr
 xmlIterStartNamespace(xmlIter *ctxt, xmlNodePtr node, int reverse,
                       xmlIterNextFunc *next) {
     xmlNsPtr *list;
     int i = 0;
-
-    /*
-     * TODO: Handle reversing
-     */
-    (void) reverse;
 
     ctxt->hasNodes = 0;
 
@@ -7710,19 +7721,24 @@ xmlIterStartNamespace(xmlIter *ctxt, xmlNodePtr node, int reverse,
         ctxt->hasNodes = 1;
         return(NULL);
     }
-    if (list != NULL) {
-        ctxt->hasNodes = 1;
-
-        while (list[i] != NULL) {
-            i++;
-        }
+    if (list == NULL) {
+        *next = xmlIterEnd;
+        return((xmlNodePtr) xmlXPathXMLNamespace);
     }
 
+    while (list[i] != NULL)
+        i++;
+    list[i] = (xmlNsPtr) xmlXPathXMLNamespace;
+
+    qsort(list, i + 1, sizeof(list[0]),
+          (reverse) ? xmlIterCmpNsNodesReverse : xmlIterCmpNsNodes);
+
+    ctxt->hasNodes = 1;
     ctxt->as.nodes = (xmlNodePtr *) list;
     ctxt->index = i;
 
     *next = xmlIterNextTable;
-    return((xmlNodePtr) xmlXPathXMLNamespace);
+    return((xmlNodePtr) list[i]);
 }
 
 static const xmlIterStartFunc xmlIterStart[14] = {
