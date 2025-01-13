@@ -210,26 +210,27 @@ typedef enum {
 
     XPATH_OP_UNION,         /*  1,700,000 - 28 */
     XPATH_OP_ROOT,
-    XPATH_OP_NODE,          /*  7,200,000 */
-    XPATH_OP_STEP,          /*  9,700,000 */
+    XPATH_OP_NODE,          /*  1,000,000 */
+    XPATH_OP_STEP,          /*  3,500,000 */
+    XPATH_OP_STEP_CTXT,     /*  6,200,000 */
     XPATH_OP_VALUE_BOOL,
     XPATH_OP_VALUE_NUMBER,  /*  6,900,000 */
     XPATH_OP_VALUE_STRING,  /*  5,900,000 */
     XPATH_OP_VARIABLE,      /* 17,200,000 */
-    XPATH_OP_SFUNC,         /*  1,100,000 */
+    XPATH_OP_SFUNC,         /*  1,200,000 */
     XPATH_OP_FUNCTION,      /*  1,300,000 */
-    XPATH_OP_ARG,           /*  2,600,000 */
+    XPATH_OP_ARG,           /*  2,700,000 */
     XPATH_OP_PREDICATE,
     XPATH_OP_FILTER,        /*    600,000 */
-    XPATH_OP_SORT,          /*  6,400,000 */
+    XPATH_OP_SORT,          /*  5,100,000 */
 
     /* nullary ops */
-    XPATH_OP_POSITION,      /*  5,000,000 - 42 */
+    XPATH_OP_POSITION,      /*  5,000,000 - 43 */
     XPATH_OP_LAST,
 
     /* name ops */
     XPATH_OP_LOCAL_NAME,
-    XPATH_OP_LOCAL_NAME_CTXT,   /* 4,200,000 - 41 */
+    XPATH_OP_LOCAL_NAME_CTXT,   /* 4,200,000 - 46 */
     XPATH_OP_NAME,
     XPATH_OP_NAME_CTXT,
     XPATH_OP_NAMESPACE_URI,
@@ -1199,6 +1200,7 @@ xmlXPathFreeCompExpr(xmlXPathCompExprPtr comp)
                 break;
 
             case XPATH_OP_STEP:
+            case XPATH_OP_STEP_CTXT:
             case XPATH_OP_VARIABLE:
                 if ((comp->dict == NULL) && (op->qname.name != NULL)) {
                     xmlFree(op->qname.name);
@@ -1305,14 +1307,16 @@ xmlXPathCompOpSetEvalMode(xmlXPathContextPtr ctxt, int opIndex,
                           xmlXPathEvalMode mode, int isPred) {
     xmlXPathOpPtr steps = ctxt->pctxt.comp->steps;
     xmlXPathOpPtr op = &steps[opIndex];
-    int oldMode;
+    int oldMode, isStep;
 
     /*
      * Mode applies to steps, filters, predicates, unions, sorts
      * and nodesets.
      */
 
-    if ((op->op != XPATH_OP_STEP) &&
+    isStep = ((op->op == XPATH_OP_STEP) || (op->op == XPATH_OP_STEP_CTXT));
+
+    if ((!isStep) &&
         (op->op != XPATH_OP_FILTER) &&
         (op->op != XPATH_OP_PREDICATE) &&
         (op->op != XPATH_OP_UNION) &&
@@ -1320,7 +1324,7 @@ xmlXPathCompOpSetEvalMode(xmlXPathContextPtr ctxt, int opIndex,
         (op->op != XPATH_OP_NODESET))
         return;
 
-    if ((isPred) && (op->op == XPATH_OP_STEP))
+    if ((isPred) && (isStep))
         oldMode = op->predMode;
     else
         oldMode = op->mode;
@@ -1355,7 +1359,7 @@ xmlXPathCompOpSetEvalMode(xmlXPathContextPtr ctxt, int opIndex,
      * Step ops need two modes. One for inner proecessing and
      * one for the whole step op after merging and sorting.
      */
-    if ((isPred) && (op->op == XPATH_OP_STEP)) {
+    if ((isPred) && (isStep)) {
         op->predMode = mode;
     } else {
         op->mode = mode;
@@ -1382,7 +1386,7 @@ xmlXPathCompOpSetEvalMode(xmlXPathContextPtr ctxt, int opIndex,
 
             if (childOp->op != XPATH_OP_NODESET)
                 xmlXPathCompOpSetEvalMode(ctxt, op->ch1, mode, 0);
-        } else if ((!isPred) && (op->op == XPATH_OP_STEP)) {
+        } else if ((!isPred) && (isStep)) {
             int predIndex;
 
             /*
@@ -1579,6 +1583,8 @@ xmlXPathCompAddSort(xmlXPathContextPtr ctxt, int opIndex) {
 
     if ((op->op == XPATH_OP_UNION) ||
         (op->op == XPATH_OP_STEP) ||
+        ((op->op == XPATH_OP_STEP_CTXT) &&
+         (AXIS_IS_REVERSE(op->as.step.axis))) ||
         (op->op == XPATH_OP_FUNCTION) ||
         ((op->op == XPATH_OP_SFUNC) &&
          (op->type == XPATH_NODESET)) ||
@@ -1595,18 +1601,30 @@ xmlXPathCompAddSort(xmlXPathContextPtr ctxt, int opIndex) {
 
 static xmlXPathOpPtr
 xmlXPathCompAddStep(xmlXPathContextPtr ctxt,
-                    int chNodeset, int chPredicate,
+                    int argIndex, int predIndex,
                     xmlXPathAxisVal axis, int typeMask) {
-    xmlXPathOpPtr op;
+    xmlXPathCompExprPtr comp = ctxt->pctxt.comp;
+    xmlXPathOpPtr op, argOp;
+    xmlXPathOpcode opcode;
 
-    chNodeset = xmlXPathCompGetArg(ctxt, chNodeset, XPATH_NODESET);
+    argIndex = xmlXPathCompGetArg(ctxt, argIndex, XPATH_NODESET);
+    if (argIndex < 0)
+        return(NULL);
 
-    op = xmlXPathCompAdd(ctxt, XPATH_OP_STEP, XPATH_NODESET);
+    argOp = &comp->steps[argIndex];
+    if (argOp->op == XPATH_OP_NODE) {
+        opcode = XPATH_OP_STEP_CTXT;
+        argIndex = -1;
+    } else {
+        opcode = XPATH_OP_STEP;
+    }
+
+    op = xmlXPathCompAdd(ctxt, opcode, XPATH_NODESET);
     if (op == NULL)
         return(NULL);
 
-    op->ch1 = chNodeset;
-    op->ch2 = chPredicate;
+    op->ch1 = argIndex;
+    op->ch2 = predIndex;
     op->predMode = 0;
     op->as.step.axis = axis;
     op->as.step.typeMask = typeMask;
@@ -1916,62 +1934,10 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	     fprintf(output, "NODE"); break;
         case XPATH_OP_SORT:
 	     fprintf(output, "SORT"); break;
-        case XPATH_OP_STEP: {
-	    xmlXPathAxisVal axis = op->as.step.axis;
-	    int type = op->as.step.typeMask;
-	    const xmlChar *prefix = op->qname.ns.prefix;
-	    const xmlChar *name = op->qname.name;
-
-	    fprintf(output, "STEP ");
-	    switch (axis) {
-		case AXIS_ANCESTOR:
-		    fprintf(output, "ancestor::"); break;
-		case AXIS_ANCESTOR_OR_SELF:
-		    fprintf(output, "ancestor-or-self::"); break;
-		case AXIS_ATTRIBUTE:
-		    fprintf(output, "attribute::"); break;
-		case AXIS_CHILD:
-		    fprintf(output, "child::"); break;
-		case AXIS_DESCENDANT:
-		    fprintf(output, "descendant::"); break;
-		case AXIS_DESCENDANT_OR_SELF:
-		    fprintf(output, "descendant-or-self::"); break;
-		case AXIS_FOLLOWING:
-		    fprintf(output, "following::"); break;
-		case AXIS_FOLLOWING_SIBLING:
-		    fprintf(output, "following-sibling::"); break;
-		case AXIS_NAMESPACE:
-		    fprintf(output, "namespace::"); break;
-		case AXIS_PARENT:
-		    fprintf(output, "parent::"); break;
-		case AXIS_PRECEDING:
-		    fprintf(output, "preceding::"); break;
-		case AXIS_PRECEDING_SIBLING:
-		    fprintf(output, "preceding-sibling::"); break;
-		case AXIS_SELF:
-		    fprintf(output, "self::"); break;
-	    }
-            switch (type) {
-                case TYPE_MASK_NODE:
-                    fprintf(output, "node()"); break;
-                case TYPE_MASK_TEXT:
-                    fprintf(output, "text()"); break;
-                case TYPE_MASK_COMMENT:
-                    fprintf(output, "comment()"); break;
-                case TYPE_MASK_PI:
-                    fprintf(output, "processing-instruction()"); break;
-                default:
-                    if (prefix != NULL)
-                        fprintf(output, "%s:", prefix);
-                    if (name != NULL)
-                        fprintf(output, "%s", name);
-                    else
-                        fprintf(output, "*");
-                    break;
-            }
-	    break;
-
-        }
+        case XPATH_OP_STEP:
+	    fprintf(output, "STEP "); break;
+        case XPATH_OP_STEP_CTXT:
+	    fprintf(output, "STEP_CTXT "); break;
 	case XPATH_OP_VALUE_BOOL:
 	    fprintf(output, "VALUE_BOOL %s",
                     (op->as.boolean) ? "true" : "false");
@@ -2033,6 +1999,68 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 
     switch (op->op) {
         case XPATH_OP_STEP:
+        case XPATH_OP_STEP_CTXT: {
+	    xmlXPathAxisVal axis = op->as.step.axis;
+	    int type = op->as.step.typeMask;
+	    const xmlChar *prefix = op->qname.ns.prefix;
+	    const xmlChar *name = op->qname.name;
+
+	    switch (axis) {
+		case AXIS_ANCESTOR:
+		    fprintf(output, "ancestor::"); break;
+		case AXIS_ANCESTOR_OR_SELF:
+		    fprintf(output, "ancestor-or-self::"); break;
+		case AXIS_ATTRIBUTE:
+		    fprintf(output, "attribute::"); break;
+		case AXIS_CHILD:
+		    fprintf(output, "child::"); break;
+		case AXIS_DESCENDANT:
+		    fprintf(output, "descendant::"); break;
+		case AXIS_DESCENDANT_OR_SELF:
+		    fprintf(output, "descendant-or-self::"); break;
+		case AXIS_FOLLOWING:
+		    fprintf(output, "following::"); break;
+		case AXIS_FOLLOWING_SIBLING:
+		    fprintf(output, "following-sibling::"); break;
+		case AXIS_NAMESPACE:
+		    fprintf(output, "namespace::"); break;
+		case AXIS_PARENT:
+		    fprintf(output, "parent::"); break;
+		case AXIS_PRECEDING:
+		    fprintf(output, "preceding::"); break;
+		case AXIS_PRECEDING_SIBLING:
+		    fprintf(output, "preceding-sibling::"); break;
+		case AXIS_SELF:
+		    fprintf(output, "self::"); break;
+	    }
+            switch (type) {
+                case TYPE_MASK_NODE:
+                    fprintf(output, "node()"); break;
+                case TYPE_MASK_TEXT:
+                    fprintf(output, "text()"); break;
+                case TYPE_MASK_COMMENT:
+                    fprintf(output, "comment()"); break;
+                case TYPE_MASK_PI:
+                    fprintf(output, "processing-instruction()"); break;
+                default:
+                    if (prefix != NULL)
+                        fprintf(output, "%s:", prefix);
+                    if (name != NULL)
+                        fprintf(output, "%s", name);
+                    else
+                        fprintf(output, "*");
+                    break;
+            }
+	    break;
+
+        }
+        default:
+            break;
+    }
+
+    switch (op->op) {
+        case XPATH_OP_STEP:
+        case XPATH_OP_STEP_CTXT:
         case XPATH_OP_FILTER:
         case XPATH_OP_PREDICATE:
         case XPATH_OP_UNION:
@@ -2044,7 +2072,7 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
             break;
     }
 
-    if (op->op == XPATH_OP_STEP)
+    if ((op->op == XPATH_OP_STEP) || (op->op == XPATH_OP_STEP_CTXT))
         xmlXPathDebugDumpEvalMode(output, "predMode", op->predMode);
 
     fprintf(output, "\n");
@@ -12163,26 +12191,19 @@ xmlXPathCompOpEvalPredicate(xmlXPathContextPtr ctxt, int opIndex,
 ATTRIBUTE_NO_INLINE
 static int
 xmlXPathCompOpEvalStep(xmlXPathContextPtr ctxt, xmlXPathItem *result,
-                       xmlNodeSet *inSeq, const xmlXPathOp *op,
-                       xmlXPathEvalMode mode) {
+                       xmlNodePtr *inputNodes, int inputSize,
+                       const xmlXPathOp *op, xmlXPathEvalMode mode) {
     int typeMask = op->as.step.typeMask;
     const xmlChar *name = op->qname.name;
     const xmlChar *URI = NULL;
 
     xmlNodeSetPtr outSeq;
-    /* The set of input nodes for the node tests */
-    xmlNodePtr *inputNodes;
-    int inputSize;
     int inputIdx;
     int outOffset;
     xmlXPathEvalMode stepMode, predMode;
     int breakPos; /* The requested position() (when a "[n]" predicate) */
     int reverse;
     int duplMaxSize;
-
-    inputSize = inSeq->nodeNr;
-    inputNodes = inSeq->nodeTab;
-    inputIdx = 0;
 
     if (inputSize <= 0)
         return(0);
@@ -12258,6 +12279,7 @@ xmlXPathCompOpEvalStep(xmlXPathContextPtr ctxt, xmlXPathItem *result,
     /*
      * Loop over input nodes
      */
+    inputIdx = 0;
     outSeq = &result->as.nodeset;
     outOffset = 0;
     while (inputIdx < inputSize) {
@@ -12965,13 +12987,24 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
                 break;
             }
 
-            if (xmlXPathCompOpEvalStep(ctxt, result, &arg.as.nodeset,
-                                       op, mode) < 0)
+            if (xmlXPathCompOpEvalStep(ctxt, result, arg.as.nodeset.nodeTab,
+                                       arg.as.nodeset.nodeNr, op, mode) < 0)
                 xmlXPathItemReleaseNodeSet(ctxt, result);
 
             xmlXPathItemReleaseNodeSet(ctxt, &arg);
             break;
         }
+
+        case XPATH_OP_STEP_CTXT:
+            if (xmlXPathItemInitNodeSet(ctxt, result) < 0)
+                break;
+
+            if (ctxt->node != NULL) {
+                if (xmlXPathCompOpEvalStep(ctxt, result, &ctxt->node, 1,
+                                           op, mode) < 0)
+                    xmlXPathItemReleaseNodeSet(ctxt, result);
+            }
+            break;
 
         case XPATH_OP_VALUE_BOOL:
             result->type = XPATH_BOOLEAN;
@@ -13746,7 +13779,8 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
     {
         xmlXPathOpPtr prevop = &comp->steps[op->ch1];
 
-        if ((prevop->op == XPATH_OP_STEP) &&
+        if (((prevop->op == XPATH_OP_STEP) ||
+             (prevop->op == XPATH_OP_STEP_CTXT)) &&
             (prevop->as.step.axis == AXIS_DESCENDANT_OR_SELF) &&
             (prevop->as.step.typeMask == TYPE_MASK_NODE) &&
             (prevop->ch2 == -1) &&
@@ -13766,6 +13800,7 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
                     * "descendant-or-self::node()/descendant::" to
                     * "descendant::"
                     */
+                    op->op = prevop->op;
                     op->ch1 = prevop->ch1;
                     op->as.step.axis = AXIS_DESCENDANT;
                     break;
@@ -13776,6 +13811,7 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
                     * "descendant-or-self::node()/descendant-or-self::" to
                     * to "descendant-or-self::"
                     */
+                    op->op = prevop->op;
                     op->ch1 = prevop->ch1;
                     op->as.step.axis = AXIS_DESCENDANT_OR_SELF;
                     break;

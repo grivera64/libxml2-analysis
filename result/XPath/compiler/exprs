@@ -16,12 +16,11 @@ Compiled Expression: nbStep = 4, maxEvalDepth = 3
 
 ========================
 Expression: 1 + a
-Compiled Expression: nbStep = 5, maxEvalDepth = 4
+Compiled Expression: nbStep = 5, maxEvalDepth = 3
   ADD
     VALUE_NUMBER 1
     NUMBER
-      STEP child::a mode=FIRST predMode=FIRST
-        NODE
+      STEP_CTXT child::a mode=FIRST predMode=FIRST
 
 ========================
 Expression: true() and true()
@@ -40,12 +39,11 @@ Compiled Expression: nbStep = 4, maxEvalDepth = 3
 
 ========================
 Expression: true() and a
-Compiled Expression: nbStep = 5, maxEvalDepth = 4
+Compiled Expression: nbStep = 5, maxEvalDepth = 3
   AND
     VALUE_BOOL true
     BOOL
-      STEP child::a mode=ANY predMode=ANY
-        NODE
+      STEP_CTXT child::a mode=ANY predMode=ANY
 
 ========================
 Expression: fn()[true()]
@@ -105,12 +103,10 @@ Compiled Expression: nbStep = 3, maxEvalDepth = 2
 
 ========================
 Expression: count(a)
-Compiled Expression: nbStep = 5, maxEvalDepth = 5
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
   FUNCTION count (1 args)
     ARG
-      SORT
-        STEP child::a
-          NODE
+      STEP_CTXT child::a
 
 ========================
 Expression: count(1)
@@ -136,11 +132,9 @@ Compiled Expression: nbStep = 4, maxEvalDepth = 4
 
 ========================
 Expression: number(a)
-Compiled Expression: nbStep = 4, maxEvalDepth = 4
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
   NUMBER
-    SORT mode=FIRST
-      STEP child::a mode=FIRST predMode=FIRST
-        NODE
+    STEP_CTXT child::a mode=FIRST predMode=FIRST
 
 ========================
 Expression: number(1)
@@ -162,13 +156,11 @@ Compiled Expression: nbStep = 2, maxEvalDepth = 2
 
 ========================
 Expression: lang(a)
-Compiled Expression: nbStep = 6, maxEvalDepth = 6
+Compiled Expression: nbStep = 5, maxEvalDepth = 4
   FUNCTION lang (1 args)
     ARG
       STRING
-        SORT mode=FIRST
-          STEP child::a mode=FIRST predMode=FIRST
-            NODE
+        STEP_CTXT child::a mode=FIRST predMode=FIRST
 
 ========================
 Expression: lang(1)
@@ -207,11 +199,9 @@ Compiled Expression: nbStep = 2, maxEvalDepth = 1
 
 ========================
 Expression: local-name(*)
-Compiled Expression: nbStep = 4, maxEvalDepth = 4
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
   LOCAL_NAME
-    SORT
-      STEP child::*
-        NODE
+    STEP_CTXT child::*
 
 ========================
 Expression: name()
@@ -225,11 +215,9 @@ Compiled Expression: nbStep = 2, maxEvalDepth = 1
 
 ========================
 Expression: name(*)
-Compiled Expression: nbStep = 4, maxEvalDepth = 4
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
   NAME
-    SORT
-      STEP child::*
-        NODE
+    STEP_CTXT child::*
 
 ========================
 Expression: namespace-uri()
@@ -243,11 +231,9 @@ Compiled Expression: nbStep = 2, maxEvalDepth = 1
 
 ========================
 Expression: namespace-uri(*)
-Compiled Expression: nbStep = 4, maxEvalDepth = 4
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
   NAMESPACE_URI
-    SORT
-      STEP child::*
-        NODE
+    STEP_CTXT child::*
 
 ========================
 Expression: a | fn() | $var
@@ -255,8 +241,7 @@ Compiled Expression: nbStep = 9, maxEvalDepth = 5
   SORT
     UNION
       UNION
-        STEP child::a
-          NODE
+        STEP_CTXT child::a
         NODESET
           FUNCTION fn (0 args)
       NODESET
@@ -268,8 +253,7 @@ Compiled Expression: nbStep = 10, maxEvalDepth = 5
   SORT mode=FIRST
     UNION mode=FIRST
       UNION mode=FIRST
-        STEP child::a mode=FIRST predMode=FIRST
-          NODE
+        STEP_CTXT child::a mode=FIRST predMode=FIRST
         NODESET
           FUNCTION fn (0 args)
       NODESET
@@ -281,8 +265,7 @@ Compiled Expression: nbStep = 10, maxEvalDepth = 5
   SORT mode=2
     UNION
       UNION
-        STEP child::a
-          NODE
+        STEP_CTXT child::a
         NODESET
           FUNCTION fn (0 args)
       NODESET
@@ -294,8 +277,7 @@ Compiled Expression: nbStep = 10, maxEvalDepth = 5
   SORT mode=LAST
     UNION mode=LAST
       UNION mode=LAST
-        STEP child::a mode=LAST predMode=LAST
-          NODE
+        STEP_CTXT child::a mode=LAST predMode=LAST
         NODESET
           FUNCTION fn (0 args)
       NODESET
@@ -303,56 +285,43 @@ Compiled Expression: nbStep = 10, maxEvalDepth = 5
 
 ========================
 Expression: (a[1])[last()]
-Compiled Expression: nbStep = 5, maxEvalDepth = 3
-  SORT mode=LAST
-    STEP child::a mode=LAST predMode=FIRST
-      NODE
+Compiled Expression: nbStep = 4, maxEvalDepth = 1
+  STEP_CTXT child::a predMode=FIRST
 
 ========================
 Expression: a[true()][1][true()][1][2][true()][last()][true()]
-Compiled Expression: nbStep = 15, maxEvalDepth = 12
-  SORT
-    STEP child::a
-      NODE
-      PREDICATE
-        PREDICATE mode=LAST
-          PREDICATE mode=NONE
-            PREDICATE mode=FIRST
-              VALUE_BOOL true
+Compiled Expression: nbStep = 14, maxEvalDepth = 11
+  STEP_CTXT child::a
+    PREDICATE
+      PREDICATE mode=LAST
+        PREDICATE mode=NONE
+          PREDICATE mode=FIRST
             VALUE_BOOL true
           VALUE_BOOL true
         VALUE_BOOL true
+      VALUE_BOOL true
 
 ========================
 Expression: a[position()=1]
-Compiled Expression: nbStep = 6, maxEvalDepth = 3
-  SORT
-    STEP child::a predMode=FIRST
-      NODE
+Compiled Expression: nbStep = 5, maxEvalDepth = 1
+  STEP_CTXT child::a predMode=FIRST
 
 ========================
 Expression: a[position()=100]
-Compiled Expression: nbStep = 6, maxEvalDepth = 3
-  SORT
-    STEP child::a predMode=100
-      NODE
+Compiled Expression: nbStep = 5, maxEvalDepth = 1
+  STEP_CTXT child::a predMode=100
 
 ========================
 Expression: a[position()=last()]
-Compiled Expression: nbStep = 6, maxEvalDepth = 3
-  SORT
-    STEP child::a predMode=LAST
-      NODE
+Compiled Expression: nbStep = 5, maxEvalDepth = 1
+  STEP_CTXT child::a predMode=LAST
 
 ========================
 Expression: a[.//b]
-Compiled Expression: nbStep = 7, maxEvalDepth = 10
-  SORT
-    STEP child::a
-      NODE
-      PREDICATE
-        STEP descendant::b mode=ANY predMode=ANY
-          NODE
+Compiled Expression: nbStep = 6, maxEvalDepth = 8
+  STEP_CTXT child::a
+    PREDICATE
+      STEP_CTXT descendant::b mode=ANY predMode=ANY
 
 ========================
 Expression: not(true())
@@ -368,10 +337,9 @@ Compiled Expression: nbStep = 2, maxEvalDepth = 2
 
 ========================
 Expression: not(boolean(boolean(a)))
-Compiled Expression: nbStep = 3, maxEvalDepth = 3
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
   NOT
-    STEP child::a mode=ANY predMode=ANY
-      NODE
+    STEP_CTXT child::a mode=ANY predMode=ANY
 
 ========================
 Expression: 0 < 1
