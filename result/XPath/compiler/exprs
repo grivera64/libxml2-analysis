@@ -194,7 +194,7 @@ Compiled Expression: nbStep = 2, maxEvalDepth = 1
 Expression: local-name(*)
 Compiled Expression: nbStep = 3, maxEvalDepth = 2
   LOCAL_NAME
-    STEP_CTXT child::*
+    STEP_CTXT child::* mode=FIRST predMode=FIRST
 
 ========================
 Expression: name()
@@ -210,7 +210,7 @@ Compiled Expression: nbStep = 2, maxEvalDepth = 1
 Expression: name(*)
 Compiled Expression: nbStep = 3, maxEvalDepth = 2
   NAME
-    STEP_CTXT child::*
+    STEP_CTXT child::* mode=FIRST predMode=FIRST
 
 ========================
 Expression: namespace-uri()
@@ -226,7 +226,7 @@ Compiled Expression: nbStep = 2, maxEvalDepth = 1
 Expression: namespace-uri(*)
 Compiled Expression: nbStep = 3, maxEvalDepth = 2
   NAMESPACE_URI
-    STEP_CTXT child::*
+    STEP_CTXT child::* mode=FIRST predMode=FIRST
 
 ========================
 Expression: a | fn() | $var

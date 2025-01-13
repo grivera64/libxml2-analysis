@@ -10494,18 +10494,31 @@ xmlXPathNameCompiler(xmlXPathContextPtr ctxt,
         xmlXPathCompAdd(ctxt, sfunc->op + 1, XPATH_STRING);
     } else {
         xmlXPathCompExprPtr comp = ctxt->pctxt.comp;
+        xmlXPathOpPtr argOp;
 
-        /*
-         * TODO: EVAL_FIRST optimization
-         */
-        argIndex = xmlXPathCompGetArg(ctxt, argIndex, XPATH_XSLT_TREE);
-        if (argIndex != -1) {
-            xmlXPathOpPtr argOp = &comp->steps[argIndex];
+        argOp = &comp->steps[argIndex];
 
-            if (argOp->op == XPATH_OP_NODE)
-                xmlXPathCompAdd(ctxt, sfunc->op + 1, XPATH_STRING);
-            else
-                xmlXPathCompAddUnary(ctxt, sfunc->op, XPATH_STRING, argIndex);
+        if (argOp->op == XPATH_OP_NODE) {
+            xmlXPathCompAdd(ctxt, sfunc->op + 1, XPATH_STRING);
+        } else {
+            if (argOp->type != XPATH_NODESET) {
+                if (argOp->type != XPATH_UNDEFINED) {
+                    xmlXPathCErr(ctxt, XPATH_INVALID_TYPE);
+                    return;
+                }
+                xmlXPathCompAddUnary(ctxt, XPATH_OP_NODESET, XPATH_NODESET,
+                                     argIndex);
+                argIndex = comp->last;
+                if (argIndex == -1)
+                    return;
+            }
+
+            /*
+             * We only need the first node for name()
+             */
+            xmlXPathCompOpSetEvalMode(ctxt, argIndex, XPATH_EVAL_FIRST, 0);
+
+            xmlXPathCompAddUnary(ctxt, sfunc->op, XPATH_STRING, argIndex);
         }
     }
 }
