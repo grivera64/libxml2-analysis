@@ -220,7 +220,7 @@ typedef enum {
     XPATH_OP_VARIABLE,      /* 17,200,000 */
     XPATH_OP_SFUNC,         /*  1,200,000 */
     XPATH_OP_FUNCTION,      /*  1,300,000 */
-    XPATH_OP_ARG,           /*  2,700,000 */
+    XPATH_OP_ARG,           /*  1,200,000 */
     XPATH_OP_PREDICATE,
     XPATH_OP_FILTER,        /*    600,000 */
     XPATH_OP_SORT,          /*  4,100,000 */
@@ -256,7 +256,8 @@ typedef struct _xmlXPathStandardFunction xmlXPathStandardFunction;
 
 typedef void
 (*xmlXPathFuncCompiler)(xmlXPathContextPtr ctxt,
-                        const xmlXPathStandardFunction *sfunc, int nargs);
+                        const xmlXPathStandardFunction *sfunc, int nargs,
+                        int argIndex);
 
 typedef struct {
     unsigned char type;
@@ -286,15 +287,18 @@ struct _xmlXPathStandardFunction {
 
 static void
 xmlXPathTrueCompiler(xmlXPathContextPtr ctxt,
-                     const xmlXPathStandardFunction *sfunc, int nargs);
+                     const xmlXPathStandardFunction *sfunc, int nargs,
+                     int argIndex);
 
 static void
 xmlXPathNameCompiler(xmlXPathContextPtr ctxt,
-                     const xmlXPathStandardFunction *sfunc, int nargs);
+                     const xmlXPathStandardFunction *sfunc, int nargs,
+                     int argIndex);
 
 static void
 xmlXPathNotCompiler(xmlXPathContextPtr ctxt,
-                    const xmlXPathStandardFunction *sfunc, int nargs);
+                    const xmlXPathStandardFunction *sfunc, int nargs,
+                    int argIndex);
 
 /*
  * Note that we allow XSLT result tree fragments (XPATH_XSLT_TREE)
@@ -10457,7 +10461,8 @@ xmlXPathIsNodeType(const xmlChar *name) {
 static void
 xmlXPathTrueCompiler(xmlXPathContextPtr ctxt,
                      const xmlXPathStandardFunction *sfunc,
-                     int nargs ATTRIBUTE_UNUSED) {
+                     int nargs ATTRIBUTE_UNUSED,
+                     int argIndex ATTRIBUTE_UNUSED) {
     xmlXPathOpPtr op;
 
     op = xmlXPathCompAdd(ctxt, XPATH_OP_VALUE_BOOL, XPATH_BOOLEAN);
@@ -10469,7 +10474,7 @@ xmlXPathTrueCompiler(xmlXPathContextPtr ctxt,
 static void
 xmlXPathNotCompiler(xmlXPathContextPtr ctxt,
                     const xmlXPathStandardFunction *sfunc ATTRIBUTE_UNUSED,
-                    int nargs ATTRIBUTE_UNUSED) {
+                    int nargs ATTRIBUTE_UNUSED, int argIndex) {
     xmlXPathCompExprPtr comp = ctxt->pctxt.comp;
     xmlXPathOpPtr lastOp;
 
@@ -10478,22 +10483,22 @@ xmlXPathNotCompiler(xmlXPathContextPtr ctxt,
     if (lastOp->op == XPATH_OP_BOOL)
         lastOp->op = XPATH_OP_NOT;
     else
-        xmlXPathCompAddUnary(ctxt, XPATH_OP_NOT, XPATH_BOOLEAN, comp->last);
+        xmlXPathCompAddUnary(ctxt, XPATH_OP_NOT, XPATH_BOOLEAN, argIndex);
 }
 
 static void
 xmlXPathNameCompiler(xmlXPathContextPtr ctxt,
-                     const xmlXPathStandardFunction *sfunc, int nargs) {
+                     const xmlXPathStandardFunction *sfunc, int nargs,
+                     int argIndex) {
     if (nargs == 0) {
         xmlXPathCompAdd(ctxt, sfunc->op + 1, XPATH_STRING);
     } else {
         xmlXPathCompExprPtr comp = ctxt->pctxt.comp;
-        int argIndex;
 
         /*
          * TODO: EVAL_FIRST optimization
          */
-        argIndex = xmlXPathCompGetArg(ctxt, comp->last, XPATH_XSLT_TREE);
+        argIndex = xmlXPathCompGetArg(ctxt, argIndex, XPATH_XSLT_TREE);
         if (argIndex != -1) {
             xmlXPathOpPtr argOp = &comp->steps[argIndex];
 
@@ -10527,6 +10532,7 @@ xmlXPathCompFunctionCall(xmlXPathContextPtr ctxt) {
     int nbargs = 0;
     int flags;
     int sortArgs = 1;
+    int ch1, ch2;
 
     name = xmlXPathParseQName(ctxt, &prefix);
     if (name == NULL) {
@@ -10581,12 +10587,20 @@ xmlXPathCompFunctionCall(xmlXPathContextPtr ctxt) {
         }
     }
 
-    if (CUR != ')') {
-        int ch1 = -1;
+    ch1 = -1;
+    ch2 = -1;
 
+    if (CUR != ')') {
 	while (1) {
             xmlXPathObjectType type;
-            int ch2;
+
+            if (ch1 != -1) {
+                op = xmlXPathCompAddBinary(ctxt, XPATH_OP_ARG, type, ch1, ch2);
+
+                if (op == NULL)
+                    goto error;
+                ch2 = comp->last;
+            }
 
 	    xmlXPathCompileExpr(ctxt);
 
@@ -10605,17 +10619,9 @@ xmlXPathCompFunctionCall(xmlXPathContextPtr ctxt) {
                 type = XPATH_UNDEFINED;
             }
 
-            ch2 = xmlXPathCompGetArg(ctxt, comp->last, type);
-            if (ch2 == -1)
+            ch1 = xmlXPathCompGetArg(ctxt, comp->last, type);
+            if (ch1 == -1)
                 goto error;
-
-            if ((sfunc == NULL) || (sfunc->op == XPATH_OP_SFUNC)) {
-                op = xmlXPathCompAddBinary(ctxt, XPATH_OP_ARG, type, ch1, ch2);
-
-                if (op == NULL)
-                    goto error;
-                ch1 = comp->last;
-            }
 
 	    nbargs++;
 	    if (CUR == ')') break;
@@ -10635,7 +10641,7 @@ xmlXPathCompFunctionCall(xmlXPathContextPtr ctxt) {
     }
 
     if ((sfunc != NULL) && (sfunc->compiler != NULL)) {
-        sfunc->compiler(ctxt, sfunc, nbargs);
+        sfunc->compiler(ctxt, sfunc, nbargs, ch1);
     } else if ((sfunc == NULL) ||
                ((sfunc->op != XPATH_OP_BOOL) &&
                 (sfunc->op != XPATH_OP_NUMBER) &&
@@ -10659,10 +10665,7 @@ xmlXPathCompFunctionCall(xmlXPathContextPtr ctxt) {
             type = XPATH_UNDEFINED;
         }
 
-        if (nbargs == 0)
-            op = xmlXPathCompAdd(ctxt, opcode, type);
-        else
-            op = xmlXPathCompAddUnary(ctxt, opcode, type, comp->last);
+        op = xmlXPathCompAddBinary(ctxt, opcode, type, ch1, ch2);
         if (op == NULL)
             goto error;
 
@@ -13107,10 +13110,24 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
             int frame;
 
             frame = ctxt->pctxt.valueNr;
+            if (op->ch2 != -1) {
+                /* next arg */
+                if (xmlXPathCompOpEval(ctxt, result, op->ch2,
+                                       XPATH_EVAL_DEFAULT) < 0)
+                    goto sfunc_cleanup;
+            }
+
             if (op->ch1 != -1) {
+                /* last arg */
                 if (xmlXPathCompOpEval(ctxt, result, op->ch1,
                                        XPATH_EVAL_DEFAULT) < 0)
                     goto sfunc_cleanup;
+
+                obj = xmlXPathItemToObj(ctxt, result);
+                if (obj == NULL)
+                    goto sfunc_cleanup;
+
+                xmlXPathValuePushInternal(ctxt, obj);
             }
 
             op->as.func(&ctxt->pctxt, op->nbArgs);
@@ -13132,13 +13149,28 @@ sfunc_cleanup:
         }
 
         case XPATH_OP_FUNCTION: {
+            xmlXPathObjectPtr obj;
             int frame;
 
             frame = ctxt->pctxt.valueNr;
+            if (op->ch2 != -1) {
+                /* next arg */
+                if (xmlXPathCompOpEval(ctxt, result, op->ch2,
+                                       XPATH_EVAL_DEFAULT) < 0)
+                    goto func_cleanup;
+            }
+
             if (op->ch1 != -1) {
+                /* last arg */
                 if (xmlXPathCompOpEval(ctxt, result, op->ch1,
                                        XPATH_EVAL_DEFAULT) < 0)
                     goto func_cleanup;
+
+                obj = xmlXPathItemToObj(ctxt, result);
+                if (obj == NULL)
+                    goto func_cleanup;
+
+                xmlXPathValuePushInternal(ctxt, obj);
             }
 
             if (xmlXPathCompOpEvalFunc(ctxt, op) < 0)
@@ -13148,7 +13180,7 @@ sfunc_cleanup:
                 (ctxt->pctxt.valueNr != frame + 1)) {
                 xmlXPathCErr(ctxt, XPATH_STACK_ERROR);
             } else {
-                xmlXPathObjectPtr obj = xmlXPathValuePopInternal(ctxt);
+                obj = xmlXPathValuePopInternal(ctxt);
 
                 xmlXPathItemFromObj(ctxt, result, obj, 0);
             }
@@ -13163,14 +13195,14 @@ func_cleanup:
         case XPATH_OP_ARG: {
             xmlXPathObjectPtr obj;
 
-            if (op->ch1 != -1) {
+            if (op->ch2 != -1) {
                 /* next arg */
-                if (xmlXPathCompOpEval(ctxt, result, op->ch1,
+                if (xmlXPathCompOpEval(ctxt, result, op->ch2,
                                        XPATH_EVAL_DEFAULT) < 0)
                     break;
             }
             /* arg */
-            if (xmlXPathCompOpEval(ctxt, result, op->ch2,
+            if (xmlXPathCompOpEval(ctxt, result, op->ch1,
                                    XPATH_EVAL_DEFAULT) < 0)
                 break;
 

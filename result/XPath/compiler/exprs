@@ -103,10 +103,9 @@ Compiled Expression: nbStep = 3, maxEvalDepth = 2
 
 ========================
 Expression: count(a)
-Compiled Expression: nbStep = 4, maxEvalDepth = 3
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
   FUNCTION count (1 args)
-    ARG
-      STEP_CTXT child::a
+    STEP_CTXT child::a
 
 ========================
 Expression: count(1)
@@ -115,20 +114,18 @@ Compilation failed: Invalid type
 
 ========================
 Expression: count(fn())
-Compiled Expression: nbStep = 5, maxEvalDepth = 5
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
   FUNCTION count (1 args)
-    ARG
-      XSLT_TREE
-        SORT
-          FUNCTION fn (0 args)
+    XSLT_TREE
+      SORT
+        FUNCTION fn (0 args)
 
 ========================
 Expression: count($var)
-Compiled Expression: nbStep = 4, maxEvalDepth = 4
+Compiled Expression: nbStep = 3, maxEvalDepth = 3
   FUNCTION count (1 args)
-    ARG
-      XSLT_TREE
-        VARIABLE var
+    XSLT_TREE
+      VARIABLE var
 
 ========================
 Expression: number(a)
@@ -156,36 +153,32 @@ Compiled Expression: nbStep = 2, maxEvalDepth = 2
 
 ========================
 Expression: lang(a)
-Compiled Expression: nbStep = 5, maxEvalDepth = 4
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
   FUNCTION lang (1 args)
-    ARG
-      STRING
-        STEP_CTXT child::a mode=FIRST predMode=FIRST
+    STRING
+      STEP_CTXT child::a mode=FIRST predMode=FIRST
 
 ========================
 Expression: lang(1)
-Compiled Expression: nbStep = 4, maxEvalDepth = 4
+Compiled Expression: nbStep = 3, maxEvalDepth = 3
   FUNCTION lang (1 args)
-    ARG
-      STRING
-        VALUE_NUMBER 1
+    STRING
+      VALUE_NUMBER 1
 
 ========================
 Expression: lang(fn())
-Compiled Expression: nbStep = 5, maxEvalDepth = 5
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
   FUNCTION lang (1 args)
-    ARG
-      STRING
-        SORT mode=FIRST
-          FUNCTION fn (0 args)
+    STRING
+      SORT mode=FIRST
+        FUNCTION fn (0 args)
 
 ========================
 Expression: lang($var)
-Compiled Expression: nbStep = 4, maxEvalDepth = 4
+Compiled Expression: nbStep = 3, maxEvalDepth = 3
   FUNCTION lang (1 args)
-    ARG
-      STRING
-        VARIABLE var
+    STRING
+      VARIABLE var
 
 ========================
 Expression: local-name()
