@@ -372,3 +372,35 @@ Compiled Expression: nbStep = 3, maxEvalDepth = 3
   NOT
     STEP child::a mode=ANY predMode=ANY
       NODE
+
+========================
+Expression: 0 < 1
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  LT_NUM
+    VALUE_NUMBER 0
+    VALUE_NUMBER 1
+
+========================
+Expression: '3.0' >= '5.2'
+Compiled Expression: nbStep = 5, maxEvalDepth = 3
+  GE_NUM
+    NUMBER
+      VALUE_STRING 3.0
+    NUMBER
+      VALUE_STRING 5.2
+
+========================
+Expression: 1 > true()
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
+  GT_NUM
+    VALUE_NUMBER 1
+    NUMBER
+      VALUE_BOOL true
+
+========================
+Expression: 4 <= 'abc'
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
+  LE_NUM
+    VALUE_NUMBER 4
+    NUMBER
+      VALUE_STRING abc

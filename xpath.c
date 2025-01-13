@@ -171,7 +171,7 @@ typedef enum {
     XPATH_OP_END=0,
 
     /* conversion */
-    XPATH_OP_BOOL,          /*  2,900,000 - 1*/
+    XPATH_OP_BOOL,          /*  2,100,000 - 1*/
     XPATH_OP_NOT,           /*    900,000 */
     XPATH_OP_NUMBER,        /*    700,000 */
     XPATH_OP_STRING,        /*  1,500,000 */
@@ -186,9 +186,14 @@ typedef enum {
     XPATH_OP_EQ,            /*  5,500,000 - 9 */
     XPATH_OP_NE,            /*  2,100,000 */
     XPATH_OP_LT,
-    XPATH_OP_GT,            /*  5,500,000 */
+    XPATH_OP_GT,            /*  1,000,000 - 12 */
     XPATH_OP_LE,
     XPATH_OP_GE,
+
+    XPATH_OP_LT_NUM,
+    XPATH_OP_GT_NUM,        /*  4,500,000 - 16 */
+    XPATH_OP_LE_NUM,
+    XPATH_OP_GE_NUM,
 
     /* unary math ops */
     XPATH_OP_NEG,
@@ -197,13 +202,13 @@ typedef enum {
     XPATH_OP_ROUND,
 
     /* binary math ops */
-    XPATH_OP_ADD,           /*    600,000 - 19 */
+    XPATH_OP_ADD,           /*    600,000 - 23 */
     XPATH_OP_SUB,
     XPATH_OP_MULT,
     XPATH_OP_DIV,
     XPATH_OP_MOD,
 
-    XPATH_OP_UNION,         /*  1,700,000 - 24 */
+    XPATH_OP_UNION,         /*  1,700,000 - 28 */
     XPATH_OP_ROOT,
     XPATH_OP_NODE,          /*  7,200,000 */
     XPATH_OP_STEP,          /*  9,700,000 */
@@ -216,10 +221,10 @@ typedef enum {
     XPATH_OP_ARG,           /*  2,600,000 */
     XPATH_OP_PREDICATE,
     XPATH_OP_FILTER,        /*    600,000 */
-    XPATH_OP_SORT,          /*  6,500,000 */
+    XPATH_OP_SORT,          /*  6,400,000 */
 
     /* nullary ops */
-    XPATH_OP_POSITION,      /*  5,000,000 - 38 */
+    XPATH_OP_POSITION,      /*  5,000,000 - 42 */
     XPATH_OP_LAST,
 
     /* name ops */
@@ -1493,9 +1498,10 @@ xmlXPathCompAddBinary(xmlXPathContextPtr ctxt, xmlXPathOpcode opcode,
 static int
 xmlXPathCompGetArg(xmlXPathContextPtr ctxt, int argIndex,
                    xmlXPathObjectType type) {
+    xmlXPathCompExprPtr comp = ctxt->pctxt.comp;
     xmlXPathOpPtr op;
 
-    op = &ctxt->pctxt.comp->steps[argIndex];
+    op = &comp->steps[argIndex];
 
     switch (type) {
         /*
@@ -1507,6 +1513,7 @@ xmlXPathCompGetArg(xmlXPathContextPtr ctxt, int argIndex,
                                      argIndex);
 
                 xmlXPathCompOpSetEvalMode(ctxt, argIndex, XPATH_EVAL_ANY, 0);
+                argIndex = comp->last;
             }
             break;
         case XPATH_NUMBER:
@@ -1515,6 +1522,7 @@ xmlXPathCompGetArg(xmlXPathContextPtr ctxt, int argIndex,
                                      argIndex);
 
                 xmlXPathCompOpSetEvalMode(ctxt, argIndex, XPATH_EVAL_FIRST, 0);
+                argIndex = comp->last;
             }
             break;
         case XPATH_STRING:
@@ -1523,24 +1531,29 @@ xmlXPathCompGetArg(xmlXPathContextPtr ctxt, int argIndex,
                                      argIndex);
 
                 xmlXPathCompOpSetEvalMode(ctxt, argIndex, XPATH_EVAL_FIRST, 0);
+                argIndex = comp->last;
             }
             break;
         case XPATH_NODESET:
             if (op->type != XPATH_NODESET) {
-                if (op->type == XPATH_UNDEFINED)
-                    xmlXPathCompAddUnary(ctxt, XPATH_OP_NODESET, XPATH_NODESET,
-                                         argIndex);
-                else
+                if (op->type != XPATH_UNDEFINED) {
                     xmlXPathCErr(ctxt, XPATH_INVALID_TYPE);
+                    break;
+                }
+                xmlXPathCompAddUnary(ctxt, XPATH_OP_NODESET, XPATH_NODESET,
+                                     argIndex);
+                argIndex = comp->last;
             }
             break;
         case XPATH_XSLT_TREE:
             if ((op->type != XPATH_NODESET) && (op->type != XPATH_XSLT_TREE)) {
-                if (op->type == XPATH_UNDEFINED)
-                    xmlXPathCompAddUnary(ctxt, XPATH_OP_XSLT_TREE,
-                                         XPATH_NODESET, argIndex);
-                else
+                if (op->type != XPATH_UNDEFINED) {
                     xmlXPathCErr(ctxt, XPATH_INVALID_TYPE);
+                    break;
+                }
+                xmlXPathCompAddUnary(ctxt, XPATH_OP_XSLT_TREE,
+                                     XPATH_NODESET, argIndex);
+                argIndex = comp->last;
             }
             break;
         case XPATH_UNDEFINED:
@@ -1551,7 +1564,7 @@ xmlXPathCompGetArg(xmlXPathContextPtr ctxt, int argIndex,
     if (ctxt->pctxt.error)
         return(-1);
 
-    return(ctxt->pctxt.comp->last);
+    return(argIndex);
 }
 
 static int
@@ -1869,6 +1882,14 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	    fprintf(output, "LE"); break;
         case XPATH_OP_GE:
 	    fprintf(output, "GE"); break;
+        case XPATH_OP_LT_NUM:
+	    fprintf(output, "LT_NUM"); break;
+        case XPATH_OP_GT_NUM:
+	    fprintf(output, "GT_NUM"); break;
+        case XPATH_OP_LE_NUM:
+	    fprintf(output, "LE_NUM"); break;
+        case XPATH_OP_GE_NUM:
+	    fprintf(output, "GE_NUM"); break;
         case XPATH_OP_NEG:
 	    fprintf(output, "NEG"); break;
         case XPATH_OP_FLOOR:
@@ -11108,10 +11129,11 @@ xmlXPathCompRelationalExpr(xmlXPathContextPtr ctxt) {
     SKIP_BLANKS;
     while ((CUR == '<') || (CUR == '>')) {
         xmlXPathCompExprPtr comp = ctxt->pctxt.comp;
-        xmlXPathOpPtr op;
+        xmlXPathOpPtr op, op1, op2;
         xmlXPathOpcode opcode;
         int inf, strict = 1;
 	int ch1 = comp->last;
+        int ch2;
 
         inf = (CUR == '<');
 	NEXT;
@@ -11123,13 +11145,32 @@ xmlXPathCompRelationalExpr(xmlXPathContextPtr ctxt) {
         xmlXPathCompAdditiveExpr(ctxt);
 	if (ctxt->pctxt.error)
 	    return;
+        ch2 = comp->last;
 
-        if (inf)
-            opcode = strict ? XPATH_OP_LT : XPATH_OP_LE;
-        else
-            opcode = strict ? XPATH_OP_GT : XPATH_OP_GE;
-        op = xmlXPathCompAddBinary(ctxt, opcode, XPATH_BOOLEAN, ch1,
-                                   comp->last);
+        op1 = &comp->steps[ch1];
+        op2 = &comp->steps[ch2];
+
+        if (((op1->type == XPATH_BOOLEAN) ||
+             (op1->type == XPATH_NUMBER) ||
+             (op1->type == XPATH_STRING)) &&
+            ((op2->type == XPATH_BOOLEAN) ||
+             (op2->type == XPATH_NUMBER) ||
+             (op2->type == XPATH_STRING))) {
+            ch1 = xmlXPathCompGetArg(ctxt, ch1, XPATH_NUMBER);
+            ch2 = xmlXPathCompGetArg(ctxt, ch2, XPATH_NUMBER);
+
+            if (inf)
+                opcode = strict ? XPATH_OP_LT_NUM : XPATH_OP_LE_NUM;
+            else
+                opcode = strict ? XPATH_OP_GT_NUM : XPATH_OP_GE_NUM;
+        } else {
+            if (inf)
+                opcode = strict ? XPATH_OP_LT : XPATH_OP_LE;
+            else
+                opcode = strict ? XPATH_OP_GT : XPATH_OP_GE;
+        }
+
+        op = xmlXPathCompAddBinary(ctxt, opcode, XPATH_BOOLEAN, ch1, ch2);
         if (op == NULL)
             return;
 
@@ -12525,6 +12566,26 @@ xmlXPathCompOpEvalSort(xmlXPathItem *item, const xmlXPathOp *op,
     }
 }
 
+#ifdef XPATH_STATS
+
+static int opCounts[XPATH_OP_TRUE];
+
+ATTRIBUTE_DESTRUCTOR
+static void
+printCounts(void) {
+    int total = 0;
+    int i;
+
+    for (i = 0; i < XPATH_OP_TRUE; i++) {
+        printf("%2d: %d\n", i, opCounts[i]);
+        total += opCounts[i];
+    }
+
+    printf("total: %d\n", total);
+}
+
+#endif
+
 /**
  * xmlXPathCompOpEval:
  * @ctxt:  the XPath parser context with the compiled expression
@@ -12545,6 +12606,10 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
         return(-1);
 
     op = &ctxt->pctxt.comp->steps[opIndex];
+
+#ifdef XPATH_STATS
+    opCounts[op->op] += 1;
+#endif
 
     switch (op->op) {
         case XPATH_OP_BOOL:
@@ -12734,6 +12799,45 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
                     break;
                 case XPATH_OP_MOD:
                     result->as.number = fmod(result->as.number, val2);
+                    break;
+                default:
+                    break;
+            }
+
+            break;
+        }
+
+        case XPATH_OP_LT_NUM:
+        case XPATH_OP_GT_NUM:
+        case XPATH_OP_LE_NUM:
+        case XPATH_OP_GE_NUM: {
+            xmlXPathItem arg;
+            double val1, val2;
+
+            if (xmlXPathCompOpEval(ctxt, &arg, op->ch2,
+                                   XPATH_EVAL_DEFAULT) < 0)
+                break;
+            if (xmlXPathCompOpEval(ctxt, result, op->ch1,
+                                   XPATH_EVAL_DEFAULT) < 0)
+                break;
+
+            val1 = result->as.number;
+            val2 = arg.as.number;
+
+            result->type = XPATH_BOOLEAN;
+
+            switch (op->op) {
+                case XPATH_OP_LT_NUM:
+                    result->as.boolean = (val1 < val2);
+                    break;
+                case XPATH_OP_GT_NUM:
+                    result->as.boolean = (val1 > val2);
+                    break;
+                case XPATH_OP_LE_NUM:
+                    result->as.boolean = (val1 <= val2);
+                    break;
+                case XPATH_OP_GE_NUM:
+                    result->as.boolean = (val1 >= val2);
                     break;
                 default:
                     break;
