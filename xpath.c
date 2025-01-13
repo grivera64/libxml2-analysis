@@ -185,15 +185,11 @@ typedef enum {
     /* relational ops */
     XPATH_OP_EQ,            /*  5,500,000 - 9 */
     XPATH_OP_NE,            /*  2,100,000 */
-    XPATH_OP_LT,
-    XPATH_OP_GT,            /*  1,000,000 - 12 */
+    XPATH_OP_LT,            /*  1,000,000 */
     XPATH_OP_LE,
-    XPATH_OP_GE,
 
-    XPATH_OP_LT_NUM,
-    XPATH_OP_GT_NUM,        /*  4,500,000 - 16 */
+    XPATH_OP_LT_NUM,        /*  4,500,000 - 13 */
     XPATH_OP_LE_NUM,
-    XPATH_OP_GE_NUM,
 
     /* unary math ops */
     XPATH_OP_NEG,
@@ -202,13 +198,13 @@ typedef enum {
     XPATH_OP_ROUND,
 
     /* binary math ops */
-    XPATH_OP_ADD,           /*    600,000 - 23 */
+    XPATH_OP_ADD,           /*    600,000 - 19 */
     XPATH_OP_SUB,
     XPATH_OP_MULT,
     XPATH_OP_DIV,
     XPATH_OP_MOD,
 
-    XPATH_OP_UNION,         /*  1,700,000 - 28 */
+    XPATH_OP_UNION,         /*  1,700,000 - 24 */
     XPATH_OP_ROOT,
     XPATH_OP_NODE,          /*  1,000,000 */
     XPATH_OP_STEP,          /*  3,500,000 */
@@ -225,12 +221,12 @@ typedef enum {
     XPATH_OP_SORT,          /*  5,100,000 */
 
     /* nullary ops */
-    XPATH_OP_POSITION,      /*  5,000,000 - 43 */
+    XPATH_OP_POSITION,      /*  5,000,000 - 39 */
     XPATH_OP_LAST,
 
     /* name ops */
     XPATH_OP_LOCAL_NAME,
-    XPATH_OP_LOCAL_NAME_CTXT,   /* 4,200,000 - 46 */
+    XPATH_OP_LOCAL_NAME_CTXT,   /* 4,200,000 - 42 */
     XPATH_OP_NAME,
     XPATH_OP_NAME_CTXT,
     XPATH_OP_NAMESPACE_URI,
@@ -1894,20 +1890,12 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	    fprintf(output, "NE"); break;
         case XPATH_OP_LT:
 	    fprintf(output, "LT"); break;
-        case XPATH_OP_GT:
-	    fprintf(output, "GT"); break;
         case XPATH_OP_LE:
 	    fprintf(output, "LE"); break;
-        case XPATH_OP_GE:
-	    fprintf(output, "GE"); break;
         case XPATH_OP_LT_NUM:
 	    fprintf(output, "LT_NUM"); break;
-        case XPATH_OP_GT_NUM:
-	    fprintf(output, "GT_NUM"); break;
         case XPATH_OP_LE_NUM:
 	    fprintf(output, "LE_NUM"); break;
-        case XPATH_OP_GE_NUM:
-	    fprintf(output, "GE_NUM"); break;
         case XPATH_OP_NEG:
 	    fprintf(output, "NEG"); break;
         case XPATH_OP_FLOOR:
@@ -6277,7 +6265,7 @@ xmlXPathStringHash(const xmlChar * string) {
 /**
  * xmlXPathCompareNodeSetValue:
  * @ctxt:  the XPath Parser context
- * @inf:  less than (1) or greater than (0)
+ * @less:  less than (1) or greater than (0)
  * @strict:  is the comparison strict
  * @arg:  the node set
  * @f:  the value
@@ -6297,7 +6285,7 @@ xmlXPathStringHash(const xmlChar * string) {
  * Returns 0 or 1 depending on the results of the test.
  */
 static int
-xmlXPathCompareNodeSetValue(xmlXPathContextPtr ctxt, int inf, int strict,
+xmlXPathCompareNodeSetValue(xmlXPathContextPtr ctxt, int less, int strict,
 	                    const xmlNodeSet *ns, xmlXPathItem *item) {
     int i, ret = 0;
     double val2;
@@ -6307,7 +6295,7 @@ xmlXPathCompareNodeSetValue(xmlXPathContextPtr ctxt, int inf, int strict,
     for (i = 0; i < ns->nodeNr; i++) {
         double val1 = xmlXPathNodeToNumberInternal(ctxt, ns->nodeTab[i]);
 
-        if (inf) {
+        if (less) {
             if (strict)
                 ret = (val1 < val2);
             else
@@ -6327,7 +6315,7 @@ xmlXPathCompareNodeSetValue(xmlXPathContextPtr ctxt, int inf, int strict,
 
 /**
  * xmlXPathCompareNodeSets:
- * @inf:  less than (1) or greater than (0)
+ * @less:  less than (1) or greater than (0)
  * @strict:  is the comparison strict
  * @arg1:  the first node set object
  * @arg2:  the second node set object
@@ -6354,7 +6342,7 @@ xmlXPathCompareNodeSetValue(xmlXPathContextPtr ctxt, int inf, int strict,
  * and then the comparison must be done when possible
  */
 static int
-xmlXPathCompareNodeSets(xmlXPathContextPtr ctxt, int inf, int strict,
+xmlXPathCompareNodeSets(xmlXPathContextPtr ctxt, int less, int strict,
 	                const xmlNodeSet *ns1, const xmlNodeSet *ns2) {
     int i, j, init = 0;
     double *values2;
@@ -6388,7 +6376,7 @@ xmlXPathCompareNodeSets(xmlXPathContextPtr ctxt, int inf, int strict,
 	    }
             val2 = values2[j];
 
-            if (inf) {
+            if (less) {
                 if (strict)
                     ret = (val1 < val2);
                 else
@@ -6800,31 +6788,31 @@ xmlXPathNotEqualValues(xmlXPathParserContextPtr ctxt) {
 static int
 xmlXPathCompareValuesInternal(xmlXPathContextPtr ctxt,
                               xmlXPathItem *item1, xmlXPathItem *item2,
-                              int inf, int strict) {
+                              int less, int strict) {
     int ret = 0;
 
     if ((item1->type == XPATH_NODESET) || (item1->type == XPATH_XSLT_TREE)) {
         if ((item2->type == XPATH_NODESET) || (item2->type == XPATH_XSLT_TREE)) {
-	    ret = xmlXPathCompareNodeSets(ctxt, inf, strict,
+	    ret = xmlXPathCompareNodeSets(ctxt, less, strict,
                                           &item1->as.nodeset,
                                           &item2->as.nodeset);
             xmlXPathItemReleaseNodeSet(ctxt, item1);
             xmlXPathItemReleaseNodeSet(ctxt, item2);
         } else {
-            ret = xmlXPathCompareNodeSetValue(ctxt, inf, strict,
+            ret = xmlXPathCompareNodeSetValue(ctxt, less, strict,
                                               &item1->as.nodeset, item2);
             xmlXPathItemReleaseNodeSet(ctxt, item1);
         }
     } else {
         if ((item2->type == XPATH_NODESET) || (item2->type == XPATH_XSLT_TREE)) {
-            ret = xmlXPathCompareNodeSetValue(ctxt, !inf, strict,
+            ret = xmlXPathCompareNodeSetValue(ctxt, !less, strict,
                                               &item2->as.nodeset, item1);
             xmlXPathItemReleaseNodeSet(ctxt, item2);
         } else {
             double val1 = xmlXPathItemToNumber(ctxt, item1);
             double val2 = xmlXPathItemToNumber(ctxt, item2);
 
-            if (inf) {
+            if (less) {
                 if (strict)
                     ret = (val1 < val2);
                 else
@@ -6844,7 +6832,7 @@ xmlXPathCompareValuesInternal(xmlXPathContextPtr ctxt,
 /**
  * xmlXPathCompareValues:
  * @ctxt:  the XPath Parser context
- * @inf:  less than (1) or greater than (0)
+ * @less:  less than (1) or greater than (0)
  * @strict:  is the comparison strict
  *
  * DEPRECATED: Internal function, don't use.
@@ -6868,7 +6856,7 @@ xmlXPathCompareValuesInternal(xmlXPathContextPtr ctxt,
  * Returns 1 if the comparison succeeded, 0 if it failed
  */
 int
-xmlXPathCompareValues(xmlXPathParserContextPtr ctxt, int inf, int strict) {
+xmlXPathCompareValues(xmlXPathParserContextPtr ctxt, int less, int strict) {
     xmlXPathContextPtr xpctxt;
     xmlXPathObjectPtr arg1, arg2;
     int ret = 0;
@@ -6888,7 +6876,7 @@ xmlXPathCompareValues(xmlXPathParserContextPtr ctxt, int inf, int strict) {
         xmlXPathItemFromObj(xpctxt, &item1, arg1, 1);
         xmlXPathItemFromObj(xpctxt, &item2, arg2, 1);
         ret = xmlXPathCompareValuesInternal(xpctxt, &item1, &item2,
-                                            inf, strict);
+                                            less, strict);
     }
 
     xmlXPathReleaseObject(xpctxt, arg1);
@@ -11175,11 +11163,11 @@ xmlXPathCompRelationalExpr(xmlXPathContextPtr ctxt) {
         xmlXPathCompExprPtr comp = ctxt->pctxt.comp;
         xmlXPathOpPtr op, op1, op2;
         xmlXPathOpcode opcode;
-        int inf, strict = 1;
+        int less, strict = 1;
 	int ch1 = comp->last;
         int ch2;
 
-        inf = (CUR == '<');
+        less = (CUR == '<');
 	NEXT;
         if (CUR == '=') {
             strict = 0;
@@ -11203,15 +11191,15 @@ xmlXPathCompRelationalExpr(xmlXPathContextPtr ctxt) {
             ch1 = xmlXPathCompGetArg(ctxt, ch1, XPATH_NUMBER);
             ch2 = xmlXPathCompGetArg(ctxt, ch2, XPATH_NUMBER);
 
-            if (inf)
-                opcode = strict ? XPATH_OP_LT_NUM : XPATH_OP_LE_NUM;
-            else
-                opcode = strict ? XPATH_OP_GT_NUM : XPATH_OP_GE_NUM;
+            opcode = strict ? XPATH_OP_LT_NUM : XPATH_OP_LE_NUM;
         } else {
-            if (inf)
-                opcode = strict ? XPATH_OP_LT : XPATH_OP_LE;
-            else
-                opcode = strict ? XPATH_OP_GT : XPATH_OP_GE;
+            opcode = strict ? XPATH_OP_LT : XPATH_OP_LE;
+        }
+
+        if (!less) {
+            int tmp = ch1;
+            ch1 = ch2;
+            ch2 = tmp;
         }
 
         op = xmlXPathCompAddBinary(ctxt, opcode, XPATH_BOOLEAN, ch1, ch2);
@@ -12753,11 +12741,9 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
         }
 
         case XPATH_OP_LT:
-        case XPATH_OP_GT:
-        case XPATH_OP_LE:
-        case XPATH_OP_GE: {
+        case XPATH_OP_LE: {
             xmlXPathItem arg;
-            int ret, inf, strict;
+            int ret;
 
             if (xmlXPathCompOpEval(ctxt, &arg, op->ch1,
                                    XPATH_EVAL_DEFAULT) < 0)
@@ -12768,10 +12754,8 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
                 break;
             }
 
-            inf = ((op->op == XPATH_OP_LT) || (op->op == XPATH_OP_LE));
-            strict = ((op->op == XPATH_OP_LT) || (op->op == XPATH_OP_GT));
             ret = xmlXPathCompareValuesInternal(ctxt, &arg, result,
-                                                inf, strict);
+                                                1, (op->op == XPATH_OP_LT));
 
             result->type = XPATH_BOOLEAN;
             result->as.boolean = ret;
@@ -12846,9 +12830,7 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
         }
 
         case XPATH_OP_LT_NUM:
-        case XPATH_OP_GT_NUM:
-        case XPATH_OP_LE_NUM:
-        case XPATH_OP_GE_NUM: {
+        case XPATH_OP_LE_NUM: {
             xmlXPathItem arg;
             double val1, val2;
 
@@ -12868,14 +12850,8 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
                 case XPATH_OP_LT_NUM:
                     result->as.boolean = (val1 < val2);
                     break;
-                case XPATH_OP_GT_NUM:
-                    result->as.boolean = (val1 > val2);
-                    break;
                 case XPATH_OP_LE_NUM:
                     result->as.boolean = (val1 <= val2);
-                    break;
-                case XPATH_OP_GE_NUM:
-                    result->as.boolean = (val1 >= val2);
                     break;
                 default:
                     break;

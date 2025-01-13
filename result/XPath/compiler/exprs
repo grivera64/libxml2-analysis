@@ -351,19 +351,19 @@ Compiled Expression: nbStep = 3, maxEvalDepth = 2
 ========================
 Expression: '3.0' >= '5.2'
 Compiled Expression: nbStep = 5, maxEvalDepth = 3
-  GE_NUM
-    NUMBER
-      VALUE_STRING 3.0
+  LE_NUM
     NUMBER
       VALUE_STRING 5.2
+    NUMBER
+      VALUE_STRING 3.0
 
 ========================
 Expression: 1 > true()
 Compiled Expression: nbStep = 4, maxEvalDepth = 3
-  GT_NUM
-    VALUE_NUMBER 1
+  LT_NUM
     NUMBER
       VALUE_BOOL true
+    VALUE_NUMBER 1
 
 ========================
 Expression: 4 <= 'abc'
