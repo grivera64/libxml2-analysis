@@ -1154,6 +1154,43 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
  *									*
  ************************************************************************/
 
+static void
+xmlXPathOpClear(xmlXPathCompExprPtr comp, xmlXPathOpPtr op) {
+    switch (op->op) {
+        case XPATH_OP_VALUE_STRING:
+            xmlFree(op->as.string);
+            break;
+
+        case XPATH_OP_STEP:
+        case XPATH_OP_STEP_CTXT:
+        case XPATH_OP_VARIABLE:
+            if ((comp->dict == NULL) && (op->qname.name != NULL)) {
+                xmlFree(op->qname.name);
+
+                if ((comp->flags & XML_XPATH_COMPILE_NS) == 0)
+                    xmlFree(op->qname.ns.prefix);
+            }
+            break;
+
+        case XPATH_OP_SFUNC:
+        case XPATH_OP_FUNCTION:
+            if ((comp->dict == NULL) && (op->qname.name != NULL)) {
+                xmlFree(op->qname.name);
+
+                /*
+                 * The check for fptr is a bit tricky.
+                 */
+                if (((comp->flags & XML_XPATH_COMPILE_NS) == 0) &&
+                    (op->as.func == NULL))
+                    xmlFree(op->qname.ns.prefix);
+            }
+            break;
+
+        default:
+            break;
+    }
+}
+
 /**
  * xmlXPathNewCompExpr:
  *
@@ -1182,47 +1219,12 @@ xmlXPathNewCompExpr(void) {
 void
 xmlXPathFreeCompExpr(xmlXPathCompExprPtr comp)
 {
-    xmlXPathOpPtr op;
     int i;
 
     if (comp == NULL)
         return;
     for (i = 0; i < comp->nbStep; i++) {
-        op = &comp->steps[i];
-
-        switch (op->op) {
-            case XPATH_OP_VALUE_STRING:
-                xmlFree(op->as.string);
-                break;
-
-            case XPATH_OP_STEP:
-            case XPATH_OP_STEP_CTXT:
-            case XPATH_OP_VARIABLE:
-                if ((comp->dict == NULL) && (op->qname.name != NULL)) {
-                    xmlFree(op->qname.name);
-
-                    if ((comp->flags & XML_XPATH_COMPILE_NS) == 0)
-                        xmlFree(op->qname.ns.prefix);
-                }
-                break;
-
-            case XPATH_OP_SFUNC:
-            case XPATH_OP_FUNCTION:
-                if ((comp->dict == NULL) && (op->qname.name != NULL)) {
-                    xmlFree(op->qname.name);
-
-                    /*
-                     * The check for fptr is a bit tricky.
-                     */
-                    if (((comp->flags & XML_XPATH_COMPILE_NS) == 0) &&
-                        (op->as.func == NULL))
-                        xmlFree(op->qname.ns.prefix);
-                }
-                break;
-
-            default:
-                break;
-        }
+        xmlXPathOpClear(comp, &comp->steps[i]);
     }
     if (comp->dict != NULL) {
         xmlDictFree(comp->dict);
@@ -13859,6 +13861,7 @@ xmlXPathTryStreamCompile(xmlXPathContextPtr ctxt, const xmlChar *str) {
 #endif /* XPATH_STREAMING */
 
 typedef struct {
+    int isConstant;
     int maxEvalDepth;
     int maxNodes;
 } xmlXPathExprStats;
@@ -13867,6 +13870,7 @@ static int
 xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
                            int opIndex, xmlXPathExprStats *stats) {
     xmlXPathOpPtr op = &comp->steps[opIndex];
+    int isConstant, hasChildren, allChildrenConstant;
     int maxEvalDepth, maxNodes, argIndex;
 
     /*
@@ -13932,8 +13936,11 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
     }
 
 
+    isConstant = 0;
     maxEvalDepth = 0;
     maxNodes = INT_MAX;
+    hasChildren = 0;
+    allChildrenConstant = 1;
 
     if ((op->op == XPATH_OP_NODE) ||
         (op->op == XPATH_OP_ROOT) ||
@@ -13959,6 +13966,12 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
             return(argIndex);
 
         op->ch1 = argIndex;
+
+        hasChildren = 1;
+
+        if (!childStats.isConstant)
+            allChildrenConstant = 0;
+
         maxEvalDepth = childStats.maxEvalDepth;
 
         if (op->op == XPATH_OP_UNION)
@@ -13987,6 +14000,11 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
             return(argIndex);
 
         op->ch2 = argIndex;
+
+        hasChildren += 1;
+
+        if (!childStats.isConstant)
+            allChildrenConstant = 0;
 
         if (op->op == XPATH_OP_PREDICATE) {
             /*
@@ -14023,6 +14041,61 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
         }
     }
 
+    if ((hasChildren) && (allChildrenConstant) &&
+        (op->op != XPATH_OP_ARG) &&
+        (op->op != XPATH_OP_PREDICATE) &&
+        (op->op != XPATH_OP_FUNCTION) &&
+        ((op->op != XPATH_OP_SFUNC) ||
+         ((!xmlStrEqual(op->qname.name, BAD_CAST "lang")) &&
+          (!xmlStrEqual(op->qname.name, BAD_CAST "id"))))) {
+        xmlXPathItem item;
+
+        if (xmlXPathCompOpEval(ctxt, &item, opIndex, XPATH_EVAL_DEFAULT) < 0)
+            return(-1);
+
+        xmlXPathOpClear(comp, op);
+        op->ch1 = -1;
+        op->ch2 = -1;
+
+        switch (item.type) {
+            case XPATH_BOOLEAN:
+                op->op = XPATH_OP_VALUE_BOOL;
+                op->as.boolean = item.as.boolean;
+                break;
+            case XPATH_NUMBER:
+                op->op = XPATH_OP_VALUE_NUMBER;
+                op->as.number = item.as.number;
+                break;
+            case XPATH_STRING:
+                op->op = XPATH_OP_VALUE_STRING;
+                if (item.isCopy) {
+                    op->as.string = xmlStrdup(item.as.string);
+                    if (op->as.string == NULL) {
+                        xmlXPathErrMemory(ctxt);
+                        return(-1);
+                    }
+                } else {
+                    op->as.string = item.as.string;
+                }
+                break;
+            default:
+                op->op = XPATH_OP_END;
+                return(-1);
+        }
+
+        maxNodes = INT_MAX;
+        maxEvalDepth = 0;
+    }
+
+    if ((op->op == XPATH_OP_VALUE_BOOL) ||
+        (op->op == XPATH_OP_VALUE_NUMBER) ||
+        (op->op == XPATH_OP_VALUE_STRING)) {
+        isConstant = 1;
+    } else if (op->op == XPATH_OP_ARG) {
+        isConstant = allChildrenConstant;
+    }
+
+    stats->isConstant = isConstant;
     stats->maxNodes = maxNodes;
     stats->maxEvalDepth = maxEvalDepth + 1;
 
@@ -14032,7 +14105,7 @@ xmlXPathOptimizeExpression(xmlXPathContextPtr ctxt, xmlXPathCompExprPtr comp,
 static int
 xmlXPathDoCompile(xmlXPathContext *ctxt) {
     xmlXPathCompExprPtr comp;
-    xmlXPathExprStats stats = { 0, 0 };
+    xmlXPathExprStats stats = { 0, 0, 0 };
     int oldDepth, opIndex;
     int ret = -1;
 

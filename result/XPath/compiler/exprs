@@ -18,48 +18,49 @@ Compiled Expression: nbStep = 2, maxEvalDepth = 1
   ROOT
 
 ========================
-Expression: 1 + 1
+Expression: position() + 1
 Compiled Expression: nbStep = 3, maxEvalDepth = 2
   ADD
-    VALUE_NUMBER 1
+    POSITION
     VALUE_NUMBER 1
 
 ========================
-Expression: 1 + '1'
-Compiled Expression: nbStep = 4, maxEvalDepth = 3
+Expression: position() + '1'
+Compiled Expression: nbStep = 4, maxEvalDepth = 2
   ADD
+    POSITION
     VALUE_NUMBER 1
-    NUMBER
-      VALUE_STRING 1
 
 ========================
-Expression: 1 + a
+Expression: position() + a
 Compiled Expression: nbStep = 5, maxEvalDepth = 3
   ADD
-    VALUE_NUMBER 1
+    POSITION
     NUMBER
       STEP_CTXT child::a mode=FIRST predMode=FIRST
 
 ========================
-Expression: true() and true()
-Compiled Expression: nbStep = 3, maxEvalDepth = 2
-  AND
-    VALUE_BOOL true
-    VALUE_BOOL true
-
-========================
-Expression: true() and 's'
+Expression: lang('en') and true()
 Compiled Expression: nbStep = 4, maxEvalDepth = 3
   AND
+    FUNCTION lang (1 args)
+      VALUE_STRING en
     VALUE_BOOL true
-    BOOL
-      VALUE_STRING s
 
 ========================
-Expression: true() and a
+Expression: lang('en') and 's'
 Compiled Expression: nbStep = 5, maxEvalDepth = 3
   AND
+    FUNCTION lang (1 args)
+      VALUE_STRING en
     VALUE_BOOL true
+
+========================
+Expression: lang('en') and a
+Compiled Expression: nbStep = 6, maxEvalDepth = 3
+  AND
+    FUNCTION lang (1 args)
+      VALUE_STRING en
     BOOL
       STEP_CTXT child::a mode=ANY predMode=ANY
 
@@ -178,10 +179,9 @@ Compiled Expression: nbStep = 4, maxEvalDepth = 3
 
 ========================
 Expression: lang(1)
-Compiled Expression: nbStep = 3, maxEvalDepth = 3
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
   FUNCTION lang (1 args)
-    STRING
-      VALUE_NUMBER 1
+    VALUE_STRING 1
 
 ========================
 Expression: lang(fn())
@@ -335,16 +335,17 @@ Compiled Expression: nbStep = 6, maxEvalDepth = 8
       STEP_CTXT descendant::b mode=ANY predMode=ANY
 
 ========================
-Expression: not(true())
-Compiled Expression: nbStep = 2, maxEvalDepth = 2
+Expression: not(lang('en'))
+Compiled Expression: nbStep = 3, maxEvalDepth = 3
   NOT
-    VALUE_BOOL true
+    FUNCTION lang (1 args)
+      VALUE_STRING en
 
 ========================
-Expression: not(1)
+Expression: not(last())
 Compiled Expression: nbStep = 2, maxEvalDepth = 2
   NOT
-    VALUE_NUMBER 1
+    LAST
 
 ========================
 Expression: not(boolean(boolean(a)))
@@ -353,36 +354,36 @@ Compiled Expression: nbStep = 3, maxEvalDepth = 2
     STEP_CTXT child::a mode=ANY predMode=ANY
 
 ========================
-Expression: 0 < 1
+Expression: position() < 1
 Compiled Expression: nbStep = 3, maxEvalDepth = 2
   LT_NUM
-    VALUE_NUMBER 0
+    POSITION
     VALUE_NUMBER 1
 
 ========================
-Expression: '3.0' >= '5.2'
+Expression: '3.0' >= name()
 Compiled Expression: nbStep = 5, maxEvalDepth = 3
   LE_NUM
     NUMBER
-      VALUE_STRING 5.2
-    NUMBER
-      VALUE_STRING 3.0
+      NAME_CTXT
+    VALUE_NUMBER 3
 
 ========================
-Expression: 1 > true()
-Compiled Expression: nbStep = 4, maxEvalDepth = 3
+Expression: 1 > lang('en')
+Compiled Expression: nbStep = 5, maxEvalDepth = 4
   LT_NUM
     NUMBER
-      VALUE_BOOL true
+      FUNCTION lang (1 args)
+        VALUE_STRING en
     VALUE_NUMBER 1
 
 ========================
-Expression: 4 <= 'abc'
-Compiled Expression: nbStep = 4, maxEvalDepth = 3
+Expression: count(.) <= 'abc'
+Compiled Expression: nbStep = 5, maxEvalDepth = 3
   LE_NUM
-    VALUE_NUMBER 4
-    NUMBER
-      VALUE_STRING abc
+    FUNCTION count (1 args)
+      NODE
+    VALUE_NUMBER nan
 
 ========================
 Expression: name() = 'abc'
