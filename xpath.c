@@ -183,13 +183,18 @@ typedef enum {
     XPATH_OP_OR,            /*  1,900,000 */
 
     /* relational ops */
-    XPATH_OP_EQ,            /*  5,500,000 - 9 */
-    XPATH_OP_NE,            /*  2,100,000 */
+    XPATH_OP_EQ,            /*  2,200,000 - 9 */
+    XPATH_OP_NE,            /*  1,700,000 */
     XPATH_OP_LT,            /*  1,000,000 */
     XPATH_OP_LE,
 
-    XPATH_OP_LT_NUM,        /*  4,500,000 - 13 */
+    XPATH_OP_EQ_NUM,        /*    100,000 - 13 */
+    XPATH_OP_NE_NUM,        /*    300,000 */
+    XPATH_OP_LT_NUM,        /*  4,500,000 */
     XPATH_OP_LE_NUM,
+
+    XPATH_OP_EQ_STR,        /*  3,200,000 - 17 */
+    XPATH_OP_NE_STR,
 
     /* unary math ops */
     XPATH_OP_NEG,
@@ -198,13 +203,13 @@ typedef enum {
     XPATH_OP_ROUND,
 
     /* binary math ops */
-    XPATH_OP_ADD,           /*    600,000 - 19 */
+    XPATH_OP_ADD,           /*    600,000 - 23 */
     XPATH_OP_SUB,
     XPATH_OP_MULT,
     XPATH_OP_DIV,
     XPATH_OP_MOD,
 
-    XPATH_OP_UNION,         /*  1,700,000 - 24 */
+    XPATH_OP_UNION,         /*  1,700,000 - 28 */
     XPATH_OP_ROOT,
     XPATH_OP_NODE,          /*  1,000,000 */
     XPATH_OP_STEP,          /*  3,500,000 */
@@ -221,12 +226,12 @@ typedef enum {
     XPATH_OP_SORT,          /*  5,100,000 */
 
     /* nullary ops */
-    XPATH_OP_POSITION,      /*  5,000,000 - 39 */
+    XPATH_OP_POSITION,      /*  5,000,000 - 43 */
     XPATH_OP_LAST,
 
     /* name ops */
     XPATH_OP_LOCAL_NAME,
-    XPATH_OP_LOCAL_NAME_CTXT,   /* 4,200,000 - 42 */
+    XPATH_OP_LOCAL_NAME_CTXT,   /* 4,200,000 - 47 */
     XPATH_OP_NAME,
     XPATH_OP_NAME_CTXT,
     XPATH_OP_NAMESPACE_URI,
@@ -1888,6 +1893,14 @@ xmlXPathDebugDumpStepOp(FILE *output, const xmlXPathCompExpr *comp,
 	    fprintf(output, "EQ"); break;
 	case XPATH_OP_NE:
 	    fprintf(output, "NE"); break;
+        case XPATH_OP_EQ_NUM:
+	    fprintf(output, "EQ_NUM"); break;
+	case XPATH_OP_NE_NUM:
+	    fprintf(output, "NE_NUM"); break;
+        case XPATH_OP_EQ_STR:
+	    fprintf(output, "EQ_STR"); break;
+	case XPATH_OP_NE_STR:
+	    fprintf(output, "NE_STR"); break;
         case XPATH_OP_LT:
 	    fprintf(output, "LT"); break;
         case XPATH_OP_LE:
@@ -11234,14 +11247,16 @@ xmlXPathCompEqualityExpr(xmlXPathContextPtr ctxt) {
     SKIP_BLANKS;
     while ((CUR == '=') || ((CUR == '!') && (NXT(1) == '='))) {
         xmlXPathCompExprPtr comp = ctxt->pctxt.comp;
-        xmlXPathOpPtr op;
+        xmlXPathOpPtr op, op1, op2;
 	xmlXPathOpcode opcode;
+        int neq;
 	int ch1 = comp->last;
+        int ch2;
 
         if (CUR == '=') {
-            opcode = XPATH_OP_EQ;
+            neq = 0;
         } else {
-            opcode = XPATH_OP_NE;
+            neq = 1;
             NEXT;
         }
 	NEXT;
@@ -11249,9 +11264,29 @@ xmlXPathCompEqualityExpr(xmlXPathContextPtr ctxt) {
         xmlXPathCompRelationalExpr(ctxt);
 	if (ctxt->pctxt.error)
 	    return;
+        ch2 = comp->last;
 
-        op = xmlXPathCompAddBinary(ctxt, opcode, XPATH_BOOLEAN, ch1,
-                                   comp->last);
+        op1 = &comp->steps[ch1];
+        op2 = &comp->steps[ch2];
+
+        if ((op1->type == XPATH_STRING) && (op2->type == XPATH_STRING)) {
+            ch1 = xmlXPathCompGetArg(ctxt, ch1, XPATH_STRING);
+            ch2 = xmlXPathCompGetArg(ctxt, ch2, XPATH_STRING);
+
+            opcode = neq ? XPATH_OP_NE_STR : XPATH_OP_EQ_STR;
+        } else if (((op1->type == XPATH_NUMBER) ||
+                    (op1->type == XPATH_STRING)) &&
+                   ((op2->type == XPATH_NUMBER) ||
+                    (op2->type == XPATH_STRING))) {
+            ch1 = xmlXPathCompGetArg(ctxt, ch1, XPATH_NUMBER);
+            ch2 = xmlXPathCompGetArg(ctxt, ch2, XPATH_NUMBER);
+
+            opcode = neq ? XPATH_OP_NE_NUM : XPATH_OP_EQ_NUM;
+        } else {
+            opcode = neq ? XPATH_OP_NE : XPATH_OP_EQ;
+        }
+
+        op = xmlXPathCompAddBinary(ctxt, opcode, XPATH_BOOLEAN, ch1, ch2);
         if (op == NULL)
             return;
 
@@ -11391,7 +11426,7 @@ xmlXPathPredicateEvalMode(xmlXPathContextPtr ctxt, int opIndex) {
     /*
      * Also check for [position()=x]
      */
-    if (pred->op == XPATH_OP_EQ) {
+    if (pred->op == XPATH_OP_EQ_NUM) {
         if (steps[pred->ch1].op == XPATH_OP_POSITION)
             pred = &steps[pred->ch2];
         else if (steps[pred->ch2].op == XPATH_OP_POSITION)
@@ -12829,6 +12864,8 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
             break;
         }
 
+        case XPATH_OP_EQ_NUM:
+        case XPATH_OP_NE_NUM:
         case XPATH_OP_LT_NUM:
         case XPATH_OP_LE_NUM: {
             xmlXPathItem arg;
@@ -12847,6 +12884,12 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
             result->type = XPATH_BOOLEAN;
 
             switch (op->op) {
+                case XPATH_OP_EQ_NUM:
+                    result->as.boolean = (val1 == val2);
+                    break;
+                case XPATH_OP_NE_NUM:
+                    result->as.boolean = (val1 != val2);
+                    break;
                 case XPATH_OP_LT_NUM:
                     result->as.boolean = (val1 < val2);
                     break;
@@ -12856,6 +12899,34 @@ xmlXPathCompOpEval(xmlXPathContextPtr ctxt, xmlXPathItem *result,
                 default:
                     break;
             }
+
+            break;
+        }
+
+        case XPATH_OP_EQ_STR:
+        case XPATH_OP_NE_STR: {
+            xmlXPathItem arg;
+            const xmlChar *val1, *val2;
+            int ret;
+
+            if (xmlXPathCompOpEval(ctxt, &arg, op->ch2,
+                                   XPATH_EVAL_DEFAULT) < 0)
+                break;
+            if (xmlXPathCompOpEval(ctxt, result, op->ch1,
+                                   XPATH_EVAL_DEFAULT) < 0)
+                break;
+
+            val1 = result->as.string;
+            val2 = arg.as.string;
+            ret = (strcmp((char *) val1, (char *) val2) == 0);
+            if (op->op == XPATH_OP_NE_STR)
+                ret = !ret;
+
+            xmlXPathItemReleaseString(result);
+            xmlXPathItemReleaseString(&arg);
+
+            result->type = XPATH_BOOLEAN;
+            result->as.boolean = ret;
 
             break;
         }

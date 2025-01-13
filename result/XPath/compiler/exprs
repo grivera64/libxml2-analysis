@@ -372,3 +372,31 @@ Compiled Expression: nbStep = 4, maxEvalDepth = 3
     VALUE_NUMBER 4
     NUMBER
       VALUE_STRING abc
+
+========================
+Expression: name() = 'abc'
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  EQ_STR
+    NAME_CTXT
+    VALUE_STRING abc
+
+========================
+Expression: position() != 1
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  NE_NUM
+    POSITION
+    VALUE_NUMBER 1
+
+========================
+Expression: 2 = last()
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  EQ_NUM
+    VALUE_NUMBER 2
+    LAST
+
+========================
+Expression: 'x' != local-name()
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  NE_STR
+    VALUE_STRING x
+    LOCAL_NAME_CTXT
