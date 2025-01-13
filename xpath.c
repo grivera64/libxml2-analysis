@@ -10891,27 +10891,13 @@ xmlXPathScanName(xmlXPathContextPtr ctxt) {
 
 static int
 xmlXPathCompPathExpr(xmlXPathContextPtr ctxt) {
-    int lc = 1;           /* Should we branch to LocationPath ?         */
+    int lc = 0;           /* Should we branch to LocationPath ?         */
     xmlChar *name = NULL; /* we may have to preparse a name to find out */
     int opIndex;
 
     SKIP_BLANKS;
-    if ((CUR == '$') || (CUR == '(') ||
-	(IS_ASCII_DIGIT(CUR)) ||
-        (CUR == '\'') || (CUR == '"') ||
-	(CUR == '.' && IS_ASCII_DIGIT(NXT(1)))) {
-	lc = 0;
-    } else if (CUR == '*') {
-	/* relative or absolute location path */
-	lc = 1;
-    } else if (CUR == '/') {
-	/* relative or absolute location path */
-	lc = 1;
-    } else if (CUR == '@') {
-	/* relative abbreviated attribute location path */
-	lc = 1;
-    } else if (CUR == '.') {
-	/* relative abbreviated attribute location path */
+    if ((CUR == '*') || (CUR == '/') || (CUR == '@') ||
+	((CUR == '.') && (!IS_ASCII_DIGIT(NXT(1))))) {
 	lc = 1;
     } else {
 	/*
@@ -10927,55 +10913,26 @@ xmlXPathCompPathExpr(xmlXPathContextPtr ctxt) {
 	 */
 	SKIP_BLANKS;
 	name = xmlXPathScanName(ctxt);
-	if ((name != NULL) && (xmlStrstr(name, (xmlChar *) "::") != NULL)) {
-	    lc = 1;
-	    xmlFree(name);
-	} else if (name != NULL) {
-	    int len =xmlStrlen(name);
-
-
-	    while (NXT(len) != 0) {
-		if (NXT(len) == '/') {
-		    /* element name */
-		    lc = 1;
-		    break;
-		} else if (IS_BLANK_CH(NXT(len))) {
-		    /* ignore blanks */
-		    ;
-		} else if (NXT(len) == ':') {
-		    lc = 1;
-		    break;
-		} else if ((NXT(len) == '(')) {
-		    /* Node Type or Function */
-		    if (xmlXPathIsNodeType(name)) {
-			lc = 1;
-		    } else {
-			lc = 0;
-		    }
-                    break;
-		} else if ((NXT(len) == '[')) {
-		    /* element name */
-		    lc = 1;
-		    break;
-		} else if ((NXT(len) == '<') || (NXT(len) == '>') ||
-			   (NXT(len) == '=')) {
-		    lc = 1;
-		    break;
-		} else {
-		    lc = 1;
-		    break;
-		}
-		len++;
-	    }
-	    if (NXT(len) == 0) {
-		/* element name */
-		lc = 1;
-	    }
-	    xmlFree(name);
-	} else {
-	    /* make sure all cases are covered explicitly */
-	    xmlXPathCErr(ctxt, XPATH_EXPR_ERROR);
+        if (ctxt->pctxt.error)
             return(-1);
+
+        if (name != NULL) {
+            if (xmlStrstr(name, (xmlChar *) "::") != NULL) {
+                lc = 1;
+            } else {
+                int len =xmlStrlen(name);
+
+                while (IS_BLANK_CH(NXT(len)))
+                    len++;
+
+                if ((NXT(len) != '(')) {
+                    lc = 1;
+                } else if (xmlXPathIsNodeType(name)) {
+                    lc = 1;
+                }
+            }
+
+	    xmlFree(name);
 	}
     }
 
