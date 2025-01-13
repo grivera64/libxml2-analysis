@@ -1,5 +1,23 @@
 
 ========================
+Expression: /
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
+  ROOT
+
+========================
+Expression: /|/
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
+  SORT
+    UNION
+      ROOT
+      ROOT
+
+========================
+Expression: (/)[1]
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  ROOT
+
+========================
 Expression: 1 + 1
 Compiled Expression: nbStep = 3, maxEvalDepth = 2
   ADD
@@ -425,3 +443,25 @@ Compiled Expression: nbStep = 9, maxEvalDepth = 2
   UNION mode=LAST
     STEP_CTXT ancestor::d:tgroup mode=LAST predMode=FIRST
     STEP_CTXT ancestor::d:entrytbl mode=LAST predMode=FIRST
+
+========================
+Expression: ///a
+Compilation failed: Invalid expression
+
+
+========================
+Expression: self::node()
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
+  NODE
+
+========================
+Expression: ././self::node()/.
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
+  NODE
+
+========================
+Expression: self::node()[self::a]
+Compiled Expression: nbStep = 5, maxEvalDepth = 8
+  STEP_CTXT self::node()
+    PREDICATE
+      STEP_CTXT self::a mode=ANY predMode=ANY

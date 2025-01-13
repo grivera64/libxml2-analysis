@@ -1,3 +1,7 @@
+/
+/|/
+(/)[1]
+
 1 + 1
 1 + '1'
 1 + a
@@ -74,3 +78,9 @@ position() != 1
 (a | fn()[1] | $var[2])[1]
 (a | fn()[1] | $var)[1]
 (ancestor::d:tgroup|ancestor::d:entrytbl)[position() = last()]
+
+///a
+
+self::node()
+././self::node()/.
+self::node()[self::a]

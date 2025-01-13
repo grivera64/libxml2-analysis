@@ -9877,7 +9877,6 @@ xmlXPathRoundFunction(xmlXPathParserContextPtr ctxt, int nargs) {
 static int xmlXPathCompileExpr(xmlXPathContextPtr ctxt);
 static int xmlXPathCompPredicate(xmlXPathContextPtr ctxt, int argIndex,
                                  int filter);
-static int xmlXPathCompLocationPath(xmlXPathContextPtr ctxt, int opIndex);
 static int xmlXPathCompRelativeLocationPath(xmlXPathContextPtr ctxt,
                                             int opIndex);
 
@@ -10894,10 +10893,24 @@ xmlXPathCompPathExpr(xmlXPathContextPtr ctxt) {
     int lc = 0;           /* Should we branch to LocationPath ?         */
     xmlChar *name = NULL; /* we may have to preparse a name to find out */
     int opIndex;
+    int isAbsolute = 0;
+    int isAbbrAbs = 0;
 
     SKIP_BLANKS;
-    if ((CUR == '*') || (CUR == '/') || (CUR == '@') ||
-	((CUR == '.') && (!IS_ASCII_DIGIT(NXT(1))))) {
+
+    if (CUR == '/') {
+        isAbsolute = 1;
+        NEXT;
+
+        if (CUR == '/') {
+            isAbbrAbs = 1;
+            NEXT;
+        }
+    }
+
+    if ((CUR == '*') || (CUR == '@') ||
+        ((CUR == '.') && (!IS_ASCII_DIGIT(NXT(1)))) ||
+        (isAbbrAbs)) {
 	lc = 1;
     } else {
 	/*
@@ -10911,7 +10924,8 @@ xmlXPathCompPathExpr(xmlXPathContextPtr ctxt) {
 	 * calls. This looks uglier but makes the code easier to
 	 * read/write/debug.
 	 */
-	SKIP_BLANKS;
+
+        SKIP_BLANKS;
 	name = xmlXPathScanName(ctxt);
         if (ctxt->pctxt.error)
             return(-1);
@@ -10937,21 +10951,34 @@ xmlXPathCompPathExpr(xmlXPathContextPtr ctxt) {
     }
 
     if (lc) {
-	if (CUR == '/') {
-	    opIndex = xmlXPathCompAdd(ctxt, NULL, XPATH_OP_ROOT,
-                                      XPATH_NODESET);
-	} else {
-	    opIndex = xmlXPathCompAdd(ctxt, NULL, XPATH_OP_NODE,
-                                      XPATH_NODESET);
-	}
-	opIndex = xmlXPathCompLocationPath(ctxt, opIndex);
+        xmlXPathOpcode opcode;
+
+	if (isAbsolute)
+            opcode = XPATH_OP_ROOT;
+        else
+            opcode = XPATH_OP_NODE;
+        opIndex = xmlXPathCompAdd(ctxt, NULL, opcode, XPATH_NODESET);
+        if (opIndex < 0)
+            return(opIndex);
+
+        if (isAbbrAbs) {
+            opIndex = xmlXPathCompAddStep(ctxt, NULL, opIndex, -1,
+                                          AXIS_DESCENDANT_OR_SELF,
+                                          TYPE_MASK_NODE);
+            if (opIndex < 0)
+                return(opIndex);
+        }
+
+	opIndex = xmlXPathCompRelativeLocationPath(ctxt, opIndex);
+    } else if (isAbsolute) {
+        opIndex = xmlXPathCompAdd(ctxt, NULL, XPATH_OP_ROOT,
+                                  XPATH_NODESET);
     } else {
 	opIndex = xmlXPathCompFilterExpr(ctxt);
 	if (opIndex < 0)
             return(opIndex);
 	if ((CUR == '/') && (NXT(1) == '/')) {
 	    SKIP(2);
-	    SKIP_BLANKS;
 
             opIndex = xmlXPathCompAddStep(ctxt, NULL, opIndex, -1,
                                           AXIS_DESCENDANT_OR_SELF,
@@ -10961,6 +10988,7 @@ xmlXPathCompPathExpr(xmlXPathContextPtr ctxt) {
 
 	    opIndex = xmlXPathCompRelativeLocationPath(ctxt, opIndex);
 	} else if (CUR == '/') {
+            NEXT;
 	    opIndex = xmlXPathCompRelativeLocationPath(ctxt, opIndex);
 	}
     }
@@ -11796,128 +11824,130 @@ xmlXPathIsAxisName(const xmlChar *name) {
 static int
 xmlXPathCompStep(xmlXPathContextPtr ctxt, int argIndex) {
     xmlXPathCompExprPtr comp = ctxt->pctxt.comp;
+    xmlXPathOpPtr op;
+    xmlChar *name = NULL;
+    xmlChar *prefix = NULL;
+    const xmlChar *nsUri = NULL;
+    xmlXPathAxisVal axis;
+    int type = 0;
+    int opIndex, predIndex, lastIndex;
     int ret = -1;
 
     SKIP_BLANKS;
     if ((CUR == '.') && (NXT(1) == '.')) {
 	SKIP(2);
 	SKIP_BLANKS;
-
-	ret = xmlXPathCompAddStep(ctxt, NULL, argIndex, -1,
-                                  AXIS_PARENT, TYPE_MASK_NODE);
+        return(xmlXPathCompAddStep(ctxt, &op, argIndex, -1, AXIS_PARENT,
+                                   TYPE_MASK_NODE));
     } else if (CUR == '.') {
 	NEXT;
 	SKIP_BLANKS;
+        return(argIndex);
+    }
 
-        ret = argIndex;
+    if (CUR == '@') {
+        NEXT;
+        axis = AXIS_ATTRIBUTE;
+    } else if (CUR == '*') {
+        axis = AXIS_CHILD;
     } else {
-        xmlXPathOpPtr op;
-	xmlChar *name = NULL;
-	xmlChar *prefix = NULL;
-        const xmlChar *nsUri = NULL;
-	xmlXPathAxisVal axis = (xmlXPathAxisVal) 0;
-	int type = 0;
-        int opIndex, predIndex, lastIndex;
-
-	if (CUR == '*') {
-	    axis = AXIS_CHILD;
-	} else {
-	    if (name == NULL) {
-		name = xmlXPathParseNameInternal(ctxt, ':');
-                if (ctxt->pctxt.error != XPATH_EXPRESSION_OK)
-                    goto error;
-            }
-	    if (name != NULL) {
-		axis = xmlXPathIsAxisName(name);
-		if (axis != 0) {
-		    SKIP_BLANKS;
-		    if ((CUR == ':') && (NXT(1) == ':')) {
-			SKIP(2);
-			xmlFree(name);
-			name = NULL;
-		    } else {
-			/* an element name can conflict with an axis one :-\ */
-			axis = AXIS_CHILD;
-		    }
-		} else {
-		    axis = AXIS_CHILD;
-		}
-	    } else if (CUR == '@') {
-		NEXT;
-		axis = AXIS_ATTRIBUTE;
-	    } else {
-		axis = AXIS_CHILD;
-	    }
-	}
-
-	if (xmlXPathCompNodeTest(ctxt, &type, &prefix, &name) < 0)
+        name = xmlXPathParseNameInternal(ctxt, ':');
+        if (name == NULL) {
+            xmlXPathCErr(ctxt, XPATH_EXPR_ERROR);
             goto error;
-
-        if (type == 0) {
-            /* principal node type */
-
-            if (axis == AXIS_ATTRIBUTE)
-                type = TYPE_MASK_ATTR;
-            else if (axis == AXIS_NAMESPACE)
-                type = TYPE_MASK_NS;
-            else
-                type = TYPE_MASK_ELEM;
         }
 
-        if ((prefix != NULL) &&
-	    ((comp->flags & XML_XPATH_CHECKNS) ||
-             (comp->flags & XML_XPATH_COMPILE_NS))) {
-	    nsUri = xmlXPathNsLookup(ctxt, prefix);
-            if (nsUri == NULL) {
-		xmlXPathCErr(ctxt, XPATH_UNDEF_PREFIX_ERROR);
-	    }
+        axis = xmlXPathIsAxisName(name);
+        if (axis != 0) {
+            SKIP_BLANKS;
+            if ((CUR == ':') && (NXT(1) == ':')) {
+                SKIP(2);
+                xmlFree(name);
+                name = NULL;
+            } else {
+                /* an element name can conflict with an axis one :-\ */
+                axis = AXIS_CHILD;
+            }
+        } else {
+            axis = AXIS_CHILD;
+        }
+    }
 
-            if (comp->flags & XML_XPATH_CHECKNS)
-                nsUri = NULL;
-	}
+    if (xmlXPathCompNodeTest(ctxt, &type, &prefix, &name) < 0)
+        goto error;
 
-        opIndex = xmlXPathCompAddStep(ctxt, &op, argIndex, -1, axis, type);
-        if (opIndex < 0)
-            goto error;
-        if ((name != NULL) &&
-            (xmlXPathCompOpSetQName(ctxt, &op->qname,
-                                   name, prefix, nsUri) == 0)) {
-            prefix = NULL;
-            name = NULL;
+    /*
+     * Ignore self::node() without predicates
+     */
+    if ((CUR != '[') && (axis == AXIS_SELF) && (type == TYPE_MASK_NODE))
+        return(argIndex);
+
+    if (type == 0) {
+        /* principal node type */
+
+        if (axis == AXIS_ATTRIBUTE)
+            type = TYPE_MASK_ATTR;
+        else if (axis == AXIS_NAMESPACE)
+            type = TYPE_MASK_NS;
+        else
+            type = TYPE_MASK_ELEM;
+    }
+
+    if ((prefix != NULL) &&
+        ((comp->flags & XML_XPATH_CHECKNS) ||
+         (comp->flags & XML_XPATH_COMPILE_NS))) {
+        nsUri = xmlXPathNsLookup(ctxt, prefix);
+        if (nsUri == NULL) {
+            xmlXPathCErr(ctxt, XPATH_UNDEF_PREFIX_ERROR);
         }
 
-        /*
-         * We can't reuse op since the steps array might be reallocated.
-         */
-        op = NULL;
+        if (comp->flags & XML_XPATH_CHECKNS)
+            nsUri = NULL;
+    }
 
-	SKIP_BLANKS;
-        predIndex = -1;
-        lastIndex = opIndex;
-	while (CUR == '[') {
-	    lastIndex = xmlXPathCompPredicate(ctxt, lastIndex, 0);
-            if (lastIndex < 0)
-                goto error;
+    SKIP_BLANKS;
 
-            if (lastIndex != opIndex) {
-                if (predIndex == -1) {
-                    /* Unlink predicate chain */
-                    comp->steps[lastIndex].ch1 = -1;
-                }
+    opIndex = xmlXPathCompAddStep(ctxt, &op, argIndex, -1, axis, type);
+    if (opIndex < 0)
+        goto error;
 
-                predIndex = lastIndex;
+    if ((name != NULL) &&
+        (xmlXPathCompOpSetQName(ctxt, &op->qname,
+                                name, prefix, nsUri) < 0))
+        goto error;
+    prefix = NULL;
+    name = NULL;
+
+    /*
+     * We can't reuse op since the steps array might be reallocated.
+     */
+    op = NULL;
+
+    predIndex = -1;
+    lastIndex = opIndex;
+    while (CUR == '[') {
+        lastIndex = xmlXPathCompPredicate(ctxt, lastIndex, 0);
+        if (lastIndex < 0)
+            goto error;
+
+        if (lastIndex != opIndex) {
+            if (predIndex == -1) {
+                /* Unlink predicate chain */
+                comp->steps[lastIndex].ch1 = -1;
             }
-	}
 
-        /* Relink predicate chain */
-        comp->steps[opIndex].ch2 = predIndex;
+            predIndex = lastIndex;
+        }
+    }
 
-        ret = opIndex;
+    /* Relink predicate chain */
+    comp->steps[opIndex].ch2 = predIndex;
+
+    ret = opIndex;
 
 error:
-        xmlFree(prefix);
-        xmlFree(name);
-    }
+    xmlFree(prefix);
+    xmlFree(name);
 
     return(ret);
 }
@@ -11936,18 +11966,6 @@ error:
 static int
 xmlXPathCompRelativeLocationPath(xmlXPathContextPtr ctxt, int opIndex) {
     SKIP_BLANKS;
-    if ((CUR == '/') && (NXT(1) == '/')) {
-	SKIP(2);
-	SKIP_BLANKS;
-
-	opIndex = xmlXPathCompAddStep(ctxt, NULL, opIndex, -1,
-                                      AXIS_DESCENDANT_OR_SELF, TYPE_MASK_NODE);
-        if (opIndex < 0)
-            return(-1);
-    } else if (CUR == '/') {
-	NEXT;
-	SKIP_BLANKS;
-    }
 
     opIndex = xmlXPathCompStep(ctxt, opIndex);
     if (opIndex < 0)
@@ -11975,62 +11993,6 @@ xmlXPathCompRelativeLocationPath(xmlXPathContextPtr ctxt, int opIndex) {
             return(opIndex);
 
 	SKIP_BLANKS;
-    }
-
-    return(opIndex);
-}
-
-/**
- * xmlXPathCompLocationPath:
- * @ctxt:  the XPath Parser context
- *
- *  [1]   LocationPath ::=   RelativeLocationPath
- *                     | AbsoluteLocationPath
- *  [2]   AbsoluteLocationPath ::=   '/' RelativeLocationPath?
- *                     | AbbreviatedAbsoluteLocationPath
- *  [10]   AbbreviatedAbsoluteLocationPath ::=
- *                           '//' RelativeLocationPath
- *
- * Compile a location path
- *
- * // is short for /descendant-or-self::node()/. For example,
- * //para is short for /descendant-or-self::node()/child::para and
- * so will select any para element in the document (even a para element
- * that is a document element will be selected by //para since the
- * document element node is a child of the root node); div//para is
- * short for div/descendant-or-self::node()/child::para and so will
- * select all para descendants of div children.
- */
-static int
-xmlXPathCompLocationPath(xmlXPathContextPtr ctxt, int opIndex) {
-    SKIP_BLANKS;
-    if (CUR != '/') {
-        opIndex = xmlXPathCompRelativeLocationPath(ctxt, opIndex);
-    } else {
-	while (CUR == '/') {
-	    if ((CUR == '/') && (NXT(1) == '/')) {
-		SKIP(2);
-		SKIP_BLANKS;
-
-                opIndex = xmlXPathCompAddStep(ctxt, NULL, opIndex, -1,
-                                              AXIS_DESCENDANT_OR_SELF,
-                                              TYPE_MASK_NODE);
-                if (opIndex < 0)
-                    return(opIndex);
-
-		opIndex = xmlXPathCompRelativeLocationPath(ctxt, opIndex);
-	    } else if (CUR == '/') {
-		NEXT;
-		SKIP_BLANKS;
-		if ((CUR != 0) &&
-		    ((IS_ASCII_LETTER(CUR)) || (CUR >= 0x80) ||
-                     (CUR == '_') || (CUR == '.') ||
-		     (CUR == '@') || (CUR == '*')))
-		    opIndex = xmlXPathCompRelativeLocationPath(ctxt, opIndex);
-	    }
-	    if (opIndex < 0)
-	        break;
-	}
     }
 
     return(opIndex);
