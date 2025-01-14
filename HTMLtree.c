@@ -369,7 +369,7 @@ htmlSaveErr(int code, xmlNodePtr node, const char *extra)
 	    msg = "unexpected error number\n";
     }
 
-    res = xmlRaiseError(NULL, NULL, NULL, NULL, node,
+    res = xmlRaiseError(NULL, NULL, NULL, NULL, NULL, node,
                         XML_FROM_OUTPUT, code, XML_ERR_ERROR, NULL, 0,
                         extra, NULL, NULL, 0, 0,
                         msg, extra);

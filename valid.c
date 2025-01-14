@@ -93,7 +93,7 @@ xmlDoErrValid(xmlValidCtxtPtr ctxt, xmlNodePtr node,
             channel = ctxt->error;
             data = ctxt->userData;
         }
-        res = xmlVRaiseError(NULL, channel, data, NULL, node,
+        res = xmlVRaiseError(NULL, channel, data, NULL, NULL, node,
                              XML_FROM_VALID, code, level, NULL, 0,
                              (const char *) str1, (const char *) str2,
                              (const char *) str2, int1, 0,

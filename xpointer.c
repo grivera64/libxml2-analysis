@@ -94,6 +94,7 @@ static void LIBXML_ATTR_FORMAT(3,0)
 xmlXPtrErr(xmlXPtrEvalCtxt *ctxt, int code,
            const char * msg, const xmlChar *extra)
 {
+    xmlErrorPtr err = NULL;
     xmlStructuredErrorFunc serror = NULL;
     void *data = NULL;
     xmlNodePtr node = NULL;
@@ -108,26 +109,12 @@ xmlXPtrErr(xmlXPtrEvalCtxt *ctxt, int code,
     ctxt->error = code;
 
     if (ctxt->context != NULL) {
-        xmlErrorPtr err = &ctxt->context->lastError;
-
-        /* cleanup current last error */
-        xmlResetError(err);
-
-        err->domain = XML_FROM_XPOINTER;
-        err->code = code;
-        err->level = XML_ERR_ERROR;
-        err->str1 = (char *) xmlStrdup(ctxt->base);
-        if (err->str1 == NULL) {
-            xmlXPtrErrMemory(ctxt);
-            return;
-        }
-        err->int1 = ctxt->cur - ctxt->base;
-
+        err = &ctxt->context->lastError;
         serror = ctxt->context->serror;
         data = ctxt->context->userData;
     }
 
-    res = xmlRaiseError(serror, NULL, data, NULL, node,
+    res = xmlRaiseError(serror, NULL, data, err, NULL, node,
                         XML_FROM_XPOINTER, code, XML_ERR_ERROR, NULL, 0,
                         (const char *) extra, (const char *) ctxt->base,
                         NULL, ctxt->cur - ctxt->base, 0,

@@ -1969,7 +1969,7 @@ xmlSchemaPErrFull(xmlSchemaParserCtxtPtr ctxt, xmlNodePtr node, int code,
     }
 
     va_start(ap, msg);
-    res = xmlVRaiseError(schannel, channel, data, ctxt, node,
+    res = xmlVRaiseError(schannel, channel, data, NULL, ctxt, node,
                          XML_FROM_SCHEMASP, code, level, file, line,
                          (const char *) str1,
                          (const char *) str2,
@@ -2117,7 +2117,7 @@ xmlSchemaVErrFull(xmlSchemaValidCtxtPtr ctxt, xmlNodePtr node, int code,
     }
 
     va_start(ap, msg);
-    res = xmlVRaiseError(schannel, channel, data, ctxt, node,
+    res = xmlVRaiseError(schannel, channel, data, NULL, ctxt, node,
                          XML_FROM_SCHEMASV, code, level, file, line,
                          (const char *) str1,
                          (const char *) str2,

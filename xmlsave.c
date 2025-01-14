@@ -105,7 +105,7 @@ xmlSaveErr(xmlOutputBufferPtr out, int code, xmlNodePtr node,
         extra = NULL;
     }
 
-    res = xmlRaiseError(NULL, NULL, NULL, NULL, node,
+    res = xmlRaiseError(NULL, NULL, NULL, NULL, NULL, node,
                         XML_FROM_OUTPUT, code, XML_ERR_ERROR, NULL, 0,
                         extra, NULL, NULL, 0, 0,
                         msg, extra);

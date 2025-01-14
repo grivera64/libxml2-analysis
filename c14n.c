@@ -154,7 +154,7 @@ xmlC14NErrFull(xmlC14NCtxPtr ctxt, xmlNodePtr node, int code, const char *str1,
         ctxt->error = code;
 
     va_start(ap, msg);
-    res = xmlVRaiseError(NULL, NULL, NULL, ctxt, node,
+    res = xmlVRaiseError(NULL, NULL, NULL, NULL, ctxt, node,
                          XML_FROM_C14N, code, XML_ERR_ERROR, NULL, 0,
                          str1, NULL, NULL, 0, 0,
                          msg, ap);

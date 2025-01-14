@@ -955,27 +955,6 @@ xmlXPathCErr(xmlXPathContextPtr ctxt, int code) {
     if (err->code == XML_ERR_NO_MEMORY)
         return;
 
-    /* cleanup current last error */
-    xmlResetError(err);
-
-    err->domain = XML_FROM_XPATH;
-    err->code = code + XML_XPATH_EXPRESSION_OK - XPATH_EXPRESSION_OK;
-    err->level = XML_ERR_ERROR;
-    err->message = xmlMemStrdup(xmlXPathErrorMessages[code]);
-    if (err->message == NULL) {
-        xmlXPathErrMemory(ctxt);
-        return;
-    }
-    if (ctxt->pctxt.base != NULL) {
-        err->str1 = (char *) xmlStrdup(ctxt->pctxt.base);
-        if (err->str1 == NULL) {
-            xmlXPathErrMemory(ctxt);
-            return;
-        }
-    }
-    err->int1 = ctxt->pctxt.cur - ctxt->pctxt.base;
-    err->node = ctxt->debugNode;
-
     schannel = ctxt->serror;
     data = ctxt->userData;
     node = ctxt->debugNode;
@@ -985,7 +964,8 @@ xmlXPathCErr(xmlXPathContextPtr ctxt, int code) {
         data = xmlGenericErrorContext;
     }
 
-    res = xmlRaiseError(schannel, channel, data, NULL, node, XML_FROM_XPATH,
+    res = xmlRaiseError(schannel, channel, data, err, NULL, node,
+                        XML_FROM_XPATH,
                         code + XML_XPATH_EXPRESSION_OK - XPATH_EXPRESSION_OK,
                         XML_ERR_ERROR, NULL, 0,
                         (const char *) ctxt->pctxt.base, NULL, NULL,
