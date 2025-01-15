@@ -2930,6 +2930,7 @@ testXPath(const char *str, int xptr, int expr, int flags) {
 	}
     }
 
+#ifdef LIBXML_DEBUG_ENABLED
     if (flags & XPATH_TEST_COMPILER) {
         if (comp != NULL) {
             xmlXPathDebugDumpCompExpr(xpathOutput, comp, 0);
@@ -2937,7 +2938,9 @@ testXPath(const char *str, int xptr, int expr, int flags) {
             fprintf(xpathOutput, "Compilation failed: %s\n",
                     ctxt->lastError.message);
         }
-    } else {
+    } else
+#endif
+    {
         xmlXPathDebugDumpObject(xpathOutput, res, 0);
     }
 
@@ -5283,9 +5286,11 @@ testDesc testDescriptions[] = {
     { "XPath document queries regression tests (COMPILE_FUNC)" ,
       xpathDocTest, "./test/XPath/docs/*", NULL, NULL, NULL,
       XML_XPATH_COMPILE_FUNC },
+#ifdef LIBXML_DEBUG_ENABLED
     { "XPath compiler tests" ,
       xpathExprTest, "./test/XPath/compiler/*", "result/XPath/compiler/", "",
       NULL, XPATH_TEST_COMPILER },
+#endif
 #ifdef LIBXML_XPTR_ENABLED
     { "XPointer document queries regression tests" ,
       xptrDocTest, "./test/XPath/docs/*", NULL, NULL, NULL,
