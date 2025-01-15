@@ -9,6 +9,9 @@
 #include <libxml/xpointer.h>
 #include "fuzz.h"
 
+#define XPATH_TEST_CACHE (1 << 29)
+#define XPATH_TEST_DICT  (1 << 28)
+
 int
 LLVMFuzzerInitialize(int *argc ATTRIBUTE_UNUSED,
                      char ***argv ATTRIBUTE_UNUSED) {
@@ -28,12 +31,14 @@ LLVMFuzzerTestOneInput(const char *data, size_t size) {
     xmlDocPtr doc;
     const char *expr, *xml;
     size_t failurePos, exprSize, xmlSize;
+    int flags;
 
     if (size > 10000)
         return(0);
 
     xmlFuzzDataInit(data, size);
 
+    flags = (int) xmlFuzzReadInt(4);
     failurePos = xmlFuzzReadInt(4) % (size + 100);
     expr = xmlFuzzReadString(&exprSize);
     xml = xmlFuzzReadString(&xmlSize);
@@ -47,18 +52,30 @@ LLVMFuzzerTestOneInput(const char *data, size_t size) {
 
         xpctxt = xmlXPathNewContext(doc);
         if (xpctxt != NULL) {
-            int res;
-
             /* Operation limit to avoid timeout */
             xpctxt->opLimit = 500000;
 
-            res = xmlXPathContextSetCache(xpctxt, 1, 4, 0);
-            xmlFuzzCheckFailureReport("xmlXPathContextSetCache", res == -1, 0);
+            xpctxt->flags = flags;
 
-            xmlFuzzResetFailure();
+            if (flags & XPATH_TEST_CACHE) {
+                int res = xmlXPathContextSetCache(xpctxt, 1, 4, 0);
+
+                xmlFuzzCheckFailureReport("xmlXPathContextSetCache",
+                                          res == -1, 0);
+                xmlFuzzResetFailure();
+            }
+
+            if (flags & XPATH_TEST_DICT) {
+                xpctxt->dict = xmlDictCreate();
+                xmlFuzzResetFailure();
+            }
+
             xmlXPathFreeObject(xmlXPtrEval(BAD_CAST expr, xpctxt));
             xmlFuzzCheckFailureReport("xmlXPtrEval",
                     xpctxt->lastError.code == XML_ERR_NO_MEMORY, 0);
+
+            if (flags & XPATH_TEST_DICT)
+                xmlDictFree(xpctxt->dict);
             xmlXPathFreeContext(xpctxt);
         }
 
