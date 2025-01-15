@@ -65,28 +65,9 @@
  * WITH_TIM_SORT:
  *
  * Use the Timsort algorithm provided in timsort.h to sort
- * nodeset as this is a great improvement over the old Shell sort
- * used in xmlXPathNodeSetSort()
+ * nodesets as this is typically faster than stdlib qsort.
  */
 #define WITH_TIM_SORT
-
-/*
-* XP_OPTIMIZED_NON_ELEM_COMPARISON:
-* If defined, this will use xmlXPathCmpNodesExt() instead of
-* xmlXPathCmpNodes(). The new function is optimized comparison of
-* non-element nodes; actually it will speed up comparison only if
-* xmlXPathOrderDocElems() was called in order to index the elements of
-* a tree in document order; Libxslt does such an indexing, thus it will
-* benefit from this optimization.
-*/
-#define XP_OPTIMIZED_NON_ELEM_COMPARISON
-
-/*
-* XP_OPTIMIZED_FILTER_FIRST:
-* If defined, this will optimize expressions like "key('foo', 'val')[b][1]"
-* in a way, that it stop evaluation at the first node.
-*/
-#define XP_OPTIMIZED_FILTER_FIRST
 
 /*
  * XPATH_MAX_STEPS:
@@ -528,10 +509,8 @@ static const xmlNs *const xmlXPathXMLNamespace = &xmlXPathXMLNamespaceStruct;
 
 #define XML_NODE_SORT_VALUE(n) XML_PTR_TO_INT((n)->content)
 
-#ifdef XP_OPTIMIZED_NON_ELEM_COMPARISON
-
 /**
- * xmlXPathCmpNodesExt:
+ * xmlXPathCmpNodes:
  * @node1:  the first node
  * @node2:  the second node
  *
@@ -541,8 +520,8 @@ static const xmlNs *const xmlXPathXMLNamespace = &xmlXPathXMLNamespaceStruct;
  * Returns -2 in case of error 1 if first point < second point, 0 if
  *         it's the same node, -1 otherwise
  */
-static int
-xmlXPathCmpNodesExt(xmlNodePtr node1, xmlNodePtr node2) {
+int
+xmlXPathCmpNodes(xmlNodePtr node1, xmlNodePtr node2) {
     int depth1, depth2;
     int misc = 0, precedence1 = 0, precedence2 = 0;
     xmlNodePtr miscNode1 = NULL, miscNode2 = NULL;
@@ -835,42 +814,6 @@ turtle_comparison:
 	    return(1);
     return(-1); /* assume there is no sibling list corruption */
 }
-#endif /* XP_OPTIMIZED_NON_ELEM_COMPARISON */
-
-/*
- * Wrapper for the Timsort algorithm from timsort.h
- */
-#ifdef WITH_TIM_SORT
-#define SORT_NAME libxml_domnode
-#define SORT_TYPE xmlNodePtr
-/**
- * wrap_cmp:
- * @x: a node
- * @y: another node
- *
- * Comparison function for the Timsort implementation
- *
- * Returns -2 in case of error -1 if first point < second point, 0 if
- *         it's the same node, +1 otherwise
- */
-static
-int wrap_cmp( xmlNodePtr x, xmlNodePtr y );
-#ifdef XP_OPTIMIZED_NON_ELEM_COMPARISON
-    static int wrap_cmp( xmlNodePtr x, xmlNodePtr y )
-    {
-        int res = xmlXPathCmpNodesExt(x, y);
-        return res == -2 ? res : -res;
-    }
-#else
-    static int wrap_cmp( xmlNodePtr x, xmlNodePtr y )
-    {
-        int res = xmlXPathCmpNodes(x, y);
-        return res == -2 ? res : -res;
-    }
-#endif
-#define SORT_CMP(x, y)  (wrap_cmp(x, y))
-#include "timsort.h"
-#endif /* WITH_TIM_SORT */
 
 /************************************************************************
  *									*
@@ -3126,180 +3069,43 @@ xmlXPathOrderDocElems(xmlDocPtr doc) {
     return(count);
 }
 
+#ifdef WITH_TIM_SORT
+
 /**
- * xmlXPathCmpNodes:
- * @node1:  the first node
- * @node2:  the second node
+ * wrap_cmp:
+ * @x: a node
+ * @y: another node
  *
- * Compare two nodes w.r.t document order
+ * Comparison function for the Timsort implementation
  *
- * Returns -2 in case of error 1 if first point < second point, 0 if
- *         it's the same node, -1 otherwise
+ * Returns -2 in case of error -1 if first point < second point, 0 if
+ *         it's the same node, +1 otherwise
  */
-int
-xmlXPathCmpNodes(xmlNodePtr node1, xmlNodePtr node2) {
-    int depth1, depth2;
-    int precedence1 = 0, precedence2 = 0;
-    xmlNodePtr miscNode1 = NULL, miscNode2 = NULL;
-    xmlNodePtr cur, root;
-
-    if ((node1 == NULL) || (node2 == NULL))
-	return(-2);
-    /*
-     * a couple of optimizations which will avoid computations in most cases
-     */
-    if (node1 == node2)		/* trivial case */
-	return(0);
-    if (node1->type == XML_NAMESPACE_DECL) {
-        xmlNsPtr ns = (xmlNsPtr) node1;
-
-        precedence1 = 1;
-        miscNode1 = node1;
-        node1 = (xmlNodePtr) ns->next;
-    } else if (node1->type == XML_ATTRIBUTE_NODE) {
-        precedence1 = 2;
-	miscNode1 = node1;
-	node1 = node1->parent;
-    }
-    if (node2->type == XML_NAMESPACE_DECL) {
-        xmlNsPtr ns = (xmlNsPtr) node2;
-
-        precedence2 = 1;
-        miscNode2 = node2;
-        node2 = (xmlNodePtr) ns->next;
-    } else if (node2->type == XML_ATTRIBUTE_NODE) {
-	precedence2 = 2;
-	miscNode2 = node2;
-	node2 = node2->parent;
-    }
-    if (node1 == node2) {
-	if (precedence1 == precedence2) {
-            if (precedence1 == 1) {
-                xmlNsPtr ns1 = (xmlNsPtr) miscNode1;
-                xmlNsPtr ns2 = (xmlNsPtr) miscNode2;
-
-                return(xmlStrcmp(ns2->prefix, ns1->prefix));
-            } else {
-	        cur = miscNode2->prev;
-		while (cur != NULL) {
-		    if (cur == miscNode1)
-		        return (1);
-		    cur = cur->prev;
-		}
-		return (-1);
-	    }
-	    return(0);
-	} else if (precedence1 < precedence2) {
-            return(1);
-        } else {
-            return(-1);
-        }
-    }
-    if (node1 == node2->prev)
-	return(1);
-    if (node1 == node2->next)
-	return(-1);
-
-    /*
-     * Speedup using document order if available.
-     */
-    if ((node1->type == XML_ELEMENT_NODE) &&
-	(node2->type == XML_ELEMENT_NODE) &&
-	(0 > XML_NODE_SORT_VALUE(node1)) &&
-	(0 > XML_NODE_SORT_VALUE(node2)) &&
-	(node1->doc == node2->doc)) {
-	XML_INTPTR_T l1, l2;
-
-	l1 = -XML_NODE_SORT_VALUE(node1);
-	l2 = -XML_NODE_SORT_VALUE(node2);
-	if (l1 < l2)
-	    return(1);
-	if (l1 > l2)
-	    return(-1);
-    }
-
-    /*
-     * compute depth to root
-     */
-    for (depth2 = 0, cur = node2;cur->parent != NULL;cur = cur->parent) {
-	if (cur->parent == node1)
-	    return(1);
-	depth2++;
-    }
-    root = cur;
-    for (depth1 = 0, cur = node1;cur->parent != NULL;cur = cur->parent) {
-	if (cur->parent == node2)
-	    return(-1);
-	depth1++;
-    }
-    /*
-     * Distinct document (or distinct entities :-( ) case.
-     */
-    if (root != cur) {
-	return(-2);
-    }
-    /*
-     * get the nearest common ancestor.
-     */
-    while (depth1 > depth2) {
-	depth1--;
-	node1 = node1->parent;
-    }
-    while (depth2 > depth1) {
-	depth2--;
-	node2 = node2->parent;
-    }
-    while (node1->parent != node2->parent) {
-	node1 = node1->parent;
-	node2 = node2->parent;
-	/* should not happen but just in case ... */
-	if ((node1 == NULL) || (node2 == NULL))
-	    return(-2);
-    }
-    /*
-     * Find who's first.
-     */
-    if (node1 == node2->prev)
-	return(1);
-    if (node1 == node2->next)
-	return(-1);
-    /*
-     * Speedup using document order if available.
-     */
-    if ((node1->type == XML_ELEMENT_NODE) &&
-	(node2->type == XML_ELEMENT_NODE) &&
-	(0 > XML_NODE_SORT_VALUE(node1)) &&
-	(0 > XML_NODE_SORT_VALUE(node2)) &&
-	(node1->doc == node2->doc)) {
-	XML_INTPTR_T l1, l2;
-
-	l1 = -XML_NODE_SORT_VALUE(node1);
-	l2 = -XML_NODE_SORT_VALUE(node2);
-	if (l1 < l2)
-	    return(1);
-	if (l1 > l2)
-	    return(-1);
-    }
-
-    for (cur = node1->next;cur != NULL;cur = cur->next)
-	if (cur == node2)
-	    return(1);
-    return(-1); /* assume there is no sibling list corruption */
+static int wrap_cmp( xmlNodePtr x, xmlNodePtr y )
+{
+    int res = xmlXPathCmpNodes(x, y);
+    return res == -2 ? res : -res;
 }
 
-#ifndef WITH_TIM_SORT
+/*
+ * Wrapper for the Timsort algorithm from timsort.h
+ */
+#define SORT_NAME libxml_domnode
+#define SORT_TYPE xmlNodePtr
+#define SORT_CMP(x, y)  (wrap_cmp(x, y))
+#include "timsort.h"
+
+#else /* WITH_TIM_SORT */
+
 static int
 xmlXPathCmpNodesQSort(const void *v1, const void *v2) {
     xmlNode *const *node1 = v1;
     xmlNode *const *node2 = v2;
 
-#ifdef XP_OPTIMIZED_NON_ELEM_COMPARISON
-    return(xmlXPathCmpNodesExt(*node2, *node1));
-#else
     return(xmlXPathCmpNodes(*node2, *node1));
-#endif
 }
-#endif
+
+#endif /* WITH_TIM_SORT */
 
 /**
  * xmlXPathNodeSetSort:
@@ -3860,13 +3666,7 @@ xmlXPathNodeSetMergeAndClear(xmlXPathContextPtr ctxt,
         node2 = set2->nodeTab[index2];
         swap = ((mode == XPATH_EVAL_FIRST) ? -1 : 1);
 
-        if (
-#ifdef XP_OPTIMIZED_NON_ELEM_COMPARISON
-             (xmlXPathCmpNodesExt(node1, node2))
-#else
-             (xmlXPathCmpNodes(node1, node2))
-#endif
-             == swap) {
+        if (xmlXPathCmpNodes(node1, node2) == swap) {
             set1->nodeTab[index1] = node2;
             set2->nodeTab[index2] = node1;
 
@@ -12354,13 +12154,7 @@ no_match:
                 node2 = outSeq->nodeTab[1];
                 swap = ((stepMode == XPATH_EVAL_FIRST) ? -1 : 1);
 
-                if (
-#ifdef XP_OPTIMIZED_NON_ELEM_COMPARISON
-                     (xmlXPathCmpNodesExt(node1, node2))
-#else
-                     (xmlXPathCmpNodes(node1, node2))
-#endif
-                     == swap) {
+                if (xmlXPathCmpNodes(node1, node2) == swap) {
                     outSeq->nodeTab[0] = node2;
                     node2 = node1;
                 }
