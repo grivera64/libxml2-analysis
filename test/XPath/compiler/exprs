@@ -2,6 +2,11 @@
 /|/
 (/)[1]
 
+text()
+node ()
+comment  ( )
+processing-instruction   (    )
+
 position() + 1
 position() + '1'
 position() + a

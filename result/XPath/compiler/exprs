@@ -18,6 +18,26 @@ Compiled Expression: nbStep = 2, maxEvalDepth = 1
   ROOT
 
 ========================
+Expression: text()
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  STEP_CTXT child::text()
+
+========================
+Expression: node ()
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  STEP_CTXT child::node()
+
+========================
+Expression: comment  ( )
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  STEP_CTXT child::comment()
+
+========================
+Expression: processing-instruction   (    )
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  STEP_CTXT child::processing-instruction()
+
+========================
 Expression: position() + 1
 Compiled Expression: nbStep = 3, maxEvalDepth = 2
   ADD

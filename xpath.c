@@ -2913,7 +2913,6 @@ xmlXPathPopExternal(xmlXPathParserContextPtr ctxt) {
 #define SKIP(val) ctxt->pctxt.cur += (val)
 #define NXT(val) ctxt->pctxt.cur[(val)]
 #define CUR_PTR ctxt->pctxt.cur
-#define CUR_CHAR(l) xmlXPathCurrentChar(ctxt, &l)
 
 #define COPY_BUF(b, i, v)						\
     if (v < 0x80) b[i++] = v;						\
@@ -9875,93 +9874,6 @@ static int xmlXPathCompPredicate(xmlXPathContextPtr ctxt, int argIndex,
 static int xmlXPathCompRelativeLocationPath(xmlXPathContextPtr ctxt,
                                             int opIndex);
 
-/**
- * xmlXPathCurrentChar:
- * @ctxt:  the XPath parser context
- * @cur:  pointer to the beginning of the char
- * @len:  pointer to the length of the char read
- *
- * The current char value, if using UTF-8 this may actually span multiple
- * bytes in the input buffer.
- *
- * Returns the current char value and its length
- */
-
-static int
-xmlXPathCurrentChar(xmlXPathContextPtr ctxt, int *len) {
-    unsigned char c;
-    unsigned int val;
-    const xmlChar *cur;
-
-    if (ctxt == NULL)
-	return(0);
-    cur = ctxt->pctxt.cur;
-
-    /*
-     * We are supposed to handle UTF8, check it's valid
-     * From rfc2044: encoding of the Unicode values on UTF-8:
-     *
-     * UCS-4 range (hex.)           UTF-8 octet sequence (binary)
-     * 0000 0000-0000 007F   0xxxxxxx
-     * 0000 0080-0000 07FF   110xxxxx 10xxxxxx
-     * 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
-     *
-     * Check for the 0x110000 limit too
-     */
-    c = *cur;
-    if (c & 0x80) {
-	if ((cur[1] & 0xc0) != 0x80)
-	    goto encoding_error;
-	if ((c & 0xe0) == 0xe0) {
-
-	    if ((cur[2] & 0xc0) != 0x80)
-		goto encoding_error;
-	    if ((c & 0xf0) == 0xf0) {
-		if (((c & 0xf8) != 0xf0) ||
-		    ((cur[3] & 0xc0) != 0x80))
-		    goto encoding_error;
-		/* 4-byte code */
-		*len = 4;
-		val = (cur[0] & 0x7) << 18;
-		val |= (cur[1] & 0x3f) << 12;
-		val |= (cur[2] & 0x3f) << 6;
-		val |= cur[3] & 0x3f;
-	    } else {
-	      /* 3-byte code */
-		*len = 3;
-		val = (cur[0] & 0xf) << 12;
-		val |= (cur[1] & 0x3f) << 6;
-		val |= cur[2] & 0x3f;
-	    }
-	} else {
-	  /* 2-byte code */
-	    *len = 2;
-	    val = (cur[0] & 0x1f) << 6;
-	    val |= cur[1] & 0x3f;
-	}
-	if (!IS_CHAR(val)) {
-	    xmlXPathCErr(ctxt, XPATH_INVALID_CHAR_ERROR);
-            return(0);
-	}
-	return(val);
-    } else {
-	/* 1-byte code */
-	*len = 1;
-	return(*cur);
-    }
-encoding_error:
-    /*
-     * If we detect an UTF8 error that probably means that the
-     * input encoding didn't get properly advertised in the
-     * declaration header. Report the error and switch the encoding
-     * to ISO-Latin-1 (if you don't like this policy, just declare the
-     * encoding !)
-     */
-    *len = 0;
-    xmlXPathCErr(ctxt, XPATH_ENCODING_ERROR);
-    return(0);
-}
-
 static xmlChar *
 xmlXPathParseNameInternal(xmlXPathContextPtr ctxt, int exclude) {
     const xmlChar *start = ctxt->pctxt.cur;
@@ -10835,55 +10747,6 @@ xmlXPathCompFilterExpr(xmlXPathContextPtr ctxt) {
 }
 
 /**
- * xmlXPathScanName:
- * @ctxt:  the XPath Parser context
- *
- * Trickery: parse an XML name but without consuming the input flow
- * Needed to avoid insanity in the parser state.
- *
- * [4] NameChar ::= Letter | Digit | '.' | '-' | '_' | ':' |
- *                  CombiningChar | Extender
- *
- * [5] Name ::= (Letter | '_' | ':') (NameChar)*
- *
- * [6] Names ::= Name (S Name)*
- *
- * Returns the Name parsed or NULL
- */
-
-static xmlChar *
-xmlXPathScanName(xmlXPathContextPtr ctxt) {
-    int l;
-    int c;
-    const xmlChar *cur;
-    xmlChar *ret;
-
-    cur = ctxt->pctxt.cur;
-
-    c = CUR_CHAR(l);
-    if ((c == ' ') || (c == '>') || (c == '/') || /* accelerators */
-	(!IS_LETTER(c) && (c != '_') &&
-         (c != ':'))) {
-	return(NULL);
-    }
-
-    while ((c != ' ') && (c != '>') && (c != '/') && /* test bigname.xml */
-	   ((IS_LETTER(c)) || (IS_DIGIT(c)) ||
-            (c == '.') || (c == '-') ||
-	    (c == '_') || (c == ':') ||
-	    (IS_COMBINING(c)) ||
-	    (IS_EXTENDER(c)))) {
-	NEXTL(l);
-	c = CUR_CHAR(l);
-    }
-    ret = xmlStrndup(cur, ctxt->pctxt.cur - cur);
-    if (ret == NULL)
-        xmlXPathErrMemory(ctxt);
-    ctxt->pctxt.cur = cur;
-    return(ret);
-}
-
-/**
  * xmlXPathCompPathExpr:
  * @ctxt:  the XPath Parser context
  *
@@ -10904,7 +10767,6 @@ xmlXPathScanName(xmlXPathContextPtr ctxt) {
 static int
 xmlXPathCompPathExpr(xmlXPathContextPtr ctxt) {
     int lc = 0;           /* Should we branch to LocationPath ?         */
-    xmlChar *name = NULL; /* we may have to preparse a name to find out */
     int opIndex;
     int isAbsolute = 0;
     int isAbbrAbs = 0;
@@ -10926,6 +10788,8 @@ xmlXPathCompPathExpr(xmlXPathContextPtr ctxt) {
         (isAbbrAbs)) {
 	lc = 1;
     } else {
+        size_t len;
+
 	/*
 	 * Problem is finding if we have a name here whether it's:
 	 *   - a nodetype
@@ -10939,27 +10803,32 @@ xmlXPathCompPathExpr(xmlXPathContextPtr ctxt) {
 	 */
 
         SKIP_BLANKS;
-	name = xmlXPathScanName(ctxt);
-        if (ctxt->pctxt.error)
-            return(-1);
+        len = xmlScanXmlName(ctxt->pctxt.cur, XML_MAX_NAME_LENGTH, 0);
 
-        if (name != NULL) {
-            if (xmlStrstr(name, (xmlChar *) "::") != NULL) {
+        if (len > 0) {
+            const char *start = (char *) ctxt->pctxt.cur;
+            const char *colon = memchr(start, ':', len);
+
+            if ((colon != NULL) && (colon[1] == ':')) {
+                /* Axis */
                 lc = 1;
             } else {
-                int len =xmlStrlen(name);
+                int i = len;
 
-                while (IS_BLANK_CH(NXT(len)))
-                    len++;
+                while (IS_BLANK_CH(NXT(i)))
+                    i++;
 
-                if ((NXT(len) != '(')) {
-                    lc = 1;
-                } else if (xmlXPathIsNodeType(name)) {
+                if ((NXT(i) != '(') ||
+                    ((len == 4) &&
+                     ((strncmp(start, "node", len) == 0) ||
+                      (strncmp(start, "text", len) == 0))) ||
+                    ((len == 7) &&
+                     (strncmp(start, "comment", len) == 0)) ||
+                    ((len == 22) &&
+                     (strncmp(start, "processing-instruction", len) == 0))) {
                     lc = 1;
                 }
             }
-
-	    xmlFree(name);
 	}
     }
 
