@@ -47,6 +47,9 @@
  *
  * a strndup for array of xmlChar's
  *
+ * WARNING: This does not behave like POSIX strndup and always copies
+ * @len chars without checking the length of the string.
+ *
  * Returns a new xmlChar * or NULL
  */
 xmlChar *
@@ -54,12 +57,14 @@ xmlStrndup(const xmlChar *cur, int len) {
     xmlChar *ret;
 
     if ((cur == NULL) || (len < 0)) return(NULL);
+
     ret = xmlMalloc((size_t) len + 1);
-    if (ret == NULL) {
+    if (ret == NULL)
         return(NULL);
-    }
+
     memcpy(ret, cur, len);
     ret[len] = 0;
+
     return(ret);
 }
 
@@ -75,11 +80,22 @@ xmlStrndup(const xmlChar *cur, int len) {
  */
 xmlChar *
 xmlStrdup(const xmlChar *cur) {
-    const xmlChar *p = cur;
+    xmlChar *ret;
+    size_t len;
 
     if (cur == NULL) return(NULL);
-    while (*p != 0) p++; /* non input consuming */
-    return(xmlStrndup(cur, p - cur));
+
+    len = strlen((char *) cur);
+    if (len > INT_MAX)
+        return(NULL);
+
+    ret = xmlMalloc(len + 1);
+    if (ret == NULL)
+        return(NULL);
+
+    memcpy(ret, cur, len + 1);
+
+    return(ret);
 }
 
 /**
@@ -94,21 +110,7 @@ xmlStrdup(const xmlChar *cur) {
 
 xmlChar *
 xmlCharStrndup(const char *cur, int len) {
-    int i;
-    xmlChar *ret;
-
-    if ((cur == NULL) || (len < 0)) return(NULL);
-    ret = xmlMalloc((size_t) len + 1);
-    if (ret == NULL) {
-        return(NULL);
-    }
-    for (i = 0;i < len;i++) {
-        /* Explicit sign change */
-        ret[i] = (xmlChar) cur[i];
-        if (ret[i] == 0) return(ret);
-    }
-    ret[len] = 0;
-    return(ret);
+    return(xmlStrndup(BAD_CAST cur, len));
 }
 
 /**
@@ -122,11 +124,7 @@ xmlCharStrndup(const char *cur, int len) {
 
 xmlChar *
 xmlCharStrdup(const char *cur) {
-    const char *p = cur;
-
-    if (cur == NULL) return(NULL);
-    while (*p != '\0') p++; /* non input consuming */
-    return(xmlCharStrndup(cur, p - cur));
+    return(xmlStrdup(BAD_CAST cur));
 }
 
 /**
@@ -144,15 +142,7 @@ xmlStrcmp(const xmlChar *str1, const xmlChar *str2) {
     if (str1 == str2) return(0);
     if (str1 == NULL) return(-1);
     if (str2 == NULL) return(1);
-#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-    return(strcmp((const char *)str1, (const char *)str2));
-#else
-    do {
-        int tmp = *str1++ - *str2;
-        if (tmp != 0) return(tmp);
-    } while (*str2++ != 0);
-    return 0;
-#endif
+    return(strcmp((char *) str1, (char *) str2));
 }
 
 /**
@@ -171,14 +161,7 @@ xmlStrEqual(const xmlChar *str1, const xmlChar *str2) {
     if (str1 == str2) return(1);
     if (str1 == NULL) return(0);
     if (str2 == NULL) return(0);
-#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-    return(strcmp((const char *)str1, (const char *)str2) == 0);
-#else
-    do {
-        if (*str1++ != *str2) return(0);
-    } while (*str2++);
-    return(1);
-#endif
+    return(strcmp((char *) str1, (char *) str2) == 0);
 }
 
 /**
@@ -225,15 +208,7 @@ xmlStrncmp(const xmlChar *str1, const xmlChar *str2, int len) {
     if (str1 == str2) return(0);
     if (str1 == NULL) return(-1);
     if (str2 == NULL) return(1);
-#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-    return(strncmp((const char *)str1, (const char *)str2, len));
-#else
-    do {
-        int tmp = *str1++ - *str2;
-        if (tmp != 0 || --len == 0) return(tmp);
-    } while (*str2++ != 0);
-    return 0;
-#endif
+    return(strncmp((char *) str1, (char *) str2, len));
 }
 
 static const xmlChar casemap[256] = {
@@ -334,11 +309,7 @@ xmlStrncasecmp(const xmlChar *str1, const xmlChar *str2, int len) {
 const xmlChar *
 xmlStrchr(const xmlChar *str, xmlChar val) {
     if (str == NULL) return(NULL);
-    while (*str != 0) { /* non input consuming */
-        if (*str == val) return((xmlChar *) str);
-        str++;
-    }
-    return(NULL);
+    return((xmlChar *) strchr((char *) str, val));
 }
 
 /**
@@ -353,20 +324,9 @@ xmlStrchr(const xmlChar *str, xmlChar val) {
 
 const xmlChar *
 xmlStrstr(const xmlChar *str, const xmlChar *val) {
-    int n;
-
     if (str == NULL) return(NULL);
     if (val == NULL) return(NULL);
-    n = xmlStrlen(val);
-
-    if (n == 0) return(str);
-    while (*str != 0) { /* non input consuming */
-        if (*str == *val) {
-            if (!xmlStrncmp(str, val, n)) return((const xmlChar *) str);
-        }
-        str++;
-    }
-    return(NULL);
+    return((xmlChar *) strstr((char *) str, (char *) val));
 }
 
 /**
@@ -381,16 +341,19 @@ xmlStrstr(const xmlChar *str, const xmlChar *val) {
 
 const xmlChar *
 xmlStrcasestr(const xmlChar *str, const xmlChar *val) {
-    int n;
+    size_t len;
 
     if (str == NULL) return(NULL);
     if (val == NULL) return(NULL);
-    n = xmlStrlen(val);
 
-    if (n == 0) return(str);
+    len = strlen((char *) val);
+    if (len > INT_MAX)
+        return(NULL);
+
+    if (len == 0) return(str);
     while (*str != 0) { /* non input consuming */
         if (casemap[*str] == casemap[*val])
-            if (!xmlStrncasecmp(str, val, n)) return(str);
+            if (!xmlStrncasecmp(str, val, len)) return(str);
         str++;
     }
     return(NULL);
@@ -409,18 +372,23 @@ xmlStrcasestr(const xmlChar *str, const xmlChar *val) {
 
 xmlChar *
 xmlStrsub(const xmlChar *str, int start, int len) {
-    int i;
+    const xmlChar *end;
 
     if (str == NULL) return(NULL);
     if (start < 0) return(NULL);
     if (len < 0) return(NULL);
 
-    for (i = 0;i < start;i++) {
-        if (*str == 0) return(NULL);
-        str++;
+    end = memchr(str, 0, start + len);
+    if (end != NULL) {
+        size_t avail = end - str;
+
+        if (avail < (size_t) start)
+            return(NULL);
+
+        len = avail - start;
     }
-    if (*str == 0) return(NULL);
-    return(xmlStrndup(str, len));
+
+    return(xmlStrndup(str + start, len));
 }
 
 /**
@@ -434,8 +402,8 @@ xmlStrsub(const xmlChar *str, int start, int len) {
 
 int
 xmlStrlen(const xmlChar *str) {
-    size_t len = str ? strlen((const char *)str) : 0;
-    return(len > INT_MAX ? 0 : len);
+    size_t len = str ? strlen((char *) str) : 0;
+    return(len > INT_MAX ? INT_MAX : len);
 }
 
 /**
@@ -448,13 +416,16 @@ xmlStrlen(const xmlChar *str) {
  * first bytes of @add. Note that if @len < 0 then this is an API error
  * and NULL will be returned.
  *
+ * WARNING: Like xmlStrndup, this function doesn't check that
+ * @add contains at least @len chars.
+ *
  * Returns a new xmlChar *, the original @cur is reallocated and should
  * not be freed.
  */
 
 xmlChar *
 xmlStrncat(xmlChar *cur, const xmlChar *add, int len) {
-    int size;
+    size_t size;
     xmlChar *ret;
 
     if ((add == NULL) || (len == 0))
@@ -464,10 +435,10 @@ xmlStrncat(xmlChar *cur, const xmlChar *add, int len) {
     if (cur == NULL)
         return(xmlStrndup(add, len));
 
-    size = xmlStrlen(cur);
-    if ((size < 0) || (size > INT_MAX - len))
+    size = strlen((char *) cur);
+    if (size > (size_t) (INT_MAX - len))
         return(NULL);
-    ret = (xmlChar *) xmlRealloc(cur, (size_t) size + len + 1);
+    ret = xmlRealloc(cur, size + len + 1);
     if (ret == NULL) {
         xmlFree(cur);
         return(NULL);
@@ -491,28 +462,30 @@ xmlStrncat(xmlChar *cur, const xmlChar *add, int len) {
  */
 xmlChar *
 xmlStrncatNew(const xmlChar *str1, const xmlChar *str2, int len) {
-    int size;
+    size_t size, size2;
     xmlChar *ret;
 
-    if (len < 0) {
-        len = xmlStrlen(str2);
-        if (len < 0)
-            return(NULL);
-    }
     if (str1 == NULL)
         return(xmlStrndup(str2, len));
     if ((str2 == NULL) || (len == 0))
         return(xmlStrdup(str1));
+    if (len < 0) {
+        size2 = strlen((char *) str2);
+        if (size2 > INT_MAX)
+            return(NULL);
+    } else {
+        size2 = len;
+    }
 
-    size = xmlStrlen(str1);
-    if ((size < 0) || (size > INT_MAX - len))
+    size = strlen((char *) str1);
+    if (size > INT_MAX - size2)
         return(NULL);
-    ret = (xmlChar *) xmlMalloc((size_t) size + len + 1);
+    ret = xmlMalloc(size + size2 + 1);
     if (ret == NULL)
         return(NULL);
     memcpy(ret, str1, size);
-    memcpy(&ret[size], str2, len);
-    ret[size + len] = 0;
+    memcpy(&ret[size], str2, size2);
+    ret[size + size2] = 0;
     return(ret);
 }
 
@@ -530,14 +503,16 @@ xmlStrncatNew(const xmlChar *str1, const xmlChar *str2, int len) {
  */
 xmlChar *
 xmlStrcat(xmlChar *cur, const xmlChar *add) {
-    const xmlChar *p = add;
+    size_t len;
 
     if (add == NULL) return(cur);
     if (cur == NULL)
         return(xmlStrdup(add));
 
-    while (*p != 0) p++; /* non input consuming */
-    return(xmlStrncat(cur, add, p - add));
+    len = strlen((char *) add);
+    if (len > INT_MAX)
+        return(NULL);
+    return(xmlStrncat(cur, add, len));
 }
 
 /**

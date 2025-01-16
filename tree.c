@@ -1148,6 +1148,69 @@ xmlFreeDoc(xmlDocPtr cur) {
     if (dict) xmlDictFree(dict);
 }
 
+int
+xmlParseStringCharRef(const xmlChar *str, int *lenPtr) {
+    int len = *lenPtr;
+    int i = 0;
+    int charval = 0;
+    int ret = -1;
+    int c = 0;
+
+    if ((i >= len) || (str[i] != '&'))
+        goto error;
+    i += 1;
+
+    if ((i >= len) || (str[i] != '#'))
+        goto error;
+    i += 1;
+
+    if (str[i] == 'x') {
+        i += 1;
+
+        while ((i < len) && (c = str[i])) {
+            if ((c >= '0') && (c <= '9'))
+                charval = charval * 16 + (c - '0');
+            else if ((c >= 'a') && (c <= 'f'))
+                charval = charval * 16 + (c - 'a') + 10;
+            else if ((c >= 'A') && (c <= 'F'))
+                charval = charval * 16 + (c - 'A') + 10;
+            else
+                break;
+            if (charval > 0x110000)
+                charval = 0x110000;
+            i += 1;
+        }
+
+        if (i <= 3)
+            goto error;
+    } else {
+        while ((i < len) && (c = str[i])) {
+            if ((c >= '0') && (c <= '9'))
+                charval = charval * 10 + (c - '0');
+            else
+                break;
+            if (charval > 0x110000)
+                charval = 0x110000;
+            i += 1;
+        }
+
+        if (i <= 2)
+            goto error;
+    }
+
+    if (c == ';')
+        i += 1;
+    else
+        goto error;
+
+    ret = charval;
+
+error:
+    if (lenPtr != NULL)
+        *lenPtr = i;
+    return(ret);
+}
+
 /**
  * xmlNodeParseContentInternal:
  * @doc:  a document (optional)
@@ -1204,53 +1267,14 @@ xmlNodeParseContentInternal(const xmlDoc *doc, xmlNodePtr parent,
 	        q = cur;
 	    }
 
-	    if ((remaining > 2) && (cur[1] == '#') && (cur[2] == 'x')) {
-	        int tmp = 0;
+	    if (cur[1] == '#') {
+	        int l = remaining;
 
-		cur += 3;
-                remaining -= 3;
-		while ((remaining > 0) && ((tmp = *cur) != ';')) {
-		    if ((tmp >= '0') && (tmp <= '9'))
-			charval = charval * 16 + (tmp - '0');
-		    else if ((tmp >= 'a') && (tmp <= 'f'))
-			charval = charval * 16 + (tmp - 'a') + 10;
-		    else if ((tmp >= 'A') && (tmp <= 'F'))
-			charval = charval * 16 + (tmp - 'A') + 10;
-		    else {
-			charval = 0;
-			break;
-		    }
-                    if (charval > 0x110000)
-                        charval = 0x110000;
-		    cur++;
-                    remaining--;
-		}
-		if (tmp == ';') {
-		    cur++;
-                    remaining--;
-                }
-		q = cur;
-	    } else if ((remaining > 1) && (cur[1] == '#')) {
-	        int tmp = 0;
-
-		cur += 2;
-                remaining -= 2;
-		while ((remaining > 0) && ((tmp = *cur) != ';')) {
-		    if ((tmp >= '0') && (tmp <= '9'))
-			charval = charval * 10 + (tmp - '0');
-		    else {
-			charval = 0;
-			break;
-		    }
-                    if (charval > 0x110000)
-                        charval = 0x110000;
-		    cur++;
-                    remaining--;
-		}
-		if (tmp == ';') {
-		    cur++;
-                    remaining--;
-                }
+                charval = xmlParseStringCharRef(cur, &l);
+                if (charval < 0)
+                    charval = 0;
+                cur += l;
+                remaining -= l;
 		q = cur;
 	    } else {
 		/*

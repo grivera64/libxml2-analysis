@@ -308,7 +308,7 @@ xmlCtxtVErr(xmlParserCtxtPtr ctxt, xmlNodePtr node, xmlErrorDomain domain,
     }
 
     if (ctxt == NULL) {
-        res = xmlVRaiseError(NULL, NULL, NULL, NULL, node, domain, code,
+        res = xmlVRaiseError(NULL, NULL, NULL, NULL, NULL, node, domain, code,
                              level, NULL, 0, (const char *) str1,
                              (const char *) str2, (const char *) str3,
                              int1, 0, msg, ap);
@@ -375,9 +375,10 @@ xmlCtxtVErr(xmlParserCtxtPtr ctxt, xmlNodePtr node, xmlErrorDomain domain,
         col = input->col;
     }
 
-    res = xmlVRaiseError(schannel, channel, data, ctxt, node, domain, code,
-                         level, file, line, (const char *) str1,
-                         (const char *) str2, (const char *) str3, int1, col,
+    res = xmlVRaiseError(schannel, channel, data, &ctxt->lastError,
+                         ctxt, node, domain, code, level, file, line,
+                         (const char *) str1, (const char *) str2,
+                         (const char *) str3, int1, col,
                          msg, ap);
 
     if (res < 0) {

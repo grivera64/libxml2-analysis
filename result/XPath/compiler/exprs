@@ -1,0 +1,501 @@
+
+========================
+Expression: /
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
+  ROOT
+
+========================
+Expression: /|/
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
+  SORT
+    UNION
+      ROOT
+      ROOT
+
+========================
+Expression: (/)[1]
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  ROOT
+
+========================
+Expression: text()
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  STEP_CTXT child::text()
+
+========================
+Expression: node ()
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  STEP_CTXT child::node()
+
+========================
+Expression: comment  ( )
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  STEP_CTXT child::comment()
+
+========================
+Expression: processing-instruction   (    )
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  STEP_CTXT child::processing-instruction()
+
+========================
+Expression: position() + 1
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  ADD
+    POSITION
+    VALUE_NUMBER 1
+
+========================
+Expression: position() + '1'
+Compiled Expression: nbStep = 4, maxEvalDepth = 2
+  ADD
+    POSITION
+    VALUE_NUMBER 1
+
+========================
+Expression: position() + a
+Compiled Expression: nbStep = 5, maxEvalDepth = 3
+  ADD
+    POSITION
+    NUMBER
+      STEP_CTXT child::a mode=FIRST predMode=FIRST
+
+========================
+Expression: lang('en') and true()
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
+  AND
+    FUNCTION lang (1 args)
+      VALUE_STRING en
+    VALUE_BOOL true
+
+========================
+Expression: lang('en') and 's'
+Compiled Expression: nbStep = 5, maxEvalDepth = 3
+  AND
+    FUNCTION lang (1 args)
+      VALUE_STRING en
+    VALUE_BOOL true
+
+========================
+Expression: lang('en') and a
+Compiled Expression: nbStep = 6, maxEvalDepth = 3
+  AND
+    FUNCTION lang (1 args)
+      VALUE_STRING en
+    BOOL
+      STEP_CTXT child::a mode=ANY predMode=ANY
+
+========================
+Expression: fn()[true()]
+Compiled Expression: nbStep = 5, maxEvalDepth = 4
+  FILTER
+    SORT
+      NODESET
+        FUNCTION fn (0 args)
+    VALUE_BOOL true
+
+========================
+Expression: fn()[1]
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
+  SORT mode=FIRST
+    NODESET
+      FUNCTION fn (0 args)
+
+========================
+Expression: fn()[2]
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
+  SORT mode=2
+    NODESET
+      FUNCTION fn (0 args)
+
+========================
+Expression: fn()[last()]
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
+  SORT mode=LAST
+    NODESET
+      FUNCTION fn (0 args)
+
+========================
+Expression: $var[true()]
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
+  FILTER
+    NODESET
+      VARIABLE var
+    VALUE_BOOL true
+
+========================
+Expression: $var[1]
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  NODESET mode=FIRST
+    VARIABLE var
+
+========================
+Expression: $var[2]
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  NODESET mode=2
+    VARIABLE var
+
+========================
+Expression: $var[last()]
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  NODESET mode=LAST
+    VARIABLE var
+
+========================
+Expression: count(a)
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  FUNCTION count (1 args)
+    STEP_CTXT child::a
+
+========================
+Expression: count(1)
+Compilation failed: Invalid type
+
+
+========================
+Expression: count(fn())
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
+  FUNCTION count (1 args)
+    XSLT_TREE
+      SORT
+        FUNCTION fn (0 args)
+
+========================
+Expression: count($var)
+Compiled Expression: nbStep = 3, maxEvalDepth = 3
+  FUNCTION count (1 args)
+    XSLT_TREE
+      VARIABLE var
+
+========================
+Expression: number(a)
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  NUMBER
+    STEP_CTXT child::a mode=FIRST predMode=FIRST
+
+========================
+Expression: number(1)
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
+  VALUE_NUMBER 1
+
+========================
+Expression: number(fn())
+Compiled Expression: nbStep = 3, maxEvalDepth = 3
+  NUMBER
+    SORT mode=FIRST
+      FUNCTION fn (0 args)
+
+========================
+Expression: number($var)
+Compiled Expression: nbStep = 2, maxEvalDepth = 2
+  NUMBER
+    VARIABLE var
+
+========================
+Expression: lang(a)
+Compiled Expression: nbStep = 4, maxEvalDepth = 3
+  FUNCTION lang (1 args)
+    STRING
+      STEP_CTXT child::a mode=FIRST predMode=FIRST
+
+========================
+Expression: lang(1)
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  FUNCTION lang (1 args)
+    VALUE_STRING 1
+
+========================
+Expression: lang(fn())
+Compiled Expression: nbStep = 4, maxEvalDepth = 4
+  FUNCTION lang (1 args)
+    STRING
+      SORT mode=FIRST
+        FUNCTION fn (0 args)
+
+========================
+Expression: lang($var)
+Compiled Expression: nbStep = 3, maxEvalDepth = 3
+  FUNCTION lang (1 args)
+    STRING
+      VARIABLE var
+
+========================
+Expression: local-name()
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
+  LOCAL_NAME_CTXT
+
+========================
+Expression: local-name(.)
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  LOCAL_NAME_CTXT
+
+========================
+Expression: local-name(*)
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  LOCAL_NAME
+    STEP_CTXT child::* mode=FIRST predMode=FIRST
+
+========================
+Expression: name()
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
+  NAME_CTXT
+
+========================
+Expression: name(.)
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  NAME_CTXT
+
+========================
+Expression: name(*)
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  NAME
+    STEP_CTXT child::* mode=FIRST predMode=FIRST
+
+========================
+Expression: namespace-uri()
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
+  NAMESPACE_URI_CTXT
+
+========================
+Expression: namespace-uri(.)
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  NAMESPACE_URI_CTXT
+
+========================
+Expression: namespace-uri(*)
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  NAMESPACE_URI
+    STEP_CTXT child::* mode=FIRST predMode=FIRST
+
+========================
+Expression: a | fn() | $var
+Compiled Expression: nbStep = 9, maxEvalDepth = 5
+  SORT
+    UNION
+      UNION
+        STEP_CTXT child::a
+        NODESET
+          FUNCTION fn (0 args)
+      NODESET
+        VARIABLE var
+
+========================
+Expression: (a | fn() | $var)[1]
+Compiled Expression: nbStep = 10, maxEvalDepth = 5
+  SORT mode=FIRST
+    UNION mode=FIRST
+      UNION mode=FIRST
+        STEP_CTXT child::a mode=FIRST predMode=FIRST
+        NODESET
+          FUNCTION fn (0 args)
+      NODESET
+        VARIABLE var
+
+========================
+Expression: (a | fn() | $var)[2]
+Compiled Expression: nbStep = 10, maxEvalDepth = 5
+  SORT mode=2
+    UNION
+      UNION
+        STEP_CTXT child::a
+        NODESET
+          FUNCTION fn (0 args)
+      NODESET
+        VARIABLE var
+
+========================
+Expression: (a | fn() | $var)[last()]
+Compiled Expression: nbStep = 10, maxEvalDepth = 5
+  SORT mode=LAST
+    UNION mode=LAST
+      UNION mode=LAST
+        STEP_CTXT child::a mode=LAST predMode=LAST
+        NODESET
+          FUNCTION fn (0 args)
+      NODESET
+        VARIABLE var
+
+========================
+Expression: (a[1])[last()]
+Compiled Expression: nbStep = 4, maxEvalDepth = 1
+  STEP_CTXT child::a predMode=FIRST
+
+========================
+Expression: a[true()][1][true()][1][2][true()][last()][true()]
+Compiled Expression: nbStep = 14, maxEvalDepth = 11
+  STEP_CTXT child::a
+    PREDICATE
+      PREDICATE mode=LAST
+        PREDICATE mode=NONE
+          PREDICATE mode=FIRST
+            VALUE_BOOL true
+          VALUE_BOOL true
+        VALUE_BOOL true
+      VALUE_BOOL true
+
+========================
+Expression: a[position()=1]
+Compiled Expression: nbStep = 5, maxEvalDepth = 1
+  STEP_CTXT child::a predMode=FIRST
+
+========================
+Expression: a[position()=100]
+Compiled Expression: nbStep = 5, maxEvalDepth = 1
+  STEP_CTXT child::a predMode=100
+
+========================
+Expression: a[position()=last()]
+Compiled Expression: nbStep = 5, maxEvalDepth = 1
+  STEP_CTXT child::a predMode=LAST
+
+========================
+Expression: a[.//b]
+Compiled Expression: nbStep = 6, maxEvalDepth = 8
+  STEP_CTXT child::a
+    PREDICATE
+      STEP_CTXT descendant::b mode=ANY predMode=ANY
+
+========================
+Expression: not(lang('en'))
+Compiled Expression: nbStep = 3, maxEvalDepth = 3
+  NOT
+    FUNCTION lang (1 args)
+      VALUE_STRING en
+
+========================
+Expression: not(last())
+Compiled Expression: nbStep = 2, maxEvalDepth = 2
+  NOT
+    LAST
+
+========================
+Expression: not(boolean(boolean(a)))
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  NOT
+    STEP_CTXT child::a mode=ANY predMode=ANY
+
+========================
+Expression: position() < 1
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  LT_NUM
+    POSITION
+    VALUE_NUMBER 1
+
+========================
+Expression: '3.0' >= name()
+Compiled Expression: nbStep = 5, maxEvalDepth = 3
+  LE_NUM
+    NUMBER
+      NAME_CTXT
+    VALUE_NUMBER 3
+
+========================
+Expression: 1 > lang('en')
+Compiled Expression: nbStep = 5, maxEvalDepth = 4
+  LT_NUM
+    NUMBER
+      FUNCTION lang (1 args)
+        VALUE_STRING en
+    VALUE_NUMBER 1
+
+========================
+Expression: count(.) <= 'abc'
+Compiled Expression: nbStep = 5, maxEvalDepth = 3
+  LE_NUM
+    FUNCTION count (1 args)
+      NODE
+    VALUE_NUMBER nan
+
+========================
+Expression: name() = 'abc'
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  EQ_STR
+    NAME_CTXT
+    VALUE_STRING abc
+
+========================
+Expression: position() != 1
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  NE_NUM
+    POSITION
+    VALUE_NUMBER 1
+
+========================
+Expression: 2 = last()
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  EQ_NUM
+    VALUE_NUMBER 2
+    LAST
+
+========================
+Expression: 'x' != local-name()
+Compiled Expression: nbStep = 3, maxEvalDepth = 2
+  NE_STR
+    VALUE_STRING x
+    LOCAL_NAME_CTXT
+
+========================
+Expression: (a | fn()[1] | $var[2])[1]
+Compiled Expression: nbStep = 13, maxEvalDepth = 5
+  UNION mode=FIRST
+    UNION mode=FIRST
+      STEP_CTXT child::a mode=FIRST predMode=FIRST
+      SORT mode=FIRST
+        NODESET
+          FUNCTION fn (0 args)
+    NODESET mode=2
+      VARIABLE var
+
+========================
+Expression: (a | fn()[1] | $var)[1]
+Compiled Expression: nbStep = 12, maxEvalDepth = 6
+  SORT mode=FIRST
+    UNION mode=FIRST
+      UNION mode=FIRST
+        STEP_CTXT child::a mode=FIRST predMode=FIRST
+        SORT mode=FIRST
+          NODESET
+            FUNCTION fn (0 args)
+      NODESET
+        VARIABLE var
+
+========================
+Expression: (ancestor::d:tgroup|ancestor::d:entrytbl)[position() = last()]
+Compiled Expression: nbStep = 9, maxEvalDepth = 2
+  UNION mode=LAST
+    STEP_CTXT ancestor::d:tgroup mode=LAST predMode=FIRST
+    STEP_CTXT ancestor::d:entrytbl mode=LAST predMode=FIRST
+
+========================
+Expression: ///a
+Compilation failed: Invalid expression
+
+
+========================
+Expression: self::node()
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
+  NODE
+
+========================
+Expression: ././self::node()/.
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
+  NODE
+
+========================
+Expression: self::node()[self::a]
+Compiled Expression: nbStep = 5, maxEvalDepth = 8
+  STEP_CTXT self::node()
+    PREDICATE
+      STEP_CTXT self::a mode=ANY predMode=ANY
+
+========================
+Expression: concat(a, b, c)
+Compiled Expression: nbStep = 12, maxEvalDepth = 5
+  FUNCTION concat (3 args)
+    STRING
+      STEP_CTXT child::a mode=FIRST predMode=FIRST
+    ARG
+      STRING
+        STEP_CTXT child::b mode=FIRST predMode=FIRST
+      ARG
+        STRING
+          STEP_CTXT child::c mode=FIRST predMode=FIRST

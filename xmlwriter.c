@@ -128,7 +128,7 @@ xmlWriterErrMsg(xmlTextWriterPtr ctxt, xmlParserErrors error,
     if (ctxt != NULL)
         pctxt = ctxt->ctxt;
 
-    xmlRaiseError(NULL, NULL, NULL, pctxt,
+    xmlRaiseError(NULL, NULL, NULL, NULL, pctxt,
                   NULL, XML_FROM_WRITER, error, XML_ERR_FATAL,
                   NULL, 0, NULL, NULL, NULL, 0, 0, "%s", msg);
 }
@@ -151,7 +151,7 @@ xmlWriterErrMsgInt(xmlTextWriterPtr ctxt, xmlParserErrors error,
     if (ctxt != NULL)
         pctxt = ctxt->ctxt;
 
-    xmlRaiseError(NULL, NULL, NULL, pctxt,
+    xmlRaiseError(NULL, NULL, NULL, NULL, pctxt,
 	          NULL, XML_FROM_WRITER, error, XML_ERR_FATAL,
 		  NULL, 0, NULL, NULL, NULL, val, 0, msg, val);
 }

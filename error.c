@@ -695,7 +695,8 @@ xmlRaiseMemoryError(xmlStructuredErrorFunc schannel, xmlGenericErrorFunc channel
  * @schannel: the structured callback channel
  * @channel: the old callback channel
  * @data: the callback data
- * @ctx: the parser context or NULL
+ * @error: optional error to be filled
+ * @ctxt: the parser context or NULL
  * @node: the current node or NULL
  * @domain: the domain for the error
  * @code: the code for the error
@@ -717,17 +718,15 @@ xmlRaiseMemoryError(xmlStructuredErrorFunc schannel, xmlGenericErrorFunc channel
  * Returns 0 on success, -1 if a memory allocation failed.
  */
 int
-xmlVRaiseError(xmlStructuredErrorFunc schannel,
-               xmlGenericErrorFunc channel, void *data, void *ctx,
-               xmlNode *node, int domain, int code, xmlErrorLevel level,
+xmlVRaiseError(xmlStructuredErrorFunc schannel, xmlGenericErrorFunc channel,
+               void *data, xmlErrorPtr error, void *ctxt, xmlNode *node,
+               int domain, int code, xmlErrorLevel level,
                const char *file, int line, const char *str1,
                const char *str2, const char *str3, int int1, int col,
                const char *msg, va_list ap)
 {
-    xmlParserCtxtPtr ctxt = NULL;
     /* xmlLastError is a macro retrieving the per-thread global. */
     xmlErrorPtr lastError = xmlGetLastErrorInternal();
-    xmlErrorPtr to = lastError;
 
     if (code == XML_ERR_OK)
         return(0);
@@ -738,28 +737,21 @@ xmlVRaiseError(xmlStructuredErrorFunc schannel,
     if ((xmlGetWarningsDefaultValue == 0) && (level == XML_ERR_WARNING))
         return(0);
 
-    if ((domain == XML_FROM_PARSER) || (domain == XML_FROM_HTML) ||
-        (domain == XML_FROM_DTD) || (domain == XML_FROM_NAMESPACE) ||
-	(domain == XML_FROM_IO) || (domain == XML_FROM_VALID)) {
-	ctxt = (xmlParserCtxtPtr) ctx;
-
-        if (ctxt != NULL)
-            to = &ctxt->lastError;
-    }
-
-    if (xmlVUpdateError(to, ctxt, node, domain, code, level, file, line,
+    if (xmlVUpdateError(lastError, ctxt, node, domain, code, level, file, line,
                         str1, str2, str3, int1, col, msg, ap))
         return(-1);
 
-    if (to != lastError) {
-        if (xmlCopyError(to, lastError) < 0)
+    if (error == NULL) {
+        error = lastError;
+    } else {
+        if (xmlCopyError(lastError, error) < 0)
             return(-1);
     }
 
     if (schannel != NULL) {
-	schannel(data, to);
+	schannel(data, error);
     } else if (xmlStructuredError != NULL) {
-        xmlStructuredError(xmlStructuredErrorContext, to);
+        xmlStructuredError(xmlStructuredErrorContext, error);
     } else if (channel != NULL) {
         /* Don't invoke legacy error handlers */
         if ((channel == xmlGenericErrorDefaultFunc) ||
@@ -767,9 +759,9 @@ xmlVRaiseError(xmlStructuredErrorFunc schannel,
             (channel == xmlParserWarning) ||
             (channel == xmlParserValidityError) ||
             (channel == xmlParserValidityWarning))
-            xmlFormatError(to, xmlGenericError, xmlGenericErrorContext);
+            xmlFormatError(error, xmlGenericError, xmlGenericErrorContext);
         else
-	    channel(data, "%s", to->message);
+	    channel(data, "%s", error->message);
     }
 
     return(0);
@@ -780,7 +772,8 @@ xmlVRaiseError(xmlStructuredErrorFunc schannel,
  * @schannel: the structured callback channel
  * @channel: the old callback channel
  * @data: the callback data
- * @ctx: the parser context or NULL
+ * @error: optional error to be filled
+ * @ctxt: the parser context or NULL
  * @node: the node or NULL
  * @domain: the domain for the error
  * @code: the code for the error
@@ -802,9 +795,9 @@ xmlVRaiseError(xmlStructuredErrorFunc schannel,
  * Returns 0 on success, -1 if a memory allocation failed.
  */
 int
-xmlRaiseError(xmlStructuredErrorFunc schannel,
-              xmlGenericErrorFunc channel, void *data, void *ctx,
-              xmlNode *node, int domain, int code, xmlErrorLevel level,
+xmlRaiseError(xmlStructuredErrorFunc schannel, xmlGenericErrorFunc channel,
+              void *data, xmlErrorPtr error, void *ctxt, xmlNode *node,
+              int domain, int code, xmlErrorLevel level,
               const char *file, int line, const char *str1,
               const char *str2, const char *str3, int int1, int col,
               const char *msg, ...)
@@ -813,9 +806,9 @@ xmlRaiseError(xmlStructuredErrorFunc schannel,
     int res;
 
     va_start(ap, msg);
-    res = xmlVRaiseError(schannel, channel, data, ctx, node, domain, code,
-                         level, file, line, str1, str2, str3, int1, col, msg,
-                         ap);
+    res = xmlVRaiseError(schannel, channel, data, error, ctxt, node, domain,
+                         code, level, file, line, str1, str2, str3, int1, col,
+                         msg, ap);
     va_end(ap);
 
     return(res);

@@ -1,0 +1,11 @@
+//a:elem
+//b:elem
+//b:group[a:elem]
+//a:*
+//b:*
+/a:doc/b:group/namespace::*[1]
+/a:doc/b:group/namespace::*[2]
+/a:doc/b:group/namespace::*[last()]
+(/a:doc/b:group/namespace::*)[1]
+(/a:doc/b:group/namespace::*)[2]
+(/a:doc/b:group/namespace::*)[last()]

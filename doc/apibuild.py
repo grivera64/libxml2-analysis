@@ -49,6 +49,7 @@ ignored_words = {
   "__declspec": (3, "Windows keyword"),
   "__stdcall": (0, "Windows keyword"),
   "ATTRIBUTE_UNUSED": (0, "macro keyword"),
+  "ATTRIBUTE_NO_INLINE": (0, "macro keyword"),
   "ATTRIBUTE_DESTRUCTOR": (0, "macro keyword"),
   "LIBEXSLT_PUBLIC": (0, "macro keyword"),
   "X_IN_Y": (5, "macro function builder"),

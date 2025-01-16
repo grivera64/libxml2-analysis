@@ -1,0 +1,70 @@
+
+========================
+Expression: 1 + 1
+Compiled Expression: nbStep = 3, maxEvalDepth = 1
+  VALUE_NUMBER 2
+
+========================
+Expression: 1 + '1'
+Compiled Expression: nbStep = 4, maxEvalDepth = 1
+  VALUE_NUMBER 2
+
+========================
+Expression: true() and true()
+Compiled Expression: nbStep = 3, maxEvalDepth = 1
+  VALUE_BOOL true
+
+========================
+Expression: true() and 's'
+Compiled Expression: nbStep = 4, maxEvalDepth = 1
+  VALUE_BOOL true
+
+========================
+Expression: number(1)
+Compiled Expression: nbStep = 1, maxEvalDepth = 1
+  VALUE_NUMBER 1
+
+========================
+Expression: not(true())
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  VALUE_BOOL false
+
+========================
+Expression: not(1)
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  VALUE_BOOL false
+
+========================
+Expression: not(boolean(boolean(false())))
+Compiled Expression: nbStep = 2, maxEvalDepth = 1
+  VALUE_BOOL true
+
+========================
+Expression: 0 < 1
+Compiled Expression: nbStep = 3, maxEvalDepth = 1
+  VALUE_BOOL true
+
+========================
+Expression: '3.0' >= '5.2'
+Compiled Expression: nbStep = 5, maxEvalDepth = 1
+  VALUE_BOOL false
+
+========================
+Expression: 1 > true()
+Compiled Expression: nbStep = 4, maxEvalDepth = 1
+  VALUE_BOOL false
+
+========================
+Expression: 4 <= 'abc'
+Compiled Expression: nbStep = 4, maxEvalDepth = 1
+  VALUE_BOOL false
+
+========================
+Expression: concat('abc "dquot"', " bcd 'squot'")
+Compiled Expression: nbStep = 4, maxEvalDepth = 1
+  VALUE_STRING abc "dquot" bcd 'squot'
+
+========================
+Expression: contains(concat('a', 'b', 'c', 'd'), 'bcd') and 3 * 4 > 100 div 25
+Compiled Expression: nbStep = 19, maxEvalDepth = 1
+  VALUE_BOOL true

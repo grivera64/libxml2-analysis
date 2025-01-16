@@ -66,7 +66,6 @@ xmlSaveErrMemory(xmlOutputBufferPtr out)
 {
     if (out != NULL)
         out->error = XML_ERR_NO_MEMORY;
-    xmlRaiseMemoryError(NULL, NULL, NULL, XML_FROM_OUTPUT, NULL);
 }
 
 /**
@@ -78,39 +77,17 @@ xmlSaveErrMemory(xmlOutputBufferPtr out)
  * Handle an out of memory condition
  */
 static void
-xmlSaveErr(xmlOutputBufferPtr out, int code, xmlNodePtr node,
-           const char *extra)
-{
-    const char *msg = NULL;
-    int res;
+xmlSaveErr(xmlOutputBufferPtr out, int code) {
+    if (out == NULL)
+        return;
 
     /* Don't overwrite catastrophic errors */
-    if ((out != NULL) &&
+    if ((code != XML_ERR_NO_MEMORY) &&
         (out->error != XML_ERR_OK) &&
         (xmlIsCatastrophicError(XML_ERR_FATAL, out->error)))
         return;
 
-    if (code == XML_ERR_NO_MEMORY) {
-        xmlSaveErrMemory(out);
-        return;
-    }
-
-    if (out != NULL)
-        out->error = code;
-
-    if (code == XML_ERR_UNSUPPORTED_ENCODING) {
-        msg = "Unsupported encoding: %s";
-    } else {
-        msg = xmlErrString(code);
-        extra = NULL;
-    }
-
-    res = xmlRaiseError(NULL, NULL, NULL, NULL, node,
-                        XML_FROM_OUTPUT, code, XML_ERR_ERROR, NULL, 0,
-                        extra, NULL, NULL, 0, 0,
-                        msg, extra);
-    if (res < 0)
-        xmlSaveErrMemory(out);
+    out->error = code;
 }
 
 /************************************************************************
@@ -314,8 +291,7 @@ xmlNewSaveCtxt(const char *encoding, int options)
 
     ret = (xmlSaveCtxtPtr) xmlMalloc(sizeof(xmlSaveCtxt));
     if (ret == NULL) {
-	xmlSaveErrMemory(NULL);
-	return ( NULL );
+	return(NULL);
     }
     memset(ret, 0, sizeof(xmlSaveCtxt));
 
@@ -325,7 +301,6 @@ xmlNewSaveCtxt(const char *encoding, int options)
         res = xmlOpenCharEncodingHandler(encoding, /* output */ 1,
                                          &ret->handler);
 	if (res != XML_ERR_OK) {
-	    xmlSaveErr(NULL, res, NULL, encoding);
             xmlFreeSaveCtxt(ret);
 	    return(NULL);
 	}
@@ -776,7 +751,7 @@ static int xmlSaveSwitchEncoding(xmlSaveCtxtPtr ctxt, const char *encoding) {
 
 	res = xmlOpenCharEncodingHandler(encoding, /* output */ 1, &handler);
         if (res != XML_ERR_OK) {
-            xmlSaveErr(buf, res, NULL, encoding);
+            xmlSaveErr(buf, res);
             return(-1);
         }
 	buf->conv = xmlBufCreate(4000 /* MINLEN */);
@@ -2375,7 +2350,6 @@ xmlBufNodeDump(xmlBufPtr buf, xmlDocPtr doc, xmlNodePtr cur, int level,
     }
     outbuf = (xmlOutputBufferPtr) xmlMalloc(sizeof(xmlOutputBuffer));
     if (outbuf == NULL) {
-        xmlSaveErrMemory(NULL);
         return ((size_t) -1);
     }
     memset(outbuf, 0, (size_t) sizeof(xmlOutputBuffer));
@@ -2550,17 +2524,13 @@ xmlDocDumpFormatMemoryEnc(xmlDocPtr out_doc, xmlChar **doc_txt_ptr,
 
 	res = xmlOpenCharEncodingHandler(txt_encoding, /* output */ 1,
                                          &conv_hdlr);
-	if (res != XML_ERR_OK) {
-            xmlSaveErr(NULL, res, NULL, txt_encoding);
+	if (res != XML_ERR_OK)
 	    return;
-	}
     }
 
     out_buff = xmlAllocOutputBuffer(conv_hdlr);
-    if (out_buff == NULL ) {
-        xmlSaveErrMemory(NULL);
+    if (out_buff == NULL)
         return;
-    }
 
     memset(&ctxt, 0, sizeof(ctxt));
     ctxt.buf = out_buff;

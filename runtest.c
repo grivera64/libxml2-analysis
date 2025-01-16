@@ -2877,13 +2877,18 @@ streamMemParseTest(const char *filename, const char *result, const char *err,
  *									*
  ************************************************************************/
 
+#define XPATH_TEST_COMPILER (1 << 30)
+#define XPATH_TEST_CACHE (1 << 29)
+
 static FILE *xpathOutput;
 static xmlDocPtr xpathDocument;
 
 static void
-testXPath(const char *str, int xptr, int expr) {
-    xmlXPathObjectPtr res;
+testXPath(const char *str, int xptr, int expr, int flags) {
     xmlXPathContextPtr ctxt;
+    xmlDocPtr varDoc = NULL;
+    xmlXPathCompExprPtr comp = NULL;
+    xmlXPathObjectPtr res = NULL;
 
     nb_tests++;
 #if defined(LIBXML_XPTR_ENABLED)
@@ -2891,34 +2896,63 @@ testXPath(const char *str, int xptr, int expr) {
 	ctxt = xmlXPathNewContext(xpathDocument);
         xmlXPathSetErrorHandler(ctxt, testStructuredErrorHandler, NULL);
 	res = xmlXPtrEval(BAD_CAST str, ctxt);
-    } else {
+    } else
 #endif
-	ctxt = xmlXPathNewContext(xpathDocument);
-        xmlXPathSetErrorHandler(ctxt, testStructuredErrorHandler, NULL);
-	ctxt->node = xmlDocGetRootElement(xpathDocument);
-	if (expr)
-	    res = xmlXPathEvalExpression(BAD_CAST str, ctxt);
-	else {
-	    /* res = xmlXPathEval(BAD_CAST str, ctxt); */
-	    xmlXPathCompExprPtr comp;
+    {
+        xmlNodePtr cur;
+        xmlXPathObjectPtr set;
 
-	    comp = xmlXPathCompile(BAD_CAST str);
-	    if (comp != NULL) {
+	ctxt = xmlXPathNewContext(xpathDocument);
+
+        if (flags & XPATH_TEST_CACHE)
+            xmlXPathContextSetCache(ctxt, 1, -1, 0);
+
+        xmlXPathSetErrorHandler(ctxt, testStructuredErrorHandler, NULL);
+        xmlXPathRegisterNs(ctxt, BAD_CAST "a", BAD_CAST "urn:a");
+        xmlXPathRegisterNs(ctxt, BAD_CAST "b", BAD_CAST "urn:b");
+
+        varDoc = xmlReadDoc(BAD_CAST "<d><a/><b/><c/></d>", NULL, NULL, 0);
+        set = xmlXPathNewNodeSet(NULL);
+        for (cur = varDoc->children->children; cur; cur = cur->next)
+            xmlXPathNodeSetAddUnique(set->nodesetval, cur);
+        xmlXPathRegisterVariable(ctxt, BAD_CAST "var", set);
+
+        ctxt->flags = flags;
+	ctxt->node = xmlDocGetRootElement(xpathDocument);
+        if (flags & XPATH_TEST_COMPILER) {
+	    comp = xmlXPathCtxtCompile(ctxt, BAD_CAST str);
+	} else if (expr) {
+	    res = xmlXPathEvalExpression(BAD_CAST str, ctxt);
+	} else {
+	    comp = xmlXPathCtxtCompile(ctxt, BAD_CAST str);
+	    if (comp != NULL)
 		res = xmlXPathCompiledEval(comp, ctxt);
-		xmlXPathFreeCompExpr(comp);
-	    } else
-		res = NULL;
 	}
-#if defined(LIBXML_XPTR_ENABLED)
     }
+
+#ifdef LIBXML_DEBUG_ENABLED
+    if (flags & XPATH_TEST_COMPILER) {
+        if (comp != NULL) {
+            xmlXPathDebugDumpCompExpr(xpathOutput, comp, 0);
+        } else {
+            fprintf(xpathOutput, "Compilation failed: %s\n",
+                    ctxt->lastError.message);
+        }
+    } else
 #endif
-    xmlXPathDebugDumpObject(xpathOutput, res, 0);
+    {
+        xmlXPathDebugDumpObject(xpathOutput, res, 0);
+    }
+
     xmlXPathFreeObject(res);
+    xmlXPathFreeCompExpr(comp);
     xmlXPathFreeContext(ctxt);
+    if (varDoc != NULL)
+        xmlFreeDoc(varDoc);
 }
 
 /**
- * xpathExprTest:
+ * xpathCommonTest:
  * @filename: the file to parse
  * @result: the file with expected result
  * @err: the file with error messages
@@ -2929,7 +2963,7 @@ testXPath(const char *str, int xptr, int expr) {
  */
 static int
 xpathCommonTest(const char *filename, const char *result,
-                int xptr, int expr) {
+                int xptr, int expr, int flags) {
     FILE *input;
     char expression[5000];
     int len, ret = 0;
@@ -2965,7 +2999,7 @@ xpathCommonTest(const char *filename, const char *result,
 	    fprintf(xpathOutput,
 	            "\n========================\nExpression: %s\n",
 		    expression) ;
-	    testXPath(expression, xptr, expr);
+	    testXPath(expression, xptr, expr, flags);
 	}
     }
 
@@ -2998,8 +3032,8 @@ xpathCommonTest(const char *filename, const char *result,
 static int
 xpathExprTest(const char *filename, const char *result,
               const char *err ATTRIBUTE_UNUSED,
-              int options ATTRIBUTE_UNUSED) {
-    return(xpathCommonTest(filename, result, 0, 1));
+              int options) {
+    return(xpathCommonTest(filename, result, 0, 1, options));
 }
 
 /**
@@ -3026,7 +3060,7 @@ xpathDocTest(const char *filename,
     int ret = 0, res;
 
     xpathDocument = xmlReadFile(filename, NULL,
-                                options | XML_PARSE_DTDATTR | XML_PARSE_NOENT);
+                                XML_PARSE_DTDATTR | XML_PARSE_NOENT);
     if (xpathDocument == NULL) {
         fprintf(stderr, "Failed to load %s\n", filename);
 	return(-1);
@@ -3043,13 +3077,15 @@ xpathDocTest(const char *filename,
 	         baseFilename(globbuf.gl_pathv[i]));
         if (res >= 499)
             result[499] = 0;
-	res = xpathCommonTest(globbuf.gl_pathv[i], &result[0], 0, 0);
+	res = xpathCommonTest(globbuf.gl_pathv[i], &result[0], 0, 0, options);
 	if (res != 0)
 	    ret = res;
     }
     globfree(&globbuf);
 
     xmlFreeDoc(xpathDocument);
+    xpathDocument = NULL;
+
     return(ret);
 }
 
@@ -3095,7 +3131,7 @@ xptrDocTest(const char *filename,
 	               baseFilename(globbuf.gl_pathv[i]));
         if (res >= 499)
             result[499] = 0;
-	res = xpathCommonTest(globbuf.gl_pathv[i], &result[0], 1, 0);
+	res = xpathCommonTest(globbuf.gl_pathv[i], &result[0], 1, 0, 0);
 	if (res != 0)
 	    ret = res;
     }
@@ -3151,7 +3187,7 @@ xmlidDocTest(const char *filename,
 	return(-1);
     }
 
-    testXPath("id('bar')", 0, 0);
+    testXPath("id('bar')", 0, 0, 0);
 
     fclose(xpathOutput);
     if (result != NULL) {
@@ -5238,9 +5274,23 @@ testDesc testDescriptions[] = {
     { "XPath expressions regression tests" ,
       xpathExprTest, "./test/XPath/expr/*", "result/XPath/expr/", "", NULL,
       0 },
-    { "XPath document queries regression tests" ,
+    { "XPath document queries regression tests without cache" ,
       xpathDocTest, "./test/XPath/docs/*", NULL, NULL, NULL,
       0 },
+    { "XPath document queries regression tests with cache" ,
+      xpathDocTest, "./test/XPath/docs/*", NULL, NULL, NULL,
+      XPATH_TEST_CACHE },
+    { "XPath document queries regression tests (COMPILE_NS)" ,
+      xpathDocTest, "./test/XPath/docs/*", NULL, NULL, NULL,
+      XML_XPATH_COMPILE_NS },
+    { "XPath document queries regression tests (COMPILE_FUNC)" ,
+      xpathDocTest, "./test/XPath/docs/*", NULL, NULL, NULL,
+      XML_XPATH_COMPILE_FUNC },
+#ifdef LIBXML_DEBUG_ENABLED
+    { "XPath compiler tests" ,
+      xpathExprTest, "./test/XPath/compiler/*", "result/XPath/compiler/", "",
+      NULL, XPATH_TEST_COMPILER },
+#endif
 #ifdef LIBXML_XPTR_ENABLED
     { "XPointer document queries regression tests" ,
       xptrDocTest, "./test/XPath/docs/*", NULL, NULL, NULL,

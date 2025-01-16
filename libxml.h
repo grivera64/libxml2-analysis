@@ -67,6 +67,14 @@
   #define ATTRIBUTE_UNUSED
 #endif
 
+#if __GNUC__ * 100 + __GNUC_MINOR__ >= 301 || defined(__clang__)
+  #define ATTRIBUTE_NO_INLINE __attribute__((noinline))
+#elif defined(_MSC_VER)
+  #define ATTRIBUTE_NO_INLINE __declspec(noinline)
+#else
+  #define ATTRIBUTE_NO_INLINE
+#endif
+
 #ifdef HAVE_FUNC_ATTRIBUTE_DESTRUCTOR
   #define ATTRIBUTE_DESTRUCTOR __attribute__((destructor))
 #endif

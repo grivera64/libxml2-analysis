@@ -39,9 +39,7 @@ extern "C" {
  *
  * Raises an error.
  */
-#define xmlXPathSetError(ctxt, err)					\
-    { xmlXPatherror((ctxt), __FILE__, __LINE__, (err));			\
-      if ((ctxt) != NULL) (ctxt)->error = (err); }
+#define xmlXPathSetError(ctxt, err) xmlXPathErr(ctxt, err);
 
 /**
  * xmlXPathSetArityError:
@@ -384,6 +382,7 @@ XMLPUBFUN xmlNodeSetPtr
 
 XMLPUBFUN xmlNodeSetPtr
 		xmlXPathDistinctSorted		(xmlNodeSetPtr nodes);
+XML_DEPRECATED
 XMLPUBFUN xmlNodeSetPtr
 		xmlXPathDistinct		(xmlNodeSetPtr nodes);
 
@@ -394,12 +393,15 @@ XMLPUBFUN int
 XMLPUBFUN xmlNodeSetPtr
 		xmlXPathNodeLeadingSorted	(xmlNodeSetPtr nodes,
 						 xmlNodePtr node);
+XML_DEPRECATED
 XMLPUBFUN xmlNodeSetPtr
 		xmlXPathLeadingSorted		(xmlNodeSetPtr nodes1,
 						 xmlNodeSetPtr nodes2);
+XML_DEPRECATED
 XMLPUBFUN xmlNodeSetPtr
 		xmlXPathNodeLeading		(xmlNodeSetPtr nodes,
 						 xmlNodePtr node);
+XML_DEPRECATED
 XMLPUBFUN xmlNodeSetPtr
 		xmlXPathLeading			(xmlNodeSetPtr nodes1,
 						 xmlNodeSetPtr nodes2);
@@ -407,12 +409,15 @@ XMLPUBFUN xmlNodeSetPtr
 XMLPUBFUN xmlNodeSetPtr
 		xmlXPathNodeTrailingSorted	(xmlNodeSetPtr nodes,
 						 xmlNodePtr node);
+XML_DEPRECATED
 XMLPUBFUN xmlNodeSetPtr
 		xmlXPathTrailingSorted		(xmlNodeSetPtr nodes1,
 						 xmlNodeSetPtr nodes2);
+XML_DEPRECATED
 XMLPUBFUN xmlNodeSetPtr
 		xmlXPathNodeTrailing		(xmlNodeSetPtr nodes,
 						 xmlNodePtr node);
+XML_DEPRECATED
 XMLPUBFUN xmlNodeSetPtr
 		xmlXPathTrailing		(xmlNodeSetPtr nodes1,
 						 xmlNodeSetPtr nodes2);
@@ -472,9 +477,11 @@ XMLPUBFUN void
 /**
  * Utilities to extend XPath.
  */
+XML_DEPRECATED
 XMLPUBFUN xmlXPathParserContextPtr
 		  xmlXPathNewParserContext	(const xmlChar *str,
 						 xmlXPathContextPtr ctxt);
+XML_DEPRECATED
 XMLPUBFUN void
 		xmlXPathFreeParserContext	(xmlXPathParserContextPtr ctxt);
 
@@ -514,6 +521,7 @@ XMLPUBFUN int
 XMLPUBFUN void
 		xmlXPathNodeSetSort		(xmlNodeSetPtr set);
 
+XML_DEPRECATED
 XMLPUBFUN void
 		xmlXPathRoot			(xmlXPathParserContextPtr ctxt);
 XML_DEPRECATED
@@ -529,6 +537,7 @@ XMLPUBFUN xmlChar *
  */
 XMLPUBFUN double
 		xmlXPathStringEvalNumber	(const xmlChar *str);
+XML_DEPRECATED
 XMLPUBFUN int
 		xmlXPathEvaluatePredicateResult (xmlXPathParserContextPtr ctxt,
 						 xmlXPathObjectPtr res);
@@ -540,9 +549,11 @@ XMLPUBFUN xmlNodeSetPtr
 XMLPUBFUN void
 		xmlXPathNodeSetDel		(xmlNodeSetPtr cur,
 						 xmlNodePtr val);
+XML_DEPRECATED
 XMLPUBFUN void
 		xmlXPathNodeSetRemove		(xmlNodeSetPtr cur,
 						 int val);
+XML_DEPRECATED
 XMLPUBFUN xmlXPathObjectPtr
 		xmlXPathNewNodeSetList		(xmlNodeSetPtr val);
 XMLPUBFUN xmlXPathObjectPtr
@@ -551,44 +562,66 @@ XMLPUBFUN xmlXPathObjectPtr
 		xmlXPathWrapExternal		(void *val);
 
 XMLPUBFUN int xmlXPathEqualValues(xmlXPathParserContextPtr ctxt);
+XML_DEPRECATED
 XMLPUBFUN int xmlXPathNotEqualValues(xmlXPathParserContextPtr ctxt);
+XML_DEPRECATED
 XMLPUBFUN int xmlXPathCompareValues(xmlXPathParserContextPtr ctxt, int inf, int strict);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathValueFlipSign(xmlXPathParserContextPtr ctxt);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathAddValues(xmlXPathParserContextPtr ctxt);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathSubValues(xmlXPathParserContextPtr ctxt);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathMultValues(xmlXPathParserContextPtr ctxt);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathDivValues(xmlXPathParserContextPtr ctxt);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathModValues(xmlXPathParserContextPtr ctxt);
 
+XML_DEPRECATED
 XMLPUBFUN int xmlXPathIsNodeType(const xmlChar *name);
 
 /*
  * Some of the axis navigation routines.
  */
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextSelf(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextChild(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextDescendant(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextDescendantOrSelf(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextParent(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextAncestorOrSelf(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextFollowingSibling(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextFollowing(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextNamespace(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextAttribute(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextPreceding(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextAncestor(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
+XML_DEPRECATED
 XMLPUBFUN xmlNodePtr xmlXPathNextPrecedingSibling(xmlXPathParserContextPtr ctxt,
 			xmlNodePtr cur);
 /*
@@ -597,27 +630,45 @@ XMLPUBFUN xmlNodePtr xmlXPathNextPrecedingSibling(xmlXPathParserContextPtr ctxt,
 XMLPUBFUN void xmlXPathLastFunction(xmlXPathParserContextPtr ctxt, int nargs);
 XMLPUBFUN void xmlXPathPositionFunction(xmlXPathParserContextPtr ctxt, int nargs);
 XMLPUBFUN void xmlXPathCountFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathIdFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathLocalNameFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathNamespaceURIFunction(xmlXPathParserContextPtr ctxt, int nargs);
 XMLPUBFUN void xmlXPathStringFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathStringLengthFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathConcatFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathContainsFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathStartsWithFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathSubstringFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathSubstringBeforeFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathSubstringAfterFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathNormalizeFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathTranslateFunction(xmlXPathParserContextPtr ctxt, int nargs);
 XMLPUBFUN void xmlXPathNotFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathTrueFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathFalseFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathLangFunction(xmlXPathParserContextPtr ctxt, int nargs);
 XMLPUBFUN void xmlXPathNumberFunction(xmlXPathParserContextPtr ctxt, int nargs);
 XMLPUBFUN void xmlXPathSumFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathFloorFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathCeilingFunction(xmlXPathParserContextPtr ctxt, int nargs);
+XML_DEPRECATED
 XMLPUBFUN void xmlXPathRoundFunction(xmlXPathParserContextPtr ctxt, int nargs);
 XMLPUBFUN void xmlXPathBooleanFunction(xmlXPathParserContextPtr ctxt, int nargs);
 

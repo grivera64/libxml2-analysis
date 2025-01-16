@@ -3,3 +3,7 @@ id('chapter3')
 id('chapter1')/p
 id('chapter1')//p
 id('chapter1')/p[1]
+id('chapter1 chapter3 chapter5 chapter5 chapter3 chapter1')
+id(//ref/@ref)
+id(//ref/@ref)[1]
+id(//ref/@ref)[last()]

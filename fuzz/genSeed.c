@@ -367,6 +367,8 @@ processXPath(const char *testDir, const char *prefix, const char *name,
                 continue;
             }
 
+            /* Flags. */
+            xmlFuzzWriteInt(out, 0, 4);
             /* Max allocations. */
             xmlFuzzWriteInt(out, 0, 4);
 

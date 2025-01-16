@@ -3260,6 +3260,86 @@ xmlSplitQName(xmlParserCtxtPtr ctxt, const xmlChar *name, xmlChar **prefixOut) {
  *									*
  ************************************************************************/
 
+size_t
+xmlScanXmlName(const xmlChar *str, size_t len, int exclude) {
+    const xmlChar *ptr = str;
+    int c, l;
+
+    c = *ptr;
+
+    if (c < 0x80) {
+        if (c == exclude)
+            return(0);
+        if (!(((c >= 'a') && (c <= 'z')) || \
+              ((c >= 'A') && (c <= 'Z')) || \
+              (c == '_') || (c == ':')))
+            return(0);
+        l = 1;
+    } else {
+        l = len < 4 ? len : 4;
+        c = xmlGetUTF8Char(ptr, &l);
+        if (c < 0)
+            return(0);
+
+        if (!(((c >= 0xC0) && (c <= 0xD6)) ||
+              ((c >= 0xD8) && (c <= 0xF6)) ||
+              ((c >= 0xF8) && (c <= 0x2FF)) ||
+              ((c >= 0x370) && (c <= 0x37D)) ||
+              ((c >= 0x37F) && (c <= 0x1FFF)) ||
+              ((c >= 0x200C) && (c <= 0x200D)) ||
+              ((c >= 0x2070) && (c <= 0x218F)) ||
+              ((c >= 0x2C00) && (c <= 0x2FEF)) ||
+              ((c >= 0x3001) && (c <= 0xD7FF)) ||
+              ((c >= 0xF900) && (c <= 0xFDCF)) ||
+              ((c >= 0xFDF0) && (c <= 0xFFFD)) ||
+              ((c >= 0x10000) && (c <= 0xEFFFF))))
+            return(0);
+    }
+
+    while (1) {
+        ptr += l;
+        len -= l;
+
+        c = *ptr;
+
+        if (c < 0x80) {
+            if (c == exclude)
+                break;
+            if (!(((c >= 'a') && (c <= 'z')) ||
+                  ((c >= 'A') && (c <= 'Z')) ||
+                  ((c >= '0') && (c <= '9')) || /* !start */
+                  (c == '_') || (c == ':') ||
+                  (c == '-') || (c == '.'))) /* !start */
+                break;
+            l = 1;
+        } else {
+            l = len < 4 ? len : 4;
+            c = xmlGetUTF8Char(ptr, &l);
+            if (c < 0)
+                break;
+
+            if (!((c == 0xB7) || /* !start */
+                  ((c >= 0xC0) && (c <= 0xD6)) ||
+                  ((c >= 0xD8) && (c <= 0xF6)) ||
+                  ((c >= 0xF8) && (c <= 0x2FF)) ||
+                  ((c >= 0x300) && (c <= 0x36F)) || /* !start */
+                  ((c >= 0x370) && (c <= 0x37D)) ||
+                  ((c >= 0x37F) && (c <= 0x1FFF)) ||
+                  ((c >= 0x200C) && (c <= 0x200D)) ||
+                  ((c >= 0x203F) && (c <= 0x2040)) || /* !start */
+                  ((c >= 0x2070) && (c <= 0x218F)) ||
+                  ((c >= 0x2C00) && (c <= 0x2FEF)) ||
+                  ((c >= 0x3001) && (c <= 0xD7FF)) ||
+                  ((c >= 0xF900) && (c <= 0xFDCF)) ||
+                  ((c >= 0xFDF0) && (c <= 0xFFFD)) ||
+                  ((c >= 0x10000) && (c <= 0xEFFFF))))
+                break;
+        }
+    }
+
+    return(ptr - str);
+}
+
 /*
  * The two following functions are related to the change of accepted
  * characters for Name and NmToken in the Revision 5 of XML-1.0

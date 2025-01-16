@@ -1,0 +1,533 @@
+
+========================
+Expression: (/doc/e2/self::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e2
+    ATTRIBUTE a21
+      TEXT
+        content=a21
+    ATTRIBUTE a22
+      TEXT
+        content=a22
+    ATTRIBUTE a23
+      TEXT
+        content=a23
+
+========================
+Expression: (/doc/e2/self::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e2
+    ATTRIBUTE a21
+      TEXT
+        content=a21
+    ATTRIBUTE a22
+      TEXT
+        content=a22
+    ATTRIBUTE a23
+      TEXT
+        content=a23
+
+========================
+Expression: (/doc/e2/child::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e21
+
+========================
+Expression: (/doc/e2/child::*[self::e23])[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e23
+
+========================
+Expression: (/doc/e2/child::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e23
+
+========================
+Expression: (/doc/e2/child::*[self::e21])[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e21
+
+========================
+Expression: (/doc/e2/attribute::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ATTRIBUTE a21
+    TEXT
+      content=a21
+
+========================
+Expression: (/doc/e2/attribute::a23)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ATTRIBUTE a23
+    TEXT
+      content=a23
+
+========================
+Expression: (/doc/e2/attribute::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ATTRIBUTE a23
+    TEXT
+      content=a23
+
+========================
+Expression: (/doc/e2/attribute::a21)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ATTRIBUTE a21
+    TEXT
+      content=a21
+
+========================
+Expression: (/doc/e2/namespace::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  namespace xml href=http://www.w3.org/XML/1998/namespace
+
+========================
+Expression: (/doc/e2/namespace::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  namespace xml href=http://www.w3.org/XML/1998/namespace
+
+========================
+Expression: (/doc/e2/descendant::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e21
+
+========================
+Expression: (/doc/e2/descendant::*[self::e233])[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e233
+
+========================
+Expression: (/doc/e2/descendant::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e233
+
+========================
+Expression: (/doc/e2/descendant::*[self::e21])[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e21
+
+========================
+Expression: (/doc/e2/descendant-or-self::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e2
+    ATTRIBUTE a21
+      TEXT
+        content=a21
+    ATTRIBUTE a22
+      TEXT
+        content=a22
+    ATTRIBUTE a23
+      TEXT
+        content=a23
+
+========================
+Expression: (/doc/e2/descendant-or-self::*[self::e233])[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e233
+
+========================
+Expression: (/doc/e2/descendant-or-self::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e233
+
+========================
+Expression: (/doc/e2/descendant-or-self::*[self::e2])[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e2
+    ATTRIBUTE a21
+      TEXT
+        content=a21
+    ATTRIBUTE a22
+      TEXT
+        content=a22
+    ATTRIBUTE a23
+      TEXT
+        content=a23
+
+========================
+Expression: (/doc/e1/following-sibling::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e2
+    ATTRIBUTE a21
+      TEXT
+        content=a21
+    ATTRIBUTE a22
+      TEXT
+        content=a22
+    ATTRIBUTE a23
+      TEXT
+        content=a23
+
+========================
+Expression: (/doc/e1/following-sibling::*[self::e3])[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e3
+
+========================
+Expression: (/doc/e1/following-sibling::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e3
+
+========================
+Expression: (/doc/e1/following-sibling::*[self::e2])[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e2
+    ATTRIBUTE a21
+      TEXT
+        content=a21
+    ATTRIBUTE a22
+      TEXT
+        content=a22
+    ATTRIBUTE a23
+      TEXT
+        content=a23
+
+========================
+Expression: (/doc/e3/preceding-sibling::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e1
+
+========================
+Expression: (/doc/e3/preceding-sibling::*[self::e2])[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e2
+    ATTRIBUTE a21
+      TEXT
+        content=a21
+    ATTRIBUTE a22
+      TEXT
+        content=a22
+    ATTRIBUTE a23
+      TEXT
+        content=a23
+
+========================
+Expression: (/doc/e3/preceding-sibling::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e2
+    ATTRIBUTE a21
+      TEXT
+        content=a21
+    ATTRIBUTE a22
+      TEXT
+        content=a22
+    ATTRIBUTE a23
+      TEXT
+        content=a23
+
+========================
+Expression: (/doc/e3/preceding-sibling::*[self::e1])[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e1
+
+========================
+Expression: (/doc/e2/e22/e222/parent::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e22
+
+========================
+Expression: (/doc/e2/e22/e222/parent::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e22
+
+========================
+Expression: (/doc/e2/e22/e222/ancestor::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT doc
+
+========================
+Expression: (/doc/e2/e22/e222/ancestor::*[self::e22])[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e22
+
+========================
+Expression: (/doc/e2/e22/e222/ancestor::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e22
+
+========================
+Expression: (/doc/e2/e22/e222/ancestor::doc)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT doc
+
+========================
+Expression: (/doc/e2/e22/e222/ancestor-or-self::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT doc
+
+========================
+Expression: (/doc/e2/e22/e222/ancestor-or-self::*[self::e222])[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e222
+
+========================
+Expression: (/doc/e2/e22/e222/ancestor-or-self::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e222
+
+========================
+Expression: (/doc/e2/e22/e222/ancestor-or-self::doc)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT doc
+
+========================
+Expression: (/doc/e1/e11/e111/following::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e112
+
+========================
+Expression: (/doc/e1/e11/e111/following::*[self::e333])[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e333
+
+========================
+Expression: (/doc/e1/e11/e111/following::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e333
+
+========================
+Expression: (/doc/e1/e11/e111/following::*[self::e112])[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e112
+
+========================
+Expression: (/doc/e3/e33/e333/preceding::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e1
+
+========================
+Expression: (/doc/e3/e33/e333/preceding::*[self::e332])[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e332
+
+========================
+Expression: (/doc/e3/e33/e333/preceding::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e332
+
+========================
+Expression: (/doc/e3/e33/e333/preceding::*[self::e1])[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e1
+
+========================
+Expression: (/doc/*/*/..)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e1
+
+========================
+Expression: (/doc/*/*/..)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e3
+
+========================
+Expression: (/doc/*/*/*/ancestor::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT doc
+
+========================
+Expression: (/doc/*/*/*/ancestor::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e33
+
+========================
+Expression: (/doc/*/*/*/ancestor-or-self::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT doc
+
+========================
+Expression: (/doc/*/*/*/ancestor-or-self::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e333
+
+========================
+Expression: (/doc/*/*/*/preceding::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e1
+
+========================
+Expression: (/doc/*/*/*/preceding::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e332
+
+========================
+Expression: (/doc/*/*/*/preceding-sibling::*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e111
+
+========================
+Expression: (/doc/*/*/*/preceding-sibling::*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e332
+
+========================
+Expression: (/doc/*/*/*)[position() > 3][1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e121
+
+========================
+Expression: (/doc/*/*/*)[position() < last() - 2][last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e323
+
+========================
+Expression: (/doc/e1/*/* | /doc/e2/*/* | /doc/e3/*/*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e111
+
+========================
+Expression: (/doc/e1/*/* | /doc/e2/*/* | /doc/e3/*/*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e333
+
+========================
+Expression: (/doc/*/*/* | /doc/*/*/*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e111
+
+========================
+Expression: (/doc/*/*/* | /doc/*/*/*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e333
+
+========================
+Expression: (/.. | /doc/*/*/*)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e111
+
+========================
+Expression: (/.. | /doc/*/*/*)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e333
+
+========================
+Expression: (/doc/*/*/* | /..)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e111
+
+========================
+Expression: (/doc/*/*/* | /..)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e333
+
+========================
+Expression: (/doc/*)[2]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e2
+    ATTRIBUTE a21
+      TEXT
+        content=a21
+    ATTRIBUTE a22
+      TEXT
+        content=a22
+    ATTRIBUTE a23
+      TEXT
+        content=a23
+
+========================
+Expression: /doc/*/*[self::e11 or self::e12 or self::e21][true()][2]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e12
+
+========================
+Expression: (/doc/e3/e33/preceding::*[1])[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e323
+
+========================
+Expression: (/doc/e3/e33/preceding::*[1][true()])[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e323
+
+========================
+Expression: (/doc/e3/e33/preceding::*[true()][1])[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT e323
+
+========================
+Expression: $var[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT a
+
+========================
+Expression: $var[2]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT b
+
+========================
+Expression: $var[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT c

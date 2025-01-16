@@ -40,3 +40,55 @@ Expression: id('chapter1')/p[1]
 Object is a Node Set :
 Set contains 1 nodes:
 1  ELEMENT p
+
+========================
+Expression: id('chapter1 chapter3 chapter5 chapter5 chapter3 chapter1')
+Object is a Node Set :
+Set contains 3 nodes:
+1  ELEMENT chapter
+    ATTRIBUTE id
+      TEXT
+        content=chapter1
+2  ELEMENT chapter
+    ATTRIBUTE id
+      TEXT
+        content=chapter3
+3  ELEMENT chapter
+    ATTRIBUTE id
+      TEXT
+        content=chapter5
+
+========================
+Expression: id(//ref/@ref)
+Object is a Node Set :
+Set contains 3 nodes:
+1  ELEMENT chapter
+    ATTRIBUTE id
+      TEXT
+        content=chapter1
+2  ELEMENT chapter
+    ATTRIBUTE id
+      TEXT
+        content=chapter3
+3  ELEMENT chapter
+    ATTRIBUTE id
+      TEXT
+        content=chapter5
+
+========================
+Expression: id(//ref/@ref)[1]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT chapter
+    ATTRIBUTE id
+      TEXT
+        content=chapter1
+
+========================
+Expression: id(//ref/@ref)[last()]
+Object is a Node Set :
+Set contains 1 nodes:
+1  ELEMENT chapter
+    ATTRIBUTE id
+      TEXT
+        content=chapter5

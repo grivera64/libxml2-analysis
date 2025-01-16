@@ -267,6 +267,49 @@ typedef xmlXPathFunction (*xmlXPathFuncLookupFunc) (void *ctxt,
  * forbid variables in expression
  */
 #define XML_XPATH_NOVAR	  (1<<1)
+/**
+ * XML_XPATH_COMPILE_NS:
+ *
+ * Look up namespaces during compilation
+ */
+#define XML_XPATH_COMPILE_NS    (1<<2)
+/**
+ * XML_XPATH_COMPILE_FUNC:
+ *
+ * Look up functions during compilation
+ */
+#define XML_XPATH_COMPILE_FUNC  (1<<3)
+
+/*
+ * The structure of a compiled expression form is not public.
+ */
+
+typedef struct _xmlXPathCompExpr xmlXPathCompExpr;
+typedef xmlXPathCompExpr *xmlXPathCompExprPtr;
+
+/**
+ * xmlXPathParserContext:
+ *
+ * Mostly misnamed. This is used for both parsing and evaluation.
+ */
+struct _xmlXPathParserContext {
+    const xmlChar *cur;			/* the current char being parsed */
+    const xmlChar *base;			/* the full expression */
+
+    int error;				/* error code */
+
+    xmlXPathContextPtr  context;	/* the evaluation context */
+    xmlXPathObjectPtr     value;	/* the current value */
+    int                 valueNr;	/* number of values stacked */
+    int                valueMax;	/* max number of values stacked */
+    xmlXPathObjectPtr *valueTab;	/* stack of values */
+
+    xmlXPathCompExprPtr comp;		/* the precompiled expression */
+    int xptr;				/* it this an XPointer expression */
+    xmlNodePtr         ancestor;	/* used for walking preceding axis */
+
+    int              valueFrame;        /* always zero for compatibility */
+};
 
 /**
  * xmlXPathContext:
@@ -341,7 +384,7 @@ struct _xmlXPathContext {
 
     /* error reporting mechanism */
     void *userData;                     /* user specific data block */
-    xmlStructuredErrorFunc error;       /* the callback in case of errors */
+    xmlStructuredErrorFunc serror;      /* the callback in case of errors */
     xmlError lastError;			/* the last error */
     xmlNodePtr debugNode;		/* the source node XSLT */
 
@@ -357,38 +400,9 @@ struct _xmlXPathContext {
     unsigned long opLimit;
     unsigned long opCount;
     int depth;
-};
 
-/*
- * The structure of a compiled expression form is not public.
- */
-
-typedef struct _xmlXPathCompExpr xmlXPathCompExpr;
-typedef xmlXPathCompExpr *xmlXPathCompExprPtr;
-
-/**
- * xmlXPathParserContext:
- *
- * An XPath parser context. It contains pure parsing information,
- * an xmlXPathContext, and the stack of objects.
- */
-struct _xmlXPathParserContext {
-    const xmlChar *cur;			/* the current char being parsed */
-    const xmlChar *base;			/* the full expression */
-
-    int error;				/* error code */
-
-    xmlXPathContextPtr  context;	/* the evaluation context */
-    xmlXPathObjectPtr     value;	/* the current value */
-    int                 valueNr;	/* number of values stacked */
-    int                valueMax;	/* max number of values stacked */
-    xmlXPathObjectPtr *valueTab;	/* stack of values */
-
-    xmlXPathCompExprPtr comp;		/* the precompiled expression */
-    int xptr;				/* it this an XPointer expression */
-    xmlNodePtr         ancestor;	/* used for walking preceding axis */
-
-    int              valueFrame;        /* always zero for compatibility */
+    /* Embedded "parser" context */
+    xmlXPathParserContext pctxt;
 };
 
 /************************************************************************
