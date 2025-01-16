@@ -10111,9 +10111,10 @@ xmlXPathCompVariableReference(xmlXPathContextPtr ctxt) {
         nsUri = xmlXPathNsLookup(ctxt, prefix);
         if (nsUri == NULL) {
             xmlXPathCErrExtra(ctxt, XPATH_UNDEF_PREFIX_ERROR, prefix);
+            goto error;
         }
 
-        if (ctxt->pctxt.comp->flags & XML_XPATH_CHECKNS)
+        if ((ctxt->pctxt.comp->flags & XML_XPATH_COMPILE_NS) == 0)
             nsUri = NULL;
     }
 
@@ -10294,15 +10295,19 @@ xmlXPathCompFunctionCall(xmlXPathContextPtr ctxt) {
             nsUri = xmlXPathNsLookup(ctxt, prefix);
             if (nsUri == NULL) {
                 xmlXPathCErrExtra(ctxt, XPATH_UNDEF_PREFIX_ERROR, prefix);
+                goto error;
             }
 
             if (flags & XML_XPATH_COMPILE_FUNC) {
                 func = xmlXPathFunctionLookupNS(ctxt, name, nsUri);
-                if (func == NULL)
+                if (func == NULL) {
                     xmlXPathCErrExtra(ctxt, XPATH_UNKNOWN_FUNC_ERROR, name);
+                    goto error;
+                }
             }
 
-            if (flags & XML_XPATH_CHECKNS)
+            if (((flags & XML_XPATH_COMPILE_NS) == 0) &&
+                ((flags & XML_XPATH_COMPILE_FUNC) == 0))
                 nsUri = NULL;
         }
     } else {
@@ -10316,8 +10321,10 @@ xmlXPathCompFunctionCall(xmlXPathContextPtr ctxt) {
                 sortArgs = 0;
         } else if (flags & XML_XPATH_COMPILE_FUNC) {
             func = xmlXPathFunctionLookupNS(ctxt, name, NULL);
-            if (func == NULL)
+            if (func == NULL) {
                 xmlXPathCErrExtra(ctxt, XPATH_UNKNOWN_FUNC_ERROR, name);
+                goto error;
+            }
         }
     }
 
@@ -11581,9 +11588,10 @@ xmlXPathCompStep(xmlXPathContextPtr ctxt, int argIndex) {
         nsUri = xmlXPathNsLookup(ctxt, prefix);
         if (nsUri == NULL) {
             xmlXPathCErrExtra(ctxt, XPATH_UNDEF_PREFIX_ERROR, prefix);
+            goto error;
         }
 
-        if (comp->flags & XML_XPATH_CHECKNS)
+        if ((comp->flags & XML_XPATH_COMPILE_NS) == 0)
             nsUri = NULL;
     }
 
