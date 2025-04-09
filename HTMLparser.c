@@ -828,6 +828,10 @@ html40ElementTable[] = {
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
+{ "source",	0, 2, 2, 1, 0, 0, 0, "media source ",
+	NULL, NULL, NULL, NULL, NULL,
+	0
+},
 { "span",	0, 0, 0, 0, 0, 0, 1, "generic language/style container ",
 	NULL, NULL, NULL, NULL, NULL,
 	0
@@ -885,6 +889,10 @@ html40ElementTable[] = {
 	DATA_RCDATA
 },
 { "tr",		0, 0, 0, 0, 0, 0, 0, "table row ",
+	NULL, NULL, NULL, NULL, NULL,
+	0
+},
+{ "track",	0, 2, 2, 1, 0, 0, 0, "external timed text tracks ",
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
