@@ -616,37 +616,7 @@ htmlAttrDumpOutput(xmlOutputBufferPtr buf, xmlDocPtr doc, xmlAttrPtr cur) {
 	value = xmlNodeListGetString(doc, cur->children, 0);
 	if (value) {
 	    xmlOutputBufferWriteString(buf, "=");
-	    if ((cur->ns == NULL) && (cur->parent != NULL) &&
-		(cur->parent->ns == NULL) &&
-		((!xmlStrcasecmp(cur->name, BAD_CAST "href")) ||
-	         (!xmlStrcasecmp(cur->name, BAD_CAST "action")) ||
-		 (!xmlStrcasecmp(cur->name, BAD_CAST "src")) ||
-		 ((!xmlStrcasecmp(cur->name, BAD_CAST "name")) &&
-		  (!xmlStrcasecmp(cur->parent->name, BAD_CAST "a"))))) {
-		xmlChar *escaped;
-		xmlChar *tmp = value;
-
-		while (IS_BLANK_CH(*tmp)) tmp++;
-
-		/*
-                 * Angle brackets are technically illegal in URIs, but they're
-                 * used in server side includes, for example. Curly brackets
-                 * are illegal as well and often used in templates.
-                 * Don't escape non-whitespace, printable ASCII chars for
-                 * improved interoperability. Only escape space, control
-                 * and non-ASCII chars.
-		 */
-		escaped = xmlURIEscapeStr(tmp,
-                        BAD_CAST "\"#$%&+,/:;<=>?@[\\]^`{|}");
-		if (escaped != NULL) {
-		    xmlOutputBufferWriteQuotedString(buf, escaped);
-		    xmlFree(escaped);
-		} else {
-                    buf->error = XML_ERR_NO_MEMORY;
-		}
-	    } else {
-		xmlOutputBufferWriteQuotedString(buf, value);
-	    }
+	    xmlOutputBufferWriteQuotedString(buf, value);
 	    xmlFree(value);
 	} else  {
             buf->error = XML_ERR_NO_MEMORY;
