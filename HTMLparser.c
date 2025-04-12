@@ -568,6 +568,10 @@ html40ElementTable[] = {
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
+{ "bgsound",	0, 0, 2, 1, 0, 0, 0, "",
+	NULL, NULL, NULL, NULL, NULL,
+	0
+},
 { "big",	0, 3, 0, 0, 0, 0, 1, "large text style",
 	NULL, NULL, NULL, NULL, NULL,
 	0
@@ -644,7 +648,7 @@ html40ElementTable[] = {
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
-{ "embed",	0, 1, 0, 0, 1, 1, 1, "generic embedded object ",
+{ "embed",	0, 1, 2, 1, 1, 1, 1, "generic embedded object ",
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
@@ -729,6 +733,10 @@ html40ElementTable[] = {
 	0
 },
 { "kbd",	0, 0, 0, 0, 0, 0, 1, "text to be entered by the user",
+	NULL, NULL, NULL, NULL, NULL,
+	0
+},
+{ "keygen",	0, 0, 2, 1, 0, 0, 0, "",
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
@@ -828,6 +836,10 @@ html40ElementTable[] = {
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
+{ "source",	0, 0, 2, 1, 0, 0, 0, "",
+	NULL, NULL, NULL, NULL, NULL,
+	0
+},
 { "span",	0, 0, 0, 0, 0, 0, 1, "generic language/style container ",
 	NULL, NULL, NULL, NULL, NULL,
 	0
@@ -888,6 +900,10 @@ html40ElementTable[] = {
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
+{ "track",	0, 0, 2, 1, 0, 0, 0, "",
+	NULL, NULL, NULL, NULL, NULL,
+	0
+},
 { "tt",		0, 3, 0, 0, 0, 0, 1, "teletype or monospaced text style",
 	NULL, NULL, NULL, NULL, NULL,
 	0
@@ -901,6 +917,10 @@ html40ElementTable[] = {
 	0
 },
 { "var",	0, 0, 0, 0, 0, 0, 1, "instance of a variable or program argument",
+	NULL, NULL, NULL, NULL, NULL,
+	0
+},
+{ "wbr",	0, 0, 2, 1, 0, 0, 0, "",
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
