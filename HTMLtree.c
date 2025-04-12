@@ -353,7 +353,7 @@ htmlFindOutputEncoder(const char *encoding, xmlCharEncodingHandler **out) {
 /**
  * htmlBufNodeDumpFormat:
  * @buf:  the xmlBufPtr output
- * @doc:  the document
+ * @doc:  the document (unused)
  * @cur:  the current node
  * @format:  should formatting spaces been added
  *
@@ -362,8 +362,8 @@ htmlFindOutputEncoder(const char *encoding, xmlCharEncodingHandler **out) {
  * Returns the number of byte written or -1 in case of error
  */
 static size_t
-htmlBufNodeDumpFormat(xmlBufPtr buf, xmlDocPtr doc, xmlNodePtr cur,
-	           int format) {
+htmlBufNodeDumpFormat(xmlBufPtr buf, xmlDocPtr doc ATTRIBUTE_UNUSED,
+                      xmlNodePtr cur, int format) {
     size_t use;
     size_t ret;
     xmlOutputBufferPtr outbuf;
@@ -386,7 +386,7 @@ htmlBufNodeDumpFormat(xmlBufPtr buf, xmlDocPtr doc, xmlNodePtr cur,
     outbuf->written = 0;
 
     use = xmlBufUse(buf);
-    htmlNodeDumpFormatOutput(outbuf, doc, cur, NULL, format);
+    htmlNodeDumpFormatOutput(outbuf, NULL, cur, NULL, format);
     if (outbuf->error)
         ret = (size_t) -1;
     else
@@ -398,7 +398,7 @@ htmlBufNodeDumpFormat(xmlBufPtr buf, xmlDocPtr doc, xmlNodePtr cur,
 /**
  * htmlNodeDump:
  * @buf:  the HTML buffer output
- * @doc:  the document
+ * @doc:  the document (unused)
  * @cur:  the current node
  *
  * Dump an HTML node, recursive behaviour,children are printed too,
@@ -407,7 +407,8 @@ htmlBufNodeDumpFormat(xmlBufPtr buf, xmlDocPtr doc, xmlNodePtr cur,
  * Returns the number of byte written or -1 in case of error
  */
 int
-htmlNodeDump(xmlBufferPtr buf, xmlDocPtr doc, xmlNodePtr cur) {
+htmlNodeDump(xmlBufferPtr buf, xmlDocPtr doc ATTRIBUTE_UNUSED,
+             xmlNodePtr cur) {
     xmlBufPtr buffer;
     size_t ret1;
     int ret2;
@@ -420,7 +421,7 @@ htmlNodeDump(xmlBufferPtr buf, xmlDocPtr doc, xmlNodePtr cur) {
     if (buffer == NULL)
         return(-1);
 
-    ret1 = htmlBufNodeDumpFormat(buffer, doc, cur, 1);
+    ret1 = htmlBufNodeDumpFormat(buffer, NULL, cur, 1);
 
     ret2 = xmlBufBackToBuffer(buffer, buf);
 
@@ -432,7 +433,7 @@ htmlNodeDump(xmlBufferPtr buf, xmlDocPtr doc, xmlNodePtr cur) {
 /**
  * htmlNodeDumpFileFormat:
  * @out:  the FILE pointer
- * @doc:  the document
+ * @doc:  the document (unused)
  * @cur:  the current node
  * @encoding: the document encoding
  * @format:  should formatting spaces been added
@@ -444,7 +445,7 @@ htmlNodeDump(xmlBufferPtr buf, xmlDocPtr doc, xmlNodePtr cur) {
  * returns: the number of byte written or -1 in case of failure.
  */
 int
-htmlNodeDumpFileFormat(FILE *out, xmlDocPtr doc,
+htmlNodeDumpFileFormat(FILE *out, xmlDocPtr doc ATTRIBUTE_UNUSED,
 	               xmlNodePtr cur, const char *encoding, int format) {
     xmlOutputBufferPtr buf;
     xmlCharEncodingHandlerPtr handler;
@@ -461,7 +462,7 @@ htmlNodeDumpFileFormat(FILE *out, xmlDocPtr doc,
     if (buf == NULL)
         return(-1);
 
-    htmlNodeDumpFormatOutput(buf, doc, cur, NULL, format);
+    htmlNodeDumpFormatOutput(buf, NULL, cur, NULL, format);
 
     ret = xmlOutputBufferClose(buf);
     return(ret);
@@ -470,15 +471,15 @@ htmlNodeDumpFileFormat(FILE *out, xmlDocPtr doc,
 /**
  * htmlNodeDumpFile:
  * @out:  the FILE pointer
- * @doc:  the document
+ * @doc:  the document (unused)
  * @cur:  the current node
  *
  * Dump an HTML node, recursive behaviour,children are printed too,
  * and formatting returns are added.
  */
 void
-htmlNodeDumpFile(FILE *out, xmlDocPtr doc, xmlNodePtr cur) {
-    htmlNodeDumpFileFormat(out, doc, cur, NULL, 1);
+htmlNodeDumpFile(FILE *out, xmlDocPtr doc ATTRIBUTE_UNUSED, xmlNodePtr cur) {
+    htmlNodeDumpFileFormat(out, NULL, cur, NULL, 1);
 }
 
 /**
@@ -633,7 +634,7 @@ htmlAttrDumpOutput(xmlOutputBufferPtr buf, xmlAttrPtr cur) {
 /**
  * htmlNodeDumpFormatOutput:
  * @buf:  the HTML buffer output
- * @doc:  the document
+ * @doc:  the document (unused)
  * @cur:  the current node
  * @encoding:  the encoding string (unused)
  * @format:  should formatting spaces been added
@@ -641,9 +642,9 @@ htmlAttrDumpOutput(xmlOutputBufferPtr buf, xmlAttrPtr cur) {
  * Dump an HTML node, recursive behaviour,children are printed too.
  */
 void
-htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
-	                 xmlNodePtr cur, const char *encoding ATTRIBUTE_UNUSED,
-                         int format) {
+htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf,
+                         xmlDocPtr doc ATTRIBUTE_UNUSED, xmlNodePtr cur,
+                         const char *encoding ATTRIBUTE_UNUSED, int format) {
     xmlNodePtr root, parent;
     xmlAttrPtr attr;
     const htmlElemDesc * info;
@@ -683,7 +684,7 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
              * case.
              */
             if ((cur->parent != parent) && (cur->children != NULL)) {
-                htmlNodeDumpFormatOutput(buf, doc, cur, encoding, format);
+                htmlNodeDumpFormatOutput(buf, NULL, cur, encoding, format);
                 break;
             }
 
@@ -769,7 +770,7 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
             } else {
                 xmlChar *buffer;
 
-                buffer = xmlEncodeEntitiesReentrant(doc, cur->content);
+                buffer = xmlEscapeText(cur->content, XML_ESCAPE_HTML);
                 if (buffer == NULL) {
                     buf->error = XML_ERR_NO_MEMORY;
                     return;
@@ -872,7 +873,7 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
 /**
  * htmlNodeDumpOutput:
  * @buf:  the HTML buffer output
- * @doc:  the document
+ * @doc:  the document (unused)
  * @cur:  the current node
  * @encoding:  the encoding string (unused)
  *
@@ -880,9 +881,9 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
  * and formatting returns/spaces are added.
  */
 void
-htmlNodeDumpOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
+htmlNodeDumpOutput(xmlOutputBufferPtr buf, xmlDocPtr doc ATTRIBUTE_UNUSED,
 	           xmlNodePtr cur, const char *encoding ATTRIBUTE_UNUSED) {
-    htmlNodeDumpFormatOutput(buf, doc, cur, NULL, 1);
+    htmlNodeDumpFormatOutput(buf, NULL, cur, NULL, 1);
 }
 
 /**
@@ -903,7 +904,7 @@ htmlDocContentDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr cur,
         type = cur->type;
         cur->type = XML_HTML_DOCUMENT_NODE;
     }
-    htmlNodeDumpFormatOutput(buf, cur, (xmlNodePtr) cur, NULL, format);
+    htmlNodeDumpFormatOutput(buf, NULL, (xmlNodePtr) cur, NULL, format);
     if (cur)
         cur->type = (xmlElementType) type;
 }
@@ -919,7 +920,7 @@ htmlDocContentDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr cur,
 void
 htmlDocContentDumpOutput(xmlOutputBufferPtr buf, xmlDocPtr cur,
 	                 const char *encoding ATTRIBUTE_UNUSED) {
-    htmlNodeDumpFormatOutput(buf, cur, (xmlNodePtr) cur, NULL, 1);
+    htmlNodeDumpFormatOutput(buf, NULL, (xmlNodePtr) cur, NULL, 1);
 }
 
 /************************************************************************
