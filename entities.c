@@ -665,8 +665,11 @@ xmlEscapeText(const xmlChar *text, int flags) {
                 if (!xmlEscapeSafe[*cur])
                     break;
             } else {
-               if (flags & XML_ESCAPE_NON_ASCII)
-                   break;
+                if (flags & XML_ESCAPE_NON_ASCII)
+                    break;
+                if ((flags & XML_ESCAPE_HTML) &&
+                    (c == 0xC2) && (cur[1] == 0xA0))
+                    break;
             }
             cur += 1;
         }
@@ -690,6 +693,11 @@ xmlEscapeText(const xmlChar *text, int flags) {
 	} else if (((flags & XML_ESCAPE_HTML) == 0) && (c == '\r')) {
 	    repl = BAD_CAST "&#13;";
             replSize = 5;
+        } else if ((flags & XML_ESCAPE_HTML) &&
+                   (c == 0xC2) && (cur[1] == 0xA0)) {
+            chunkSize = 2;
+            repl = BAD_CAST "&nbsp;";
+            replSize = 6;
 	} else if ((flags & XML_ESCAPE_NON_ASCII) && (c >= 0x80)) {
             int val;
 
