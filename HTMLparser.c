@@ -748,7 +748,7 @@ html40ElementTable[] = {
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
-{ "li",		0, 1, 1, 0, 0, 0, 0, "list item ",
+{ "li",		0, 1, 0, 0, 0, 0, 0, "list item ",
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
