@@ -24,6 +24,7 @@
 #include <libxml/uri.h>
 
 #include "private/buf.h"
+#include "private/entities.h"
 #include "private/html.h"
 #include "private/error.h"
 #include "private/io.h"
@@ -593,15 +594,8 @@ htmlDtdDumpOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
  * Dump an HTML attribute
  */
 static void
-htmlAttrDumpOutput(xmlOutputBufferPtr buf, xmlDocPtr doc, xmlAttrPtr cur) {
-    xmlChar *value;
-
-    /*
-     * The html output method should not escape a & character
-     * occurring in an attribute value immediately followed by
-     * a { character (see Section B.7.1 of the HTML 4.0 Recommendation).
-     * This is implemented in xmlEncodeEntitiesReentrant
-     */
+htmlAttrDumpOutput(xmlOutputBufferPtr buf, xmlAttrPtr cur) {
+    xmlNodePtr child;
 
     if (cur == NULL) {
 	return;
@@ -612,18 +606,28 @@ htmlAttrDumpOutput(xmlOutputBufferPtr buf, xmlDocPtr doc, xmlAttrPtr cur) {
 	xmlOutputBufferWriteString(buf, ":");
     }
     xmlOutputBufferWriteString(buf, (const char *)cur->name);
-    if (cur->children == NULL) {
-	xmlOutputBufferWriteString(buf, "=\"\"");
-    } else {
-	value = xmlNodeListGetString(doc, cur->children, 0);
-	if (value == NULL) {
-            buf->error = XML_ERR_NO_MEMORY;
-            return;
+    xmlOutputBufferWriteString(buf, "=\"");
+
+    child = cur->children;
+    while (child != NULL) {
+        if (child->type == XML_TEXT_NODE) {
+            xmlChar *escaped;
+
+            escaped = xmlEscapeText(child->content,
+                    XML_ESCAPE_HTML | XML_ESCAPE_ATTR | XML_ESCAPE_QUOT);
+            if (escaped == NULL) {
+                buf->error = XML_ERR_NO_MEMORY;
+                return;
+            }
+
+            xmlOutputBufferWriteString(buf, (const char *) escaped);
+            xmlFree(escaped);
         }
-        xmlOutputBufferWriteString(buf, "=");
-        xmlOutputBufferWriteQuotedString(buf, value);
-        xmlFree(value);
+
+        child = child->next;
     }
+
+    xmlOutputBufferWriteString(buf, "\"");
 }
 
 /**
@@ -701,7 +705,7 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
                 xmlNsListDumpOutput(buf, cur->nsDef);
             attr = cur->properties;
             while (attr != NULL) {
-                htmlAttrDumpOutput(buf, doc, attr);
+                htmlAttrDumpOutput(buf, attr);
                 attr = attr->next;
             }
 
@@ -753,7 +757,7 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
             break;
 
         case XML_ATTRIBUTE_NODE:
-            htmlAttrDumpOutput(buf, doc, (xmlAttrPtr) cur);
+            htmlAttrDumpOutput(buf, (xmlAttrPtr) cur);
             break;
 
         case HTML_TEXT_NODE:
