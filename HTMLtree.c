@@ -24,6 +24,7 @@
 #include <libxml/uri.h>
 
 #include "private/buf.h"
+#include "private/html.h"
 #include "private/error.h"
 #include "private/io.h"
 #include "private/save.h"
@@ -670,6 +671,7 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
     xmlNodePtr root, parent;
     xmlAttrPtr attr;
     const htmlElemDesc * info;
+    int isRaw = 0;
 
     xmlInitParser();
 
@@ -757,6 +759,10 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
                     (cur->name != NULL) &&
                     (cur->name[0] != 'p')) /* p, pre, param */
                     xmlOutputBufferWriteString(buf, "\n");
+
+                if ((info != NULL) && (info->dataMode >= DATA_RAWTEXT))
+                    isRaw = 1;
+
                 parent = cur;
                 cur = cur->children;
                 continue;
@@ -781,11 +787,10 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
         case HTML_TEXT_NODE:
             if (cur->content == NULL)
                 break;
-            if (((cur->name == (const xmlChar *)xmlStringText) ||
-                 (cur->name != (const xmlChar *)xmlStringTextNoenc)) &&
-                ((parent == NULL) ||
-                 ((xmlStrcasecmp(parent->name, BAD_CAST "script")) &&
-                  (xmlStrcasecmp(parent->name, BAD_CAST "style"))))) {
+            if ((cur->name == (const xmlChar *)xmlStringTextNoenc) ||
+                (isRaw)) {
+                xmlOutputBufferWriteString(buf, (const char *)cur->content);
+            } else {
                 xmlChar *buffer;
 
                 buffer = xmlEncodeEntitiesReentrant(doc, cur->content);
@@ -795,8 +800,6 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
                 }
                 xmlOutputBufferWriteString(buf, (const char *)buffer);
                 xmlFree(buffer);
-            } else {
-                xmlOutputBufferWriteString(buf, (const char *)cur->content);
             }
             break;
 
@@ -844,6 +847,8 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf, xmlDocPtr doc,
                 cur = cur->next;
                 break;
             }
+
+            isRaw = 0;
 
             cur = parent;
             /* cur->parent was validated when descending. */
