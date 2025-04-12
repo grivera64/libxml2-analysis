@@ -1581,15 +1581,6 @@ xmlSAX2HtmlAttribute(xmlParserCtxtPtr ctxt, const xmlChar *fullname,
         return;
     }
 
-    if ((value == NULL) && (htmlIsBooleanAttr(fullname))) {
-        nval = xmlStrdup(fullname);
-        if (nval == NULL) {
-            xmlSAX2ErrMemory(ctxt);
-            return;
-        }
-        value = nval;
-    }
-
     if (value != NULL) {
         ret->children = xmlNewDocText(ctxt->myDoc, value);
         if (ret->children == NULL) {

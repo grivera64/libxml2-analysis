@@ -612,15 +612,17 @@ htmlAttrDumpOutput(xmlOutputBufferPtr buf, xmlDocPtr doc, xmlAttrPtr cur) {
 	xmlOutputBufferWriteString(buf, ":");
     }
     xmlOutputBufferWriteString(buf, (const char *)cur->name);
-    if ((cur->children != NULL) && (!htmlIsBooleanAttr(cur->name))) {
+    if (cur->children == NULL) {
+	xmlOutputBufferWriteString(buf, "=\"\"");
+    } else {
 	value = xmlNodeListGetString(doc, cur->children, 0);
-	if (value) {
-	    xmlOutputBufferWriteString(buf, "=");
-	    xmlOutputBufferWriteQuotedString(buf, value);
-	    xmlFree(value);
-	} else  {
+	if (value == NULL) {
             buf->error = XML_ERR_NO_MEMORY;
-	}
+            return;
+        }
+        xmlOutputBufferWriteString(buf, "=");
+        xmlOutputBufferWriteQuotedString(buf, value);
+        xmlFree(value);
     }
 }
 
