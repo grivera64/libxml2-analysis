@@ -624,7 +624,6 @@ static const char xmlEscapeSafe[128] = {
  * XML_ESCAPE_ATTR: for attribute content.
  * XML_ESCAPE_NON_ASCII: escape non-ASCII chars.
  * XML_ESCAPE_HTML: for HTML content.
- * XML_ESCAPE_QUOT: escape double quotes.
  * XML_ESCAPE_ALLOW_INVALID: allow invalid characters.
  *
  * Returns an escaped string or NULL if a memory allocation failed.
@@ -687,7 +686,7 @@ xmlEscapeText(const xmlChar *text, int flags) {
 	} else if (c == '&') {
             repl = BAD_CAST "&amp;";
             replSize = 5;
-	} else if ((flags & XML_ESCAPE_QUOT) && (c == '"')) {
+	} else if ((flags & XML_ESCAPE_ATTR) && (c == '"')) {
             repl = BAD_CAST "&quot;";
             replSize = 6;
 	} else if (((flags & XML_ESCAPE_HTML) == 0) && (c == '\r')) {
@@ -836,7 +835,7 @@ xmlEncodeSpecialChars(const xmlDoc *doc ATTRIBUTE_UNUSED,
     if (input == NULL)
         return(NULL);
 
-    return(xmlEscapeText(input, XML_ESCAPE_QUOT | XML_ESCAPE_ALLOW_INVALID));
+    return(xmlEscapeText(input, XML_ESCAPE_ATTR | XML_ESCAPE_ALLOW_INVALID));
 }
 
 /**
