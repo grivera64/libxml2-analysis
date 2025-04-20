@@ -552,6 +552,28 @@ htmlDocDumpMemory(xmlDocPtr cur, xmlChar**mem, int *size) {
  *									*
  ************************************************************************/
 
+static const signed char htmlEscapeTab[128] = {
+     0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, 33, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 39, -1, 44, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+};
+
+static const signed char htmlEscapeTabAttr[128] = {
+     0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, 26, -1, -1, -1, 33, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+};
+
 /**
  * htmlDtdDumpOutput:
  * @buf:  the HTML buffer output
@@ -611,19 +633,9 @@ htmlAttrDumpOutput(xmlOutputBufferPtr buf, xmlAttrPtr cur) {
 
     child = cur->children;
     while (child != NULL) {
-        if (child->type == XML_TEXT_NODE) {
-            xmlChar *escaped;
-
-            escaped = xmlEscapeText(child->content,
-                    XML_ESCAPE_HTML | XML_ESCAPE_ATTR | XML_ESCAPE_QUOT);
-            if (escaped == NULL) {
-                buf->error = XML_ERR_NO_MEMORY;
-                return;
-            }
-
-            xmlOutputBufferWriteString(buf, (const char *) escaped);
-            xmlFree(escaped);
-        }
+        if (child->type == XML_TEXT_NODE)
+            xmlSerializeText(buf, child->content, htmlEscapeTabAttr,
+                             XML_ESCAPE_HTML);
 
         child = child->next;
     }
@@ -768,15 +780,8 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf,
                 (isRaw)) {
                 xmlOutputBufferWriteString(buf, (const char *)cur->content);
             } else {
-                xmlChar *buffer;
-
-                buffer = xmlEscapeText(cur->content, XML_ESCAPE_HTML);
-                if (buffer == NULL) {
-                    buf->error = XML_ERR_NO_MEMORY;
-                    return;
-                }
-                xmlOutputBufferWriteString(buf, (const char *)buffer);
-                xmlFree(buffer);
+                xmlSerializeText(buf, cur->content, htmlEscapeTab,
+                                 XML_ESCAPE_HTML);
             }
             break;
 
