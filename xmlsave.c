@@ -126,7 +126,7 @@ static const char xmlEscapeContent[] = {
     ';',
 };
 
-static const signed char xmlEscapeTab[128] = {
+static const char xmlEscapeTab[128] = {
      0,  0,  0,  0,  0,  0,  0,  0,  0, -1, -1,  0,  0, 20,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     -1, -1, -1, -1, -1, -1, 33, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -137,7 +137,7 @@ static const signed char xmlEscapeTab[128] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 };
 
-static const signed char xmlEscapeTabAttr[128] = {
+static const char xmlEscapeTabAttr[128] = {
      0,  0,  0,  0,  0,  0,  0,  0,  0,  9, 14,  0,  0, 20,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
     -1, -1, 26, -1, -1, -1, 33, -1, -1, -1, -1, -1, -1, -1, -1, -1,
