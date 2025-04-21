@@ -725,20 +725,14 @@ htmlNodeDumpFormatOutput(xmlOutputBufferPtr buf,
             if ((info != NULL) && (info->empty)) {
                 xmlOutputBufferWriteString(buf, ">");
             } else if (cur->children == NULL) {
-                if ((info != NULL) && (info->saveEndTag != 0) &&
-                    (xmlStrcmp(BAD_CAST info->name, BAD_CAST "html")) &&
-                    (xmlStrcmp(BAD_CAST info->name, BAD_CAST "body"))) {
-                    xmlOutputBufferWriteString(buf, ">");
-                } else {
-                    xmlOutputBufferWriteString(buf, "></");
-                    if ((cur->ns != NULL) && (cur->ns->prefix != NULL)) {
-                        xmlOutputBufferWriteString(buf,
-                                (const char *)cur->ns->prefix);
-                        xmlOutputBufferWriteString(buf, ":");
-                    }
-                    xmlOutputBufferWriteString(buf, (const char *)cur->name);
-                    xmlOutputBufferWriteString(buf, ">");
+                xmlOutputBufferWriteString(buf, "></");
+                if ((cur->ns != NULL) && (cur->ns->prefix != NULL)) {
+                    xmlOutputBufferWriteString(buf,
+                            (const char *)cur->ns->prefix);
+                    xmlOutputBufferWriteString(buf, ":");
                 }
+                xmlOutputBufferWriteString(buf, (const char *)cur->name);
+                xmlOutputBufferWriteString(buf, ">");
             } else {
                 xmlOutputBufferWriteString(buf, ">");
                 if ((format) && (info != NULL) && (!info->isinline) &&
