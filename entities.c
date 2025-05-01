@@ -624,7 +624,6 @@ static const char xmlEscapeSafe[128] = {
  * XML_ESCAPE_ATTR: for attribute content.
  * XML_ESCAPE_NON_ASCII: escape non-ASCII chars.
  * XML_ESCAPE_HTML: for HTML content.
- * XML_ESCAPE_QUOT: escape double quotes.
  * XML_ESCAPE_ALLOW_INVALID: allow invalid characters.
  *
  * Returns an escaped string or NULL if a memory allocation failed.
@@ -636,6 +635,8 @@ xmlEscapeText(const xmlChar *text, int flags) {
     xmlChar *out;
     const xmlChar *unescaped;
     size_t size = 50;
+    int htmlAttr = (flags & (XML_ESCAPE_HTML | XML_ESCAPE_ATTR)) ==
+                   (XML_ESCAPE_HTML | XML_ESCAPE_ATTR);
 
     buffer = xmlMalloc(size + 1);
     if (buffer == NULL)
@@ -647,7 +648,6 @@ xmlEscapeText(const xmlChar *text, int flags) {
 
     while (*cur != '\0') {
         char buf[12];
-	const xmlChar *end;
         const xmlChar *repl;
         size_t used;
         size_t replSize;
@@ -664,8 +664,11 @@ xmlEscapeText(const xmlChar *text, int flags) {
                 if (!xmlEscapeSafe[*cur])
                     break;
             } else {
-               if (flags & XML_ESCAPE_NON_ASCII)
-                   break;
+                if (flags & XML_ESCAPE_NON_ASCII)
+                    break;
+                if ((flags & XML_ESCAPE_HTML) &&
+                    (c == 0xC2) && (cur[1] == 0xA0))
+                    break;
             }
             cur += 1;
         }
@@ -674,43 +677,26 @@ xmlEscapeText(const xmlChar *text, int flags) {
             chunkSize = 0;
             repl = BAD_CAST "";
             replSize = 0;
-        } else if (c == '<') {
-	    /*
-	     * Special handling of server side include in HTML attributes
-	     */
-	    if ((flags & XML_ESCAPE_HTML) && (flags & XML_ESCAPE_ATTR) &&
-	        (cur[1] == '!') && (cur[2] == '-') && (cur[3] == '-') &&
-	        ((end = xmlStrstr(cur, BAD_CAST "-->")) != NULL)) {
-                chunkSize = (end - cur) + 3;
-                repl = cur;
-                replSize = chunkSize;
-	    } else {
-                repl = BAD_CAST "&lt;";
-                replSize = 4;
-            }
-	} else if (c == '>') {
+        } else if ((c == '<') && (!htmlAttr)) {
+            repl = BAD_CAST "&lt;";
+            replSize = 4;
+	} else if ((c == '>') && (!htmlAttr)) {
             repl = BAD_CAST "&gt;";
             replSize = 4;
 	} else if (c == '&') {
-	    /*
-	     * Special handling of &{...} construct from HTML 4, see
-	     * http://www.w3.org/TR/html401/appendix/notes.html#h-B.7.1
-	     */
-	    if ((flags & XML_ESCAPE_HTML) && (flags & XML_ESCAPE_ATTR) &&
-                (cur[1] == '{') && (end = xmlStrchr(cur, '}'))) {
-                chunkSize = (end - cur) + 1;
-                repl = cur;
-                replSize = chunkSize;
-	    } else {
-                repl = BAD_CAST "&amp;";
-                replSize = 5;
-            }
-	} else if ((flags & XML_ESCAPE_QUOT) && (c == '"')) {
+            repl = BAD_CAST "&amp;";
+            replSize = 5;
+	} else if ((flags & XML_ESCAPE_ATTR) && (c == '"')) {
             repl = BAD_CAST "&quot;";
             replSize = 6;
 	} else if (((flags & XML_ESCAPE_HTML) == 0) && (c == '\r')) {
 	    repl = BAD_CAST "&#13;";
             replSize = 5;
+        } else if ((flags & XML_ESCAPE_HTML) &&
+                   (c == 0xC2) && (cur[1] == 0xA0)) {
+            chunkSize = 2;
+            repl = BAD_CAST "&nbsp;";
+            replSize = 6;
 	} else if ((flags & XML_ESCAPE_NON_ASCII) && (c >= 0x80)) {
             int val;
 
@@ -849,7 +835,7 @@ xmlEncodeSpecialChars(const xmlDoc *doc ATTRIBUTE_UNUSED,
     if (input == NULL)
         return(NULL);
 
-    return(xmlEscapeText(input, XML_ESCAPE_QUOT | XML_ESCAPE_ALLOW_INVALID));
+    return(xmlEscapeText(input, XML_ESCAPE_ATTR | XML_ESCAPE_ALLOW_INVALID));
 }
 
 /**

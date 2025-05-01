@@ -519,13 +519,6 @@ htmlSkipBlankChars(xmlParserCtxtPtr ctxt) {
  * Name,Start Tag,End Tag,Save End,Empty,Deprecated,DTD,inline,Description
  */
 
-#define DATA_RCDATA         1
-#define DATA_RAWTEXT        2
-#define DATA_PLAINTEXT      3
-#define DATA_SCRIPT         4
-#define DATA_SCRIPT_ESC1    5
-#define DATA_SCRIPT_ESC2    6
-
 static const htmlElemDesc
 html40ElementTable[] = {
 { "a",		0, 0, 0, 0, 0, 0, 1, "anchor ",
@@ -565,6 +558,10 @@ html40ElementTable[] = {
 	0
 },
 { "bdo",	0, 0, 0, 0, 0, 0, 1, "i18n bidi over-ride ",
+	NULL, NULL, NULL, NULL, NULL,
+	0
+},
+{ "bgsound",	0, 0, 2, 1, 0, 0, 0, "",
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
@@ -644,7 +641,7 @@ html40ElementTable[] = {
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
-{ "embed",	0, 1, 0, 0, 1, 1, 1, "generic embedded object ",
+{ "embed",	0, 1, 2, 1, 1, 1, 1, "generic embedded object ",
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
@@ -732,6 +729,10 @@ html40ElementTable[] = {
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
+{ "keygen",	0, 0, 2, 1, 0, 0, 0, "",
+	NULL, NULL, NULL, NULL, NULL,
+	0
+},
 { "label",	0, 0, 0, 0, 0, 0, 1, "form field label text ",
 	NULL, NULL, NULL, NULL, NULL,
 	0
@@ -740,7 +741,7 @@ html40ElementTable[] = {
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
-{ "li",		0, 1, 1, 0, 0, 0, 0, "list item ",
+{ "li",		0, 1, 0, 0, 0, 0, 0, "list item ",
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
@@ -828,6 +829,10 @@ html40ElementTable[] = {
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
+{ "source",	0, 0, 2, 1, 0, 0, 0, "",
+	NULL, NULL, NULL, NULL, NULL,
+	0
+},
 { "span",	0, 0, 0, 0, 0, 0, 1, "generic language/style container ",
 	NULL, NULL, NULL, NULL, NULL,
 	0
@@ -888,6 +893,10 @@ html40ElementTable[] = {
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },
+{ "track",	0, 0, 2, 1, 0, 0, 0, "",
+	NULL, NULL, NULL, NULL, NULL,
+	0
+},
 { "tt",		0, 3, 0, 0, 0, 0, 1, "teletype or monospaced text style",
 	NULL, NULL, NULL, NULL, NULL,
 	0
@@ -901,6 +910,10 @@ html40ElementTable[] = {
 	0
 },
 { "var",	0, 0, 0, 0, 0, 0, 1, "instance of a variable or program argument",
+	NULL, NULL, NULL, NULL, NULL,
+	0
+},
+{ "wbr",	0, 0, 2, 1, 0, 0, 0, "",
 	NULL, NULL, NULL, NULL, NULL,
 	0
 },

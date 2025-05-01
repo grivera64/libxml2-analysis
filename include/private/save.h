@@ -7,6 +7,10 @@
 
 #ifdef LIBXML_OUTPUT_ENABLED
 
+XML_HIDDEN void
+xmlSerializeText(xmlOutputBufferPtr buf, const xmlChar *string,
+                 const signed char *tab, unsigned flags);
+
 XML_HIDDEN int
 xmlSaveNotationDecl(xmlSaveCtxtPtr ctxt, xmlNotationPtr cur);
 XML_HIDDEN int

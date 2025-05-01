@@ -148,19 +148,13 @@ static const signed char xmlEscapeTabAttr[128] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 };
 
-static void
+void
 xmlSerializeText(xmlOutputBufferPtr buf, const xmlChar *string,
-                 unsigned flags) {
+                 const signed char *tab, unsigned flags) {
     const char *cur;
-    const signed char *tab;
 
     if (string == NULL)
         return;
-
-    if (flags & XML_ESCAPE_ATTR)
-        tab = xmlEscapeTabAttr;
-    else
-        tab = xmlEscapeTab;
 
     cur = (const char *) string;
 
@@ -179,8 +173,12 @@ xmlSerializeText(xmlOutputBufferPtr buf, const xmlChar *string,
                 offset = tab[c];
                 if (offset >= 0)
                     break;
-            } else if (flags & XML_ESCAPE_NON_ASCII) {
-                break;
+            } else {
+                if (flags & XML_ESCAPE_NON_ASCII)
+                    break;
+                if ((flags & XML_ESCAPE_HTML) &&
+                    (c == 0xC2) && ((unsigned char) cur[1] == 0xA0))
+                    break;
             }
 
             cur += 1;
@@ -196,6 +194,10 @@ xmlSerializeText(xmlOutputBufferPtr buf, const xmlChar *string,
             xmlOutputBufferWrite(buf, xmlEscapeContent[offset],
                                  &xmlEscapeContent[offset+1]);
             cur += 1;
+        } else if ((flags & XML_ESCAPE_HTML) &&
+                   (c == 0xC2) && ((unsigned char) cur[1] == 0xA0)) {
+            xmlOutputBufferWrite(buf, 6, "&nbsp;");
+            cur += 2;
         } else {
             char tempBuf[12];
             int tempSize;
@@ -339,11 +341,14 @@ xmlNewSaveCtxt(const char *encoding, int options)
  ************************************************************************/
 
 static void
-xmlSaveWriteText(xmlSaveCtxt *ctxt, const xmlChar *text, unsigned flags) {
+xmlSaveWriteText(xmlSaveCtxt *ctxt, const xmlChar *text,
+                 const signed char *tab) {
+    unsigned flags = 0;
+
     if (ctxt->encoding == NULL)
         flags |= XML_ESCAPE_NON_ASCII;
 
-    xmlSerializeText(ctxt->buf, text, flags);
+    xmlSerializeText(ctxt->buf, text, tab, flags);
 }
 
 /**
@@ -363,7 +368,7 @@ xmlSaveWriteAttrContent(xmlSaveCtxt *ctxt, xmlAttrPtr attr)
     while (children != NULL) {
         switch (children->type) {
             case XML_TEXT_NODE:
-	        xmlSaveWriteText(ctxt, children->content, XML_ESCAPE_ATTR);
+	        xmlSaveWriteText(ctxt, children->content, xmlEscapeTabAttr);
 		break;
             case XML_ENTITY_REF_NODE:
                 xmlOutputBufferWrite(buf, 1, "&");
@@ -882,7 +887,7 @@ xmlOutputBufferWriteWSNonSig(xmlSaveCtxtPtr ctxt, int extra)
  */
 static void
 xmlNsDumpOutput(xmlOutputBufferPtr buf, xmlNsPtr cur, xmlSaveCtxtPtr ctxt) {
-    unsigned escapeFlags = XML_ESCAPE_ATTR;
+    unsigned escapeFlags = 0;
 
     if ((cur == NULL) || (buf == NULL)) return;
 
@@ -905,7 +910,7 @@ xmlNsDumpOutput(xmlOutputBufferPtr buf, xmlNsPtr cur, xmlSaveCtxtPtr ctxt) {
 	} else
 	    xmlOutputBufferWrite(buf, 5, "xmlns");
         xmlOutputBufferWrite(buf, 2, "=\"");
-        xmlSerializeText(buf, cur->href, escapeFlags);
+        xmlSerializeText(buf, cur->href, xmlEscapeTabAttr, escapeFlags);
         xmlOutputBufferWrite(buf, 1, "\"");
     }
 }
@@ -1222,7 +1227,7 @@ xmlNodeDumpOutputInternal(xmlSaveCtxtPtr ctxt, xmlNodePtr cur) {
                     xmlOutputBufferWriteEscape(buf, cur->content, NULL);
 #endif
                 else
-                    xmlSaveWriteText(ctxt, cur->content, /* flags */ 0);
+                    xmlSaveWriteText(ctxt, cur->content, xmlEscapeTab);
 	    } else {
 		/*
 		 * Disable escaping, needed for XSLT
@@ -1840,7 +1845,7 @@ xhtmlNodeDumpOutput(xmlSaveCtxtPtr ctxt, xmlNodePtr cur) {
                     xmlOutputBufferWriteEscape(buf, cur->content,
                                                ctxt->escape);
                 else
-                    xmlSaveWriteText(ctxt, cur->content, /* flags */ 0);
+                    xmlSaveWriteText(ctxt, cur->content, xmlEscapeTab);
 	    } else {
 		/*
 		 * Disable escaping, needed for XSLT
@@ -2285,11 +2290,11 @@ void
 xmlBufAttrSerializeTxtContent(xmlOutputBufferPtr buf, xmlDocPtr doc,
                               const xmlChar *string)
 {
-    int flags = XML_ESCAPE_ATTR;
+    int flags = 0;
 
     if ((doc == NULL) || (doc->encoding == NULL))
         flags |= XML_ESCAPE_NON_ASCII;
-    xmlSerializeText(buf, string, flags);
+    xmlSerializeText(buf, string, xmlEscapeTabAttr, flags);
 }
 
 /**
