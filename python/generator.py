@@ -3,7 +3,299 @@
 # generate python wrappers from the XML API description
 #
 
-functions = {}
+functions = {
+    'xmlRegisterXPathFunction': (
+        'Register a Python written function to the XPath interpreter',
+        ['int', '1 in case of success, 0 or -1 in case of error', None],
+        [['ctx', 'xmlXPathContextPtr', 'the xpathContext'], ['name', 'xmlChar *', 'the function name'], ['ns_uri', 'xmlChar *', 'the namespace or NULL'], ['f', 'pythonObject', 'the python function']],
+        'python', 'defined(LIBXML_XPATH_ENABLED)'),
+    'xmlXPathRegisterVariable': (
+        'Register a variable with the XPath context',
+        ['int', '1 in case of success, 0 or -1 in case of error', None],
+        [['ctx', 'xmlXPathContextPtr', 'the xpathContext'], ['name', 'xmlChar *', 'the variable name'], ['ns_uri', 'xmlChar *', 'the namespace or NULL'], ['value', 'pythonObject', 'the value']],
+        'python', 'defined(LIBXML_XPATH_ENABLED)'),
+    'xmlNewNode': (
+        'Create a new Node',
+        ['xmlNodePtr', 'A new element node', None],
+        [['name', 'xmlChar *', 'the node name']],
+        'python', None),
+    'xmlCreatePushParser': (
+        'Create a progressive XML parser context to build either an event flow if the SAX object is not None, or a DOM tree otherwise.',
+        ['xmlParserCtxtPtr', 'the parser context or None in case of error', None],
+        [['SAX', 'pythonObject', 'the SAX callback object or None'], ['chunk', 'xmlChar *', 'the initial data'], ['size', 'int', 'the size of the initial data'], ['URI', 'xmlChar *', 'The URI used for base computations']],
+        'python', None),
+    'htmlCreatePushParser': (
+        'Create a progressive HTML parser context to build either an event flow if the SAX object is not None, or a DOM tree otherwise.',
+        ['xmlParserCtxtPtr', 'the parser context or None in case of error', None],
+        [['SAX', 'pythonObject', 'the SAX callback object or None'], ['chunk', 'xmlChar *', 'the initial data'], ['size', 'int', 'the size of the initial data'], ['URI', 'xmlChar *', 'The URI used for base computations']],
+        'python', 'defined(LIBXML_HTML_ENABLED)'),
+    'xmlSAXParseFile': (
+        'Interface to parse an XML file or resource pointed by an URI to build an event flow to the SAX object',
+        ['void', None, None],
+        [['SAX', 'pythonObject', 'the SAX callback object or None'], ['URI', 'xmlChar *', 'The URI of the resource'], ['recover', 'int', 'allow recovery in case of error']],
+        'python', None),
+    'htmlSAXParseFile': (
+        'Interface to parse an HTML file or resource pointed by an URI to build an event flow to the SAX object',
+        ['void', None, None],
+        [['SAX', 'pythonObject', 'the SAX callback object or None'], ['URI', 'xmlChar *', 'The URI of the resource'], ['encoding', 'const char *', 'encoding or None']],
+        'python', 'defined(LIBXML_HTML_ENABLED)'),
+    'xmlCreateOutputBuffer': (
+        'Create a libxml2 output buffer from a Python file',
+        ['xmlOutputBufferPtr', 'the output buffer', None],
+        [['file', 'pythonObject', 'the Python file'], ['encoding', 'xmlChar *', 'an optional encoding']],
+        'python', None),
+    'xmlCreateInputBuffer': (
+        'Create a libxml2 input buffer from a Python file',
+        ['xmlParserInputBufferPtr', 'the input buffer', None],
+        [['file', 'pythonObject', 'the Python file'], ['encoding', 'xmlChar *', 'an optional encoding']],
+        'python', None),
+    'xmlSetEntityLoader': (
+        'Set the entity resolver as a python function',
+        ['int', '0 in case of success, -1 for error', None],
+        [['resolver', 'pythonObject', 'the Python function']],
+        'python', None),
+    'xmlParserGetDoc': (
+        'Get the document tree from a parser context.',
+        ['xmlDocPtr', 'the document tree', 'myDoc'],
+        [['ctxt', 'xmlParserCtxtPtr', 'the parser context']],
+        'python_accessor', None),
+    'xmlParserGetWellFormed': (
+        'Get the well formed information from a parser context.',
+        ['int', 'the wellFormed field', 'wellFormed'],
+        [['ctxt', 'xmlParserCtxtPtr', 'the parser context']],
+        'python_accessor', None),
+    'xmlParserGetIsValid': (
+        'Get the validity information from a parser context.',
+        ['int', 'the valid field', 'valid'],
+        [['ctxt', 'xmlParserCtxtPtr', 'the parser context']],
+        'python_accessor', None),
+    'xmlParserSetValidate': (
+        'Switch the parser to validation mode.',
+        ['void', None, None],
+        [['ctxt', 'xmlParserCtxtPtr', 'the parser context'], ['validate', 'int', '1 to activate validation']],
+        'python_accessor', None),
+    'xmlParserSetReplaceEntities': (
+        'Switch the parser to replace entities.',
+        ['void', None, None],
+        [['ctxt', 'xmlParserCtxtPtr', 'the parser context'], ['replaceEntities', 'int', '1 to replace entities']],
+        'python_accessor', None),
+    'xmlParserSetPedantic': (
+        'Switch the parser to be pedantic.',
+        ['void', None, None],
+        [['ctxt', 'xmlParserCtxtPtr', 'the parser context'], ['pedantic', 'int', '1 to run in pedantic mode']],
+        'python_accessor', None),
+    'xmlParserSetLoadSubset': (
+        'Switch the parser to load the DTD without validating.',
+        ['void', None, None],
+        [['ctxt', 'xmlParserCtxtPtr', 'the parser context'], ['loadsubset', 'int', '1 to load the DTD']],
+        'python_accessor', None),
+    'xmlParserSetLineNumbers': (
+        'Switch on the generation of line number for elements nodes.',
+        ['void', None, None],
+        [['ctxt', 'xmlParserCtxtPtr', 'the parser context'], ['linenumbers', 'int', '1 to save line numbers']],
+        'python_accessor', None),
+    'xmlDebugMemory': (
+        'Switch on the generation of line number for elements nodes. Also returns the number of bytes allocated and not freed by libxml2 since memory debugging was switched on.',
+        ['int', 'returns the number of bytes allocated and not freed', None],
+        [['activate', 'int', '1 switch on memory debugging 0 switch it off']],
+        'python', None),
+    'xmlNodeGetNs': (
+        'Get the namespace of a node',
+        ['xmlNsPtr', 'The namespace or None', None],
+        [['node', 'xmlNodePtr', 'the node']],
+        'python_accessor', None),
+    'xmlNodeGetNsDefs': (
+        'Get the namespace of a node',
+        ['xmlNsPtr', 'The namespace or None', None],
+        [['node', 'xmlNodePtr', 'the node']],
+        'python_accessor', None),
+    'xmlXPathParserGetContext': (
+        'Get the xpathContext from an xpathParserContext',
+        ['xmlXPathContextPtr', 'The XPath context', 'context'],
+        [['ctxt', 'xmlXPathParserContextPtr', 'the XPath parser context']],
+        'python_accessor', 'defined(LIBXML_XPATH_ENABLED)'),
+    'xmlXPathGetContextDoc': (
+        'Get the doc from an xpathContext',
+        ['xmlDocPtr', 'The doc context', 'doc'],
+        [['ctxt', 'xmlXPathContextPtr', 'the XPath context']],
+        'python_accessor', 'defined(LIBXML_XPATH_ENABLED)'),
+    'xmlXPathGetContextNode': (
+        'Get the current node from an xpathContext',
+        ['xmlNodePtr', 'The node context', 'node'],
+        [['ctxt', 'xmlXPathContextPtr', 'the XPath context']],
+        'python_accessor', 'defined(LIBXML_XPATH_ENABLED)'),
+    'xmlXPathSetContextDoc': (
+        'Set the doc of an xpathContext',
+        ['void', None, None],
+        [['ctxt', 'xmlXPathContextPtr', 'the XPath context'], ['doc', 'xmlDocPtr', 'The doc context']],
+        'python_accessor', 'defined(LIBXML_XPATH_ENABLED)'),
+    'xmlXPathSetContextNode': (
+        'Set the current node of an xpathContext',
+        ['void', None, None],
+        [['ctxt', 'xmlXPathContextPtr', 'the XPath context'], ['node', 'xmlNodePtr', 'The node context']],
+        'python_accessor', 'defined(LIBXML_XPATH_ENABLED)'),
+    'xmlXPathGetContextPosition': (
+        'Get the current node from an xpathContext',
+        ['int', 'The node context', 'proximityPosition'],
+        [['ctxt', 'xmlXPathContextPtr', 'the XPath context']],
+        'python_accessor', 'defined(LIBXML_XPATH_ENABLED)'),
+    'xmlXPathGetContextSize': (
+        'Get the current node from an xpathContext',
+        ['int', 'The node context', 'contextSize'],
+        [['ctxt', 'xmlXPathContextPtr', 'the XPath context']],
+        'python_accessor', 'defined(LIBXML_XPATH_ENABLED)'),
+    'xmlXPathGetFunction': (
+        'Get the current function name xpathContext',
+        ['const xmlChar *', 'The function name', 'function'],
+        [['ctxt', 'xmlXPathContextPtr', 'the XPath context']],
+        'python_accessor', 'defined(LIBXML_XPATH_ENABLED)'),
+    'xmlXPathGetFunctionURI': (
+        'Get the current function name URI xpathContext',
+        ['const xmlChar *', 'The function name URI', 'functionURI'],
+        [['ctxt', 'xmlXPathContextPtr', 'the XPath context']],
+        'python_accessor', 'defined(LIBXML_XPATH_ENABLED)'),
+    'xmlURIGetScheme': (
+        'Get the scheme part from an URI',
+        ['const char *', 'The URI scheme', 'scheme'],
+        [['URI', 'xmlURIPtr', 'the URI']],
+        'python_accessor', None),
+    'xmlURISetScheme': (
+        'Set the scheme part of an URI.',
+        ['void', None, None],
+        [['URI', 'xmlURIPtr', 'the URI'], ['scheme', 'char *', 'The URI scheme part']],
+        'python_accessor', None),
+    'xmlURIGetOpaque': (
+        'Get the opaque part from an URI',
+        ['const char *', 'The URI opaque', 'opaque'],
+        [['URI', 'xmlURIPtr', 'the URI']],
+        'python_accessor', None),
+    'xmlURISetOpaque': (
+        'Set the opaque part of an URI.',
+        ['void', None, None],
+        [['URI', 'xmlURIPtr', 'the URI'], ['opaque', 'char *', 'The URI opaque part']],
+        'python_accessor', None),
+    'xmlURIGetAuthority': (
+        'Get the authority part from an URI',
+        ['const char *', 'The URI authority', 'authority'],
+        [['URI', 'xmlURIPtr', 'the URI']],
+        'python_accessor', None),
+    'xmlURISetAuthority': (
+        'Set the authority part of an URI.',
+        ['void', None, None],
+        [['URI', 'xmlURIPtr', 'the URI'], ['authority', 'char *', 'The URI authority part']],
+        'python_accessor', None),
+    'xmlURIGetServer': (
+        'Get the server part from an URI',
+        ['const char *', 'The URI server', 'server'],
+        [['URI', 'xmlURIPtr', 'the URI']],
+        'python_accessor', None),
+    'xmlURISetServer': (
+        'Set the server part of an URI.',
+        ['void', None, None],
+        [['URI', 'xmlURIPtr', 'the URI'], ['server', 'char *', 'The URI server part']],
+        'python_accessor', None),
+    'xmlURIGetUser': (
+        'Get the user part from an URI',
+        ['const char *', 'The URI user', 'user'],
+        [['URI', 'xmlURIPtr', 'the URI']],
+        'python_accessor', None),
+    'xmlURISetUser': (
+        'Set the user part of an URI.',
+        ['void', None, None],
+        [['URI', 'xmlURIPtr', 'the URI'], ['user', 'char *', 'The URI user part']],
+        'python_accessor', None),
+    'xmlURIGetPath': (
+        'Get the path part from an URI',
+        ['const char *', 'The URI path', 'path'],
+        [['URI', 'xmlURIPtr', 'the URI']],
+        'python_accessor', None),
+    'xmlURISetPath': (
+        'Set the path part of an URI.',
+        ['void', None, None],
+        [['URI', 'xmlURIPtr', 'the URI'], ['path', 'char *', 'The URI path part']],
+        'python_accessor', None),
+    'xmlURIGetQuery': (
+        'Get the query part from an URI',
+        ['const char *', 'The URI query', 'query'],
+        [['URI', 'xmlURIPtr', 'the URI']],
+        'python_accessor', None),
+    'xmlURISetQuery': (
+        'Set the query part of an URI.',
+        ['void', None, None],
+        [['URI', 'xmlURIPtr', 'the URI'], ['query', 'char *', 'The URI query part']],
+        'python_accessor', None),
+    'xmlURIGetQueryRaw': (
+        'Get the raw query part from an URI (i.e. the unescaped form).',
+        ['const char *', 'The URI query', 'query_raw'],
+        [['URI', 'xmlURIPtr', 'the URI']],
+        'python_accessor', None),
+    'xmlURISetQueryRaw': (
+        'Set the raw query part of an URI (i.e. the unescaped form).',
+        ['void', None, None],
+        [['URI', 'xmlURIPtr', 'the URI'], ['query_raw', 'char *', 'The raw URI query part']],
+        'python_accessor', None),
+    'xmlURIGetFragment': (
+        'Get the fragment part from an URI',
+        ['const char *', 'The URI fragment', 'fragment'],
+        [['URI', 'xmlURIPtr', 'the URI']],
+        'python_accessor', None),
+    'xmlURISetFragment': (
+        'Set the fragment part of an URI.',
+        ['void', None, None],
+        [['URI', 'xmlURIPtr', 'the URI'], ['fragment', 'char *', 'The URI fragment part']],
+        'python_accessor', None),
+    'xmlURIGetPort': (
+        'Get the port part from an URI',
+        ['int', 'The URI port', 'port'],
+        [['URI', 'xmlURIPtr', 'the URI']],
+        'python_accessor', None),
+    'xmlURISetPort': (
+        'Set the port part of an URI.',
+        ['void', None, None],
+        [['URI', 'xmlURIPtr', 'the URI'], ['port', 'int', 'The URI port part']],
+        'python_accessor', None),
+    'xmlErrorGetDomain': (
+        'What part of the library raised this error',
+        ['int', 'The error domain', 'domain'],
+        [['Error', 'xmlErrorPtr', 'the Error']],
+        'python_accessor', None),
+    'xmlErrorGetCode': (
+        'The error code, e.g. an xmlParserError',
+        ['int', 'The error code', 'code'],
+        [['Error', 'xmlErrorPtr', 'the Error']],
+        'python_accessor', None),
+    'xmlErrorGetMessage': (
+        'human-readable informative error message',
+        ['const char *', 'The error message', 'message'],
+        [['Error', 'xmlErrorPtr', 'the Error']],
+        'python_accessor', None),
+    'xmlErrorGetLevel': (
+        'how consequent is the error',
+        ['int', 'The error level', 'level'],
+        [['Error', 'xmlErrorPtr', 'the Error']],
+        'python_accessor', None),
+    'xmlErrorGetFile': (
+        'the filename',
+        ['const char *', 'The error file', 'file'],
+        [['Error', 'xmlErrorPtr', 'the Error']],
+        'python_accessor', None),
+    'xmlErrorGetLine': (
+        'the line number if available',
+        ['int', 'The error line', 'line'],
+        [['Error', 'xmlErrorPtr', 'the Error']],
+        'python_accessor', None),
+    'xmlPythonCleanupParser': (
+        "Cleanup function for the XML library. It tries to reclaim all parsing related global memory allocated for the library processing. It doesn't deallocate any document related memory. Calling this function should not prevent reusing the library but one should call xmlCleanupParser() only when the process has finished using the library or XML document built with it.",
+        ['void', None, None],
+        [],
+        'python', None),
+    'xmlMemoryUsed': (
+        'Returns the total amount of memory allocated by libxml2',
+        ['int', 'number of bytes allocated', None],
+        [],
+        'python', None)
+}
+
 enums = {} # { enumType: { enumConstant: enumValue } }
 
 import os
@@ -21,132 +313,6 @@ else:
     # imported
     srcPref = os.path.dirname(__file__)
     dstPref = os.getcwd()
-
-#######################################################################
-#
-#  That part if purely the API acquisition phase from the
-#  XML API description
-#
-#######################################################################
-import os
-import xml.sax
-
-debug = 0
-
-def getparser():
-    # Attach parser to an unmarshalling object. return both objects.
-    target = docParser()
-    parser = xml.sax.make_parser()
-    parser.setContentHandler(target)
-    return parser, target
-
-class docParser(xml.sax.handler.ContentHandler):
-    def __init__(self):
-        self._methodname = None
-        self._data = []
-        self.in_function = 0
-
-        self.startElement = self.start
-        self.endElement = self.end
-        self.characters = self.data
-
-    def close(self):
-        if debug:
-            print("close")
-
-    def getmethodname(self):
-        return self._methodname
-
-    def data(self, text):
-        if debug:
-            print("data %s" % text)
-        self._data.append(text)
-
-    def start(self, tag, attrs):
-        if debug:
-            print("start %s, %s" % (tag, attrs))
-        if tag == 'function':
-            self._data = []
-            self.in_function = 1
-            self.function = None
-            self.function_cond = None
-            self.function_args = []
-            self.function_descr = None
-            self.function_return = None
-            self.function_file = None
-            if 'name' in attrs.keys():
-                self.function = attrs['name']
-            if 'file' in attrs.keys():
-                self.function_file = attrs['file']
-        elif tag == 'cond':
-            self._data = []
-        elif tag == 'info':
-            self._data = []
-        elif tag == 'arg':
-            if self.in_function == 1:
-                self.function_arg_name = None
-                self.function_arg_type = None
-                self.function_arg_info = None
-                if 'name' in attrs.keys():
-                    self.function_arg_name = attrs['name']
-                if 'type' in attrs.keys():
-                    self.function_arg_type = attrs['type']
-                if 'info' in attrs.keys():
-                    self.function_arg_info = attrs['info']
-        elif tag == 'return':
-            if self.in_function == 1:
-                self.function_return_type = None
-                self.function_return_info = None
-                self.function_return_field = None
-                if 'type' in attrs.keys():
-                    self.function_return_type = attrs['type']
-                if 'info' in attrs.keys():
-                    self.function_return_info = attrs['info']
-                if 'field' in attrs.keys():
-                    self.function_return_field = attrs['field']
-        elif tag == 'enum':
-            enum(attrs['type'],attrs['name'],attrs['value'])
-
-    def end(self, tag):
-        if debug:
-            print("end %s" % tag)
-        if tag == 'function':
-            if self.function != None:
-                function(self.function, self.function_descr,
-                         self.function_return, self.function_args,
-                         self.function_file, self.function_cond)
-                self.in_function = 0
-        elif tag == 'arg':
-            if self.in_function == 1:
-                self.function_args.append([self.function_arg_name,
-                                           self.function_arg_type,
-                                           self.function_arg_info])
-        elif tag == 'return':
-            if self.in_function == 1:
-                self.function_return = [self.function_return_type,
-                                        self.function_return_info,
-                                        self.function_return_field]
-        elif tag == 'info':
-            str = ''
-            for c in self._data:
-                str = str + c
-            if self.in_function == 1:
-                self.function_descr = str
-        elif tag == 'cond':
-            str = ''
-            for c in self._data:
-                str = str + c
-            if self.in_function == 1:
-                self.function_cond = str
-
-
-def function(name, desc, ret, args, file, cond):
-    functions[name] = (desc, ret, args, file, cond)
-
-def enum(type, name, value):
-    if type not in enums:
-        enums[type] = {}
-    enums[type][name] = value
 
 #######################################################################
 #
@@ -174,6 +340,132 @@ skipped_types = {
     'xmlBufferPtr': "internal representation not suitable for python",
     'FILE *': None,
 }
+
+#######################################################################
+#
+#  That part if purely the API acquisition phase from the
+#  XML API description
+#
+#######################################################################
+import os
+import xml.etree.ElementTree as etree
+
+sys.path.append(srcPref + '/../tools')
+import xmlmod
+
+xmlDocDir = dstPref + '/../doc/xml'
+if not os.path.isdir(xmlDocDir):
+    xmlDocDir = dstPref + '/doc/xml'
+    if not os.path.isdir(xmlDocDir):
+        raise Exception(f'Doxygen XML not found in {dstPref}')
+
+def extractDocs(node):
+    text = ''
+
+    if node.text is not None:
+        text = node.text.strip()
+        if text == 'Deprecated':
+            text = 'DEPRECATED:'
+
+    i = 0
+    n = len(node)
+    for child in node:
+        i += 1
+
+        if (child.tag != 'parameterlist' and
+            (child.tag != 'simplesect' or child.get('kind') != 'return')):
+            childtext = extractDocs(child)
+            if childtext != '':
+                if text != '':
+                    text += ' '
+                text += childtext
+
+        tail = child.tail
+        if tail is not None:
+            tail = tail.strip()
+            if tail != '':
+                if text != '':
+                    text += ' '
+                text += child.tail.strip()
+
+    return text
+
+for file in os.listdir(xmlDocDir):
+    if not file.endswith('_8h.xml'):
+        continue
+
+    doc = etree.parse(xmlDocDir + '/' + file)
+
+    compound = doc.find('compounddef')
+    module = compound.find('compoundname').text
+    if not module.endswith('.h'):
+        continue
+    module = module[:-2]
+    if module in skipped_modules:
+        continue
+
+    for section in compound.findall('sectiondef'):
+        kind = section.get('kind')
+
+        if kind == 'func':
+            for func in section.findall('memberdef'):
+                name = func.find('name').text
+                if name in functions:
+                    continue
+
+                docs = extractDocs(func.find('detaileddescription'))
+
+                rtype = etree.tostring(func.find('type'),
+                    method='text', encoding='unicode').rstrip()
+
+                valid = True
+                args = []
+                for arg in func.findall('param'):
+                    atype = etree.tostring(arg.find('type'),
+                        method='text', encoding='unicode').rstrip()
+                    if atype == 'void':
+                        continue
+
+                    aname = arg.find('declname')
+                    if aname is None:
+                        valid = False
+                        break
+
+                    args.append([aname.text, atype])
+
+                if not valid:
+                    continue
+
+                module1, module2 = xmlmod.findModules(module, name)
+
+                cond = None
+                if module1 != '':
+                    cond = f'defined(LIBXML_{module1}_ENABLED)'
+                if module2 != '':
+                    cond += f' && defined(LIBXML_{module2}_ENABLED)'
+
+                functions[name] = (docs, [rtype], args, module, cond)
+        elif kind == 'enum':
+            for enum in section.findall('memberdef'):
+                name = enum.find('name').text
+                edict = {}
+                enums[name] = edict
+                prev = -1
+
+                for value in enum.findall('enumvalue'):
+                    ename = value.find('name').text
+
+                    init = value.find('initializer')
+                    if init is None:
+                        evalue = prev + 1
+                    else:
+                        evalue = init.text.lstrip()
+                        if evalue[0] != '=':
+                            raise Exception(f'invalid init value {init}')
+                        evalue = eval(evalue[1:].strip())
+
+                    edict[ename] = evalue
+                    prev = evalue
 
 #######################################################################
 #
@@ -311,6 +603,7 @@ deprecated_funcs = {
     'xmlCleanupCharEncodingHandlers': True,
     'xmlCleanupEncodingAliases': True,
     'xmlCleanupGlobals': True,
+    'xmlClearParserCtxt': True,
     'xmlCopyChar': True,
     'xmlCopyCharMultiByte': True,
     'xmlCreateEntityParserCtxt': True,
@@ -669,39 +962,7 @@ def buildStubs():
     global py_return_types
     global unknown_types
 
-    try:
-        f = open(os.path.join(srcPref,"libxml2-api.xml"))
-        data = f.read()
-        (parser, target)  = getparser()
-        parser.feed(data)
-        parser.close()
-    except IOError as msg:
-        try:
-            f = open(os.path.join(srcPref,"..","doc","libxml2-api.xml"))
-            data = f.read()
-            (parser, target)  = getparser()
-            parser.feed(data)
-            parser.close()
-        except IOError as msg:
-            print("Failed to open libxml2-api.xml:", msg)
-            sys.exit(1)
-
-    n = len(list(functions.keys()))
-    print("Found %d functions in libxml2-api.xml" % (n))
-
     py_types['pythonObject'] = ('O', "pythonObject", "pythonObject", "pythonObject")
-    try:
-        f = open(os.path.join(srcPref,"libxml2-python-api.xml"))
-        data = f.read()
-        (parser, target)  = getparser()
-        parser.feed(data)
-        parser.close()
-    except IOError as msg:
-        print("Failed to open libxml2-python-api.xml:", msg)
-
-
-    print("Found %d functions in libxml2-python-api.xml" % (
-          len(list(functions.keys())) - n))
     nb_wrap = 0
     failed = 0
     skipped = 0
@@ -733,8 +994,8 @@ def buildStubs():
     export.close()
     wrapper.close()
 
-    print("Generated %d wrapper functions, %d failed, %d skipped" % (nb_wrap,
-                                                              failed, skipped))
+#    print("Generated %d wrapper functions, %d failed, %d skipped" % (nb_wrap,
+#                                                              failed, skipped))
 #    print("Missing type converters: ")
 #    for type in list(unknown_types.keys()):
 #        print("%s:%d " % (type, len(unknown_types[type])))
@@ -985,6 +1246,7 @@ def writeDoc(name, args, indent, output):
          return
      val = functions[name][0]
      val = val.replace("NULL", "None")
+     val = val.replace("\\", "\\\\")
      output.write(indent)
      output.write('"""')
      while len(val) > 60:
@@ -1370,7 +1632,8 @@ def buildWrappers():
     #
     # Generate enum constants
     #
-    for type,enum in enums.items():
+    for type in sorted(enums.keys()):
+        enum = enums[type]
         classes.write("# %s\n" % type)
         items = enum.items()
         items = sorted(items, key=(lambda i: int(i[1])))

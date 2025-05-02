@@ -3,7 +3,7 @@
  *
  * See Copyright for the status of this software.
  *
- * daniel@veillard.com
+ * Author: Daniel Veillard
  */
 
 #define IN_LIBXML
@@ -114,12 +114,11 @@ static int xmlOutputCallbackNr;
  ************************************************************************/
 
 /**
- * xmlIOErr:
- * @code:  the error number
+ * @param err  the error number
  *
  * Convert errno to xmlParserErrors.
  *
- * Returns an xmlParserErrors code.
+ * @returns an xmlParserErrors code.
  */
 static xmlParserErrors
 xmlIOErr(int err)
@@ -290,7 +289,7 @@ xmlIOErr(int err)
 
 /**
  * __xmlIOWin32UTF8ToWChar:
- * @u8String:  uft-8 string
+ * @param u8String  uft-8 string
  *
  * Convert a string from utf-8 to wchar (WINDOWS ONLY!)
  */
@@ -330,12 +329,11 @@ __xmlIOWin32UTF8ToWChar(const char *u8String)
 #endif
 
 /**
- * xmlNormalizeWindowsPath:
- * @path: the input file path
+ * @param path  the input file path
  *
- * DEPRECATED: This never really worked.
+ * @deprecated This never really worked.
  *
- * Returns a copy of path.
+ * @returns a copy of path.
  */
 xmlChar *
 xmlNormalizeWindowsPath(const xmlChar *path)
@@ -344,16 +342,15 @@ xmlNormalizeWindowsPath(const xmlChar *path)
 }
 
 /**
- * xmlCheckFilename:
- * @path:  the path to check
+ * @param path  the path to check
  *
- * DEPRECATED: Internal function, don't use.
+ * @deprecated Internal function, don't use.
  *
  * if stat is not available on the target machine,
- * returns 1.  if stat fails, returns 0 (if calling
+ * @returns 1.  if stat fails, returns 0 (if calling
  * stat on the filename fails, it can't be right).
  * if stat succeeds and the file is a directory,
- * returns 2.  otherwise returns 1.
+ * @returns 2.  otherwise returns 1.
  */
 int
 xmlCheckFilename(const char *path)
@@ -437,11 +434,11 @@ typedef struct {
 } xmlFdIOCtxt;
 
 /**
- * xmlFdOpen:
- * @filename:  the URI for matching
- * @out:  pointer to resulting context
+ * @param filename  the URI for matching
+ * @param write  whether the fd is opened for writing
+ * @param out  pointer to resulting context
  *
- * Returns an xmlParserErrors code
+ * @returns an xmlParserErrors code
  */
 static xmlParserErrors
 xmlFdOpen(const char *filename, int write, int *out) {
@@ -504,14 +501,13 @@ xmlFdOpen(const char *filename, int write, int *out) {
 }
 
 /**
- * xmlFdRead:
- * @context:  the I/O context
- * @buffer:  where to drop data
- * @len:  number of bytes to read
+ * @param context  the I/O context
+ * @param buffer  where to drop data
+ * @param len  number of bytes to read
  *
- * Read @len bytes to @buffer from the I/O channel.
+ * Read `len` bytes to `buffer` from the I/O channel.
  *
- * Returns the number of bytes read
+ * @returns the number of bytes read
  */
 static int
 xmlFdRead(void *context, char *buffer, int len) {
@@ -543,14 +539,13 @@ xmlFdRead(void *context, char *buffer, int len) {
 
 #ifdef LIBXML_OUTPUT_ENABLED
 /**
- * xmlFdWrite:
- * @context:  the I/O context
- * @buffer:  where to get data
- * @len:  number of bytes to write
+ * @param context  the I/O context
+ * @param buffer  where to get data
+ * @param len  number of bytes to write
  *
- * Write @len bytes from @buffer to the I/O channel.
+ * Write `len` bytes from `buffer` to the I/O channel.
  *
- * Returns the number of bytes written
+ * @returns the number of bytes written
  */
 static int
 xmlFdWrite(void *context, const char *buffer, int len) {
@@ -579,12 +574,11 @@ xmlFdFree(void *context) {
 }
 
 /**
- * xmlFdClose:
- * @context:  the I/O context
+ * @param context  the I/O context
  *
  * Close an I/O channel
  *
- * Returns 0 in case of success and error code otherwise
+ * @returns 0 in case of success and error code otherwise
  */
 static int
 xmlFdClose (void * context) {
@@ -603,12 +597,11 @@ xmlFdClose (void * context) {
 }
 
 /**
- * xmlFileMatch:
- * @filename:  the URI for matching
+ * @param filename  the URI for matching
  *
- * DEPRECATED: Internal function, don't use.
+ * @deprecated Internal function, don't use.
  *
- * Returns 1 if matches, 0 otherwise
+ * @returns 1 if matches, 0 otherwise
  */
 int
 xmlFileMatch (const char *filename ATTRIBUTE_UNUSED) {
@@ -616,13 +609,13 @@ xmlFileMatch (const char *filename ATTRIBUTE_UNUSED) {
 }
 
 /**
- * xmlFileOpenSafe:
- * @filename:  the URI for matching
- * @out:  pointer to resulting context
+ * @param filename  the URI for matching
+ * @param write  whether the file is opened for writing
+ * @param out  pointer to resulting context
  *
  * input from FILE *
  *
- * Returns an xmlParserErrors code
+ * @returns an xmlParserErrors code
  */
 static xmlParserErrors
 xmlFileOpenSafe(const char *filename, int write, void **out) {
@@ -678,12 +671,11 @@ xmlFileOpenSafe(const char *filename, int write, void **out) {
 }
 
 /**
- * xmlFileOpen:
- * @filename:  the URI for matching
+ * @param filename  the URI for matching
  *
- * DEPRECATED: Internal function, don't use.
+ * @deprecated Internal function, don't use.
  *
- * Returns an IO context or NULL in case or failure
+ * @returns an IO context or NULL in case or failure
  */
 void *
 xmlFileOpen(const char *filename) {
@@ -694,14 +686,13 @@ xmlFileOpen(const char *filename) {
 }
 
 /**
- * xmlFileRead:
- * @context:  the I/O context
- * @buffer:  where to drop data
- * @len:  number of bytes to write
+ * @param context  the I/O context
+ * @param buffer  where to drop data
+ * @param len  number of bytes to write
  *
- * DEPRECATED: Internal function, don't use.
+ * @deprecated Internal function, don't use.
  *
- * Returns the number of bytes read or < 0 in case of failure
+ * @returns the number of bytes read or < 0 in case of failure
  */
 int
 xmlFileRead(void * context, char * buffer, int len) {
@@ -727,14 +718,13 @@ xmlFileRead(void * context, char * buffer, int len) {
 
 #ifdef LIBXML_OUTPUT_ENABLED
 /**
- * xmlFileWrite:
- * @context:  the I/O context
- * @buffer:  where to drop data
- * @len:  number of bytes to write
+ * @param context  the I/O context
+ * @param buffer  where to drop data
+ * @param len  number of bytes to write
  *
- * Write @len bytes from @buffer to the I/O channel.
+ * Write `len` bytes from `buffer` to the I/O channel.
  *
- * Returns the number of bytes written
+ * @returns the number of bytes written
  */
 static int
 xmlFileWrite(void *context, const char *buffer, int len) {
@@ -754,8 +744,7 @@ xmlFileWrite(void *context, const char *buffer, int len) {
 #endif /* LIBXML_OUTPUT_ENABLED */
 
 /**
- * xmlFileFlush:
- * @context:  the I/O context
+ * @param context  the I/O context
  *
  * Flush an I/O channel
  */
@@ -773,12 +762,11 @@ xmlFileFlush (void * context) {
 }
 
 /**
- * xmlFileClose:
- * @context:  the I/O context
+ * @param context  the I/O context
  *
- * DEPRECATED: Internal function, don't use.
+ * @deprecated Internal function, don't use.
  *
- * Returns 0 or -1 an error code case of error
+ * @returns 0 or -1 an error code case of error
  */
 int
 xmlFileClose (void * context) {
@@ -800,14 +788,13 @@ xmlFileClose (void * context) {
 
 #ifdef LIBXML_OUTPUT_ENABLED
 /**
- * xmlBufferWrite:
- * @context:  the xmlBuffer
- * @buffer:  the data to write
- * @len:  number of bytes to write
+ * @param context  the xmlBuffer
+ * @param buffer  the data to write
+ * @param len  number of bytes to write
  *
- * Write @len bytes from @buffer to the xml buffer
+ * Write `len` bytes from `buffer` to the xml buffer
  *
- * Returns the number of bytes written or a negative xmlParserErrors
+ * @returns the number of bytes written or a negative xmlParserErrors
  * value.
  */
 static int
@@ -829,14 +816,13 @@ xmlBufferWrite (void * context, const char * buffer, int len) {
  ************************************************************************/
 
 /**
- * xmlGzfileRead:
- * @context:  the I/O context
- * @buffer:  where to drop data
- * @len:  number of bytes to write
+ * @param context  the I/O context
+ * @param buffer  where to drop data
+ * @param len  number of bytes to write
  *
- * Read @len bytes to @buffer from the compressed I/O channel.
+ * Read `len` bytes to `buffer` from the compressed I/O channel.
  *
- * Returns the number of bytes read.
+ * @returns the number of bytes read.
  */
 static int
 xmlGzfileRead (void * context, char * buffer, int len) {
@@ -850,14 +836,13 @@ xmlGzfileRead (void * context, char * buffer, int len) {
 
 #ifdef LIBXML_OUTPUT_ENABLED
 /**
- * xmlGzfileWrite:
- * @context:  the I/O context
- * @buffer:  where to drop data
- * @len:  number of bytes to write
+ * @param context  the I/O context
+ * @param buffer  where to drop data
+ * @param len  number of bytes to write
  *
- * Write @len bytes from @buffer to the compressed I/O channel.
+ * Write `len` bytes from `buffer` to the compressed I/O channel.
  *
- * Returns the number of bytes written
+ * @returns the number of bytes written
  */
 static int
 xmlGzfileWrite (void * context, const char * buffer, int len) {
@@ -871,8 +856,7 @@ xmlGzfileWrite (void * context, const char * buffer, int len) {
 #endif /* LIBXML_OUTPUT_ENABLED */
 
 /**
- * xmlGzfileClose:
- * @context:  the I/O context
+ * @param context  the I/O context
  *
  * Close a compressed I/O channel
  */
@@ -895,14 +879,13 @@ xmlGzfileClose (void * context) {
 #include "private/xzlib.h"
 
 /**
- * xmlXzfileRead:
- * @context:  the I/O context
- * @buffer:  where to drop data
- * @len:  number of bytes to write
+ * @param context  the I/O context
+ * @param buffer  where to drop data
+ * @param len  number of bytes to write
  *
- * Read @len bytes to @buffer from the compressed I/O channel.
+ * Read `len` bytes to `buffer` from the compressed I/O channel.
  *
- * Returns the number of bytes written
+ * @returns the number of bytes written
  */
 static int
 xmlXzfileRead (void * context, char * buffer, int len) {
@@ -915,8 +898,7 @@ xmlXzfileRead (void * context, char * buffer, int len) {
 }
 
 /**
- * xmlXzfileClose:
- * @context:  the I/O context
+ * @param context  the I/O context
  *
  * Close a compressed I/O channel
  */
@@ -940,15 +922,14 @@ xmlIODefaultMatch(const char *filename ATTRIBUTE_UNUSED) {
 }
 
 /**
- * xmlInputFromFd:
- * @buf:  parser input buffer
- * @fd:  file descriptor
- * @flags:  flags
+ * @param buf  parser input buffer
+ * @param fd  file descriptor
+ * @param flags  flags
  *
- * Update the buffer to read from @fd. Supports the XML_INPUT_UNZIP
+ * Update the buffer to read from `fd`. Supports the XML_INPUT_UNZIP
  * flag.
  *
- * Returns an xmlParserErrors code.
+ * @returns an xmlParserErrors code.
  */
 xmlParserErrors
 xmlInputFromFd(xmlParserInputBufferPtr buf, int fd,
@@ -1055,12 +1036,11 @@ xmlInputFromFd(xmlParserInputBufferPtr buf, int fd,
 }
 
 /**
- * xmlInputDefaultOpen:
- * @buf:  input buffer to be filled
- * @filename:  filename or URI
- * @flags:  XML_INPUT flags
+ * @param buf  input buffer to be filled
+ * @param filename  filename or URI
+ * @param flags  XML_INPUT flags
  *
- * Returns an xmlParserErrors code.
+ * @returns an xmlParserErrors code.
  */
 static xmlParserErrors
 xmlInputDefaultOpen(xmlParserInputBufferPtr buf, const char *filename,
@@ -1084,13 +1064,11 @@ xmlInputDefaultOpen(xmlParserInputBufferPtr buf, const char *filename,
 
 #ifdef LIBXML_OUTPUT_ENABLED
 /**
- * xmlOutputDefaultOpen:
- * @buf:  input buffer to be filled
- * @filename:  filename or URI
- * @compression:  compression level or 0
- * @is_file_uri:  whether filename is a file URI
+ * @param buf  input buffer to be filled
+ * @param filename  filename or URI
+ * @param compression  compression level or 0
  *
- * Returns an xmlParserErrors code.
+ * @returns an xmlParserErrors code.
  */
 static xmlParserErrors
 xmlOutputDefaultOpen(xmlOutputBufferPtr buf, const char *filename,
@@ -1149,10 +1127,9 @@ xmlOutputDefaultOpen(xmlOutputBufferPtr buf, const char *filename,
 #endif
 
 /**
- * xmlAllocParserInputBuffer:
- * @enc:  the charset encoding if known (deprecated)
+ * @param enc  the charset encoding if known (deprecated)
  *
- * DEPRECATED: Use xmlNewInputFrom*.
+ * @deprecated Use xmlNewInputFrom*.
  *
  * Create a buffered parser input for progressive parsing.
  *
@@ -1160,7 +1137,7 @@ xmlOutputDefaultOpen(xmlOutputBufferPtr buf, const char *filename,
  * XML_CHAR_ENCODING_NONE. The encoding can be changed with
  * xmlSwitchEncoding or xmlSwitchEncodingName later on.
  *
- * Returns the new parser input or NULL
+ * @returns the new parser input or NULL
  */
 xmlParserInputBufferPtr
 xmlAllocParserInputBuffer(xmlCharEncoding enc) {
@@ -1198,14 +1175,13 @@ xmlAllocParserInputBuffer(xmlCharEncoding enc) {
 
 #ifdef LIBXML_OUTPUT_ENABLED
 /**
- * xmlAllocOutputBuffer:
- * @encoder:  the encoding converter or NULL
+ * @param encoder  the encoding converter or NULL
  *
  * Create a buffered parser output
  *
- * Consumes @encoder even in error case.
+ * Consumes `encoder` even in error case.
  *
- * Returns the new parser output or NULL
+ * @returns the new parser output or NULL
  */
 xmlOutputBufferPtr
 xmlAllocOutputBuffer(xmlCharEncodingHandlerPtr encoder) {
@@ -1248,8 +1224,7 @@ xmlAllocOutputBuffer(xmlCharEncodingHandlerPtr encoder) {
 #endif /* LIBXML_OUTPUT_ENABLED */
 
 /**
- * xmlFreeParserInputBuffer:
- * @in:  a buffered parser input
+ * @param in  a buffered parser input
  *
  * Free up the memory used by a buffered parser input
  */
@@ -1277,13 +1252,12 @@ xmlFreeParserInputBuffer(xmlParserInputBufferPtr in) {
 
 #ifdef LIBXML_OUTPUT_ENABLED
 /**
- * xmlOutputBufferClose:
- * @out:  a buffered output
+ * @param out  a buffered output
  *
  * flushes and close the output I/O channel
  * and free up all the associated resources
  *
- * Returns the number of byte written or a negative xmlParserErrors
+ * @returns the number of byte written or a negative xmlParserErrors
  * code in case of error.
  */
 int
@@ -1333,13 +1307,12 @@ xmlOutputBufferClose(xmlOutputBufferPtr out)
 #endif /* LIBXML_OUTPUT_ENABLED */
 
 /**
- * xmlParserInputBufferCreateUrl:
- * @URI:  the filename or URI
- * @enc:  encoding enum (deprecated)
- * @flags:  XML_INPUT flags
- * @out:  pointer to resulting input buffer
+ * @param URI  the filename or URI
+ * @param enc  encoding enum (deprecated)
+ * @param flags  XML_INPUT flags
+ * @param out  pointer to resulting input buffer
  *
- * Returns an xmlParserErrors code.
+ * @returns an xmlParserErrors code.
  */
 xmlParserErrors
 xmlParserInputBufferCreateUrl(const char *URI, xmlCharEncoding enc,
@@ -1405,18 +1378,17 @@ __xmlParserInputBufferCreateFilename(const char *URI, xmlCharEncoding enc) {
 }
 
 /**
- * xmlParserInputBufferCreateFilename:
- * @URI:  a C string containing the URI or filename
- * @enc:  the charset encoding if known
+ * @param URI  a C string containing the URI or filename
+ * @param enc  the charset encoding if known
  *
- * DEPRECATED: Use xmlNewInputFromUrl.
+ * @deprecated Use xmlNewInputFromUrl.
  *
  * Create a buffered parser input for the progressive parsing of a file
  * Automatic support for ZLIB/Compress compressed document is provided
  * by default if found at compile-time.
  * Do an encoding check if enc == XML_CHAR_ENCODING_NONE
  *
- * Returns the new parser input or NULL
+ * @returns the new parser input or NULL
  */
 xmlParserInputBufferPtr
 xmlParserInputBufferCreateFilename(const char *URI, xmlCharEncoding enc) {
@@ -1519,10 +1491,9 @@ error:
 }
 
 /**
- * xmlOutputBufferCreateFilename:
- * @URI:  a C string containing the URI or filename
- * @encoder:  the encoding converter or NULL
- * @compression:  the compression ration (0 none, 9 max).
+ * @param URI  a C string containing the URI or filename
+ * @param encoder  the encoding converter or NULL
+ * @param compression  the compression ration (0 none, 9 max).
  *
  * Create a buffered  output for the progressive saving of a file
  * If filename is "-' then we use stdout as the output.
@@ -1531,9 +1502,9 @@ error:
  * TODO: currently if compression is set, the library only support
  *       writing to a local file.
  *
- * Consumes @encoder even in error case.
+ * Consumes `encoder` even in error case.
  *
- * Returns the new output or NULL
+ * @returns the new output or NULL
  */
 xmlOutputBufferPtr
 xmlOutputBufferCreateFilename(const char *URI,
@@ -1547,11 +1518,10 @@ xmlOutputBufferCreateFilename(const char *URI,
 #endif /* LIBXML_OUTPUT_ENABLED */
 
 /**
- * xmlParserInputBufferCreateFile:
- * @file:  a FILE*
- * @enc:  the charset encoding if known (deprecated)
+ * @param file  a FILE*
+ * @param enc  the charset encoding if known (deprecated)
  *
- * DEPRECATED: Don't use.
+ * @deprecated Don't use.
  *
  * Create a buffered parser input for the progressive parsing of a FILE *
  * buffered C I/O
@@ -1560,7 +1530,7 @@ xmlOutputBufferCreateFilename(const char *URI,
  * XML_CHAR_ENCODING_NONE. The encoding can be changed with
  * xmlSwitchEncoding or xmlSwitchEncodingName later on.
  *
- * Returns the new parser input or NULL
+ * @returns the new parser input or NULL
  */
 xmlParserInputBufferPtr
 xmlParserInputBufferCreateFile(FILE *file, xmlCharEncoding enc) {
@@ -1580,16 +1550,15 @@ xmlParserInputBufferCreateFile(FILE *file, xmlCharEncoding enc) {
 
 #ifdef LIBXML_OUTPUT_ENABLED
 /**
- * xmlOutputBufferCreateFile:
- * @file:  a FILE*
- * @encoder:  the encoding converter or NULL
+ * @param file  a FILE*
+ * @param encoder  the encoding converter or NULL
  *
  * Create a buffered output for the progressive saving to a FILE *
  * buffered C I/O
  *
- * Consumes @encoder even in error case.
+ * Consumes `encoder` even in error case.
  *
- * Returns the new parser output or NULL
+ * @returns the new parser output or NULL
  */
 xmlOutputBufferPtr
 xmlOutputBufferCreateFile(FILE *file, xmlCharEncodingHandlerPtr encoder) {
@@ -1611,15 +1580,14 @@ xmlOutputBufferCreateFile(FILE *file, xmlCharEncodingHandlerPtr encoder) {
 }
 
 /**
- * xmlOutputBufferCreateBuffer:
- * @buffer:  a xmlBufferPtr
- * @encoder:  the encoding converter or NULL
+ * @param buffer  a xmlBufferPtr
+ * @param encoder  the encoding converter or NULL
  *
  * Create a buffered output for the progressive saving to a xmlBuffer
  *
- * Consumes @encoder even in error case.
+ * Consumes `encoder` even in error case.
  *
- * Returns the new parser output or NULL
+ * @returns the new parser output or NULL
  */
 xmlOutputBufferPtr
 xmlOutputBufferCreateBuffer(xmlBufferPtr buffer,
@@ -1638,12 +1606,11 @@ xmlOutputBufferCreateBuffer(xmlBufferPtr buffer,
 }
 
 /**
- * xmlOutputBufferGetContent:
- * @out:  an xmlOutputBufferPtr
+ * @param out  an xmlOutputBufferPtr
  *
  * Gives a pointer to the data currently held in the output buffer
  *
- * Returns a pointer to the data or NULL in case of error
+ * @returns a pointer to the data or NULL in case of error
  */
 const xmlChar *
 xmlOutputBufferGetContent(xmlOutputBufferPtr out) {
@@ -1654,12 +1621,11 @@ xmlOutputBufferGetContent(xmlOutputBufferPtr out) {
 }
 
 /**
- * xmlOutputBufferGetSize:
- * @out:  an xmlOutputBufferPtr
+ * @param out  an xmlOutputBufferPtr
  *
  * Gives the length of the data currently held in the output buffer
  *
- * Returns 0 in case or error or no data is held, the size otherwise
+ * @returns 0 in case or error or no data is held, the size otherwise
  */
 size_t
 xmlOutputBufferGetSize(xmlOutputBufferPtr out) {
@@ -1673,11 +1639,10 @@ xmlOutputBufferGetSize(xmlOutputBufferPtr out) {
 #endif /* LIBXML_OUTPUT_ENABLED */
 
 /**
- * xmlParserInputBufferCreateFd:
- * @fd:  a file descriptor number
- * @enc:  the charset encoding if known (deprecated)
+ * @param fd  a file descriptor number
+ * @param enc  the charset encoding if known (deprecated)
  *
- * DEPRECATED: Use xmlNewInputFromFd.
+ * @deprecated Use xmlNewInputFromFd.
  *
  * Create a buffered parser input for the progressive parsing for the input
  * from a file descriptor
@@ -1686,7 +1651,7 @@ xmlOutputBufferGetSize(xmlOutputBufferPtr out) {
  * XML_CHAR_ENCODING_NONE. The encoding can be changed with
  * xmlSwitchEncoding or xmlSwitchEncodingName later on.
  *
- * Returns the new parser input or NULL
+ * @returns the new parser input or NULL
  */
 xmlParserInputBufferPtr
 xmlParserInputBufferCreateFd(int fd, xmlCharEncoding enc) {
@@ -1740,15 +1705,14 @@ xmlMemClose(void *vctxt) {
 }
 
 /**
- * xmlNewInputBufferMemory:
- * @mem:  memory buffer
- * @size:  size of buffer
- * @flags:  flags
- * @enc:  the charset encoding if known (deprecated)
+ * @param mem  memory buffer
+ * @param size  size of buffer
+ * @param flags  flags
+ * @param enc  the charset encoding if known (deprecated)
  *
  * Create an input buffer for memory.
  *
- * Returns the new input buffer or NULL.
+ * @returns the new input buffer or NULL.
  */
 xmlParserInputBufferPtr
 xmlNewInputBufferMemory(const void *mem, size_t size,
@@ -1798,12 +1762,11 @@ xmlNewInputBufferMemory(const void *mem, size_t size,
 }
 
 /**
- * xmlParserInputBufferCreateMem:
- * @mem:  the memory input
- * @size:  the length of the memory block
- * @enc:  the charset encoding if known (deprecated)
+ * @param mem  the memory input
+ * @param size  the length of the memory block
+ * @param enc  the charset encoding if known (deprecated)
  *
- * DEPRECATED: Use xmlNewInputFromMemory.
+ * @deprecated Use xmlNewInputFromMemory.
  *
  * Create a parser input buffer for parsing from a memory area.
  *
@@ -1816,7 +1779,7 @@ xmlNewInputBufferMemory(const void *mem, size_t size,
  * XML_CHAR_ENCODING_NONE. The encoding can be changed with
  * xmlSwitchEncoding or xmlSwitchEncodingName later on.
  *
- * Returns the new parser input or NULL in case of error.
+ * @returns the new parser input or NULL in case of error.
  */
 xmlParserInputBufferPtr
 xmlParserInputBufferCreateMem(const char *mem, int size, xmlCharEncoding enc) {
@@ -1827,12 +1790,11 @@ xmlParserInputBufferCreateMem(const char *mem, int size, xmlCharEncoding enc) {
 }
 
 /**
- * xmlParserInputBufferCreateStatic:
- * @mem:  the memory input
- * @size:  the length of the memory block
- * @enc:  the charset encoding if known
+ * @param mem  the memory input
+ * @param size  the length of the memory block
+ * @param enc  the charset encoding if known
  *
- * DEPRECATED: Use xmlNewInputFromMemory.
+ * @deprecated Use xmlNewInputFromMemory.
  *
  * Create a parser input buffer for parsing from a memory area.
  *
@@ -1844,7 +1806,7 @@ xmlParserInputBufferCreateMem(const char *mem, int size, xmlCharEncoding enc) {
  * XML_CHAR_ENCODING_NONE. The encoding can be changed with
  * xmlSwitchEncoding or xmlSwitchEncodingName later on.
  *
- * Returns the new parser input or NULL in case of error.
+ * @returns the new parser input or NULL in case of error.
  */
 xmlParserInputBufferPtr
 xmlParserInputBufferCreateStatic(const char *mem, int size,
@@ -1856,15 +1818,14 @@ xmlParserInputBufferCreateStatic(const char *mem, int size,
 }
 
 /**
- * xmlNewInputBufferString:
- * @str:  C string
- * @flags:  flags
+ * @param str  C string
+ * @param flags  flags
  *
- * DEPRECATED: Use xmlNewInputFromString.
+ * @deprecated Use xmlNewInputFromString.
  *
  * Create an input buffer for a null-terminated C string.
  *
- * Returns the new input buffer or NULL.
+ * @returns the new input buffer or NULL.
  */
 xmlParserInputBufferPtr
 xmlNewInputBufferString(const char *str, xmlParserInputFlags flags) {
@@ -1888,16 +1849,15 @@ xmlNewInputBufferString(const char *str, xmlParserInputFlags flags) {
 
 #ifdef LIBXML_OUTPUT_ENABLED
 /**
- * xmlOutputBufferCreateFd:
- * @fd:  a file descriptor number
- * @encoder:  the encoding converter or NULL
+ * @param fd  a file descriptor number
+ * @param encoder  the encoding converter or NULL
  *
  * Create a buffered output for the progressive saving
  * to a file descriptor
  *
- * Consumes @encoder even in error case.
+ * Consumes `encoder` even in error case.
  *
- * Returns the new parser output or NULL
+ * @returns the new parser output or NULL
  */
 xmlOutputBufferPtr
 xmlOutputBufferCreateFd(int fd, xmlCharEncodingHandlerPtr encoder) {
@@ -1928,13 +1888,12 @@ xmlOutputBufferCreateFd(int fd, xmlCharEncodingHandlerPtr encoder) {
 #endif /* LIBXML_OUTPUT_ENABLED */
 
 /**
- * xmlParserInputBufferCreateIO:
- * @ioread:  an I/O read function
- * @ioclose:  an I/O close function
- * @ioctx:  an I/O handler
- * @enc:  the charset encoding if known (deprecated)
+ * @param ioread  an I/O read function
+ * @param ioclose  an I/O close function
+ * @param ioctx  an I/O handler
+ * @param enc  the charset encoding if known (deprecated)
  *
- * DEPRECATED: Use xmlNewInputFromIO.
+ * @deprecated Use xmlNewInputFromIO.
  *
  * Create a buffered parser input for the progressive parsing for the input
  * from an I/O handler
@@ -1943,7 +1902,7 @@ xmlOutputBufferCreateFd(int fd, xmlCharEncodingHandlerPtr encoder) {
  * XML_CHAR_ENCODING_NONE. The encoding can be changed with
  * xmlSwitchEncoding or xmlSwitchEncodingName later on.
  *
- * Returns the new parser input or NULL
+ * @returns the new parser input or NULL
  */
 xmlParserInputBufferPtr
 xmlParserInputBufferCreateIO(xmlInputReadCallback   ioread,
@@ -1964,18 +1923,17 @@ xmlParserInputBufferCreateIO(xmlInputReadCallback   ioread,
 
 #ifdef LIBXML_OUTPUT_ENABLED
 /**
- * xmlOutputBufferCreateIO:
- * @iowrite:  an I/O write function
- * @ioclose:  an I/O close function
- * @ioctx:  an I/O handler
- * @encoder:  the charset encoding if known
+ * @param iowrite  an I/O write function
+ * @param ioclose  an I/O close function
+ * @param ioctx  an I/O handler
+ * @param encoder  the charset encoding if known
  *
  * Create a buffered output for the progressive saving
  * to an I/O handler
  *
- * Consumes @encoder even in error case.
+ * Consumes `encoder` even in error case.
  *
- * Returns the new parser output or NULL
+ * @returns the new parser output or NULL
  */
 xmlOutputBufferPtr
 xmlOutputBufferCreateIO(xmlOutputWriteCallback   iowrite,
@@ -2000,14 +1958,13 @@ xmlOutputBufferCreateIO(xmlOutputWriteCallback   iowrite,
 #endif /* LIBXML_OUTPUT_ENABLED */
 
 /**
- * xmlParserInputBufferCreateFilenameDefault:
- * @func: function pointer to the new ParserInputBufferCreateFilenameFunc
+ * @param func  function pointer to the new ParserInputBufferCreateFilenameFunc
  *
- * DEPRECATED: Use xmlCtxtSetResourceLoader or similar functions.
+ * @deprecated Use xmlCtxtSetResourceLoader or similar functions.
  *
  * Registers a callback for URI input file handling
  *
- * Returns the old value of the registration function
+ * @returns the old value of the registration function
  */
 xmlParserInputBufferCreateFilenameFunc
 xmlParserInputBufferCreateFilenameDefault(
@@ -2026,12 +1983,11 @@ xmlParserInputBufferCreateFilenameDefault(
 }
 
 /**
- * xmlOutputBufferCreateFilenameDefault:
- * @func: function pointer to the new OutputBufferCreateFilenameFunc
+ * @param func  function pointer to the new OutputBufferCreateFilenameFunc
  *
  * Registers a callback for URI output file handling
  *
- * Returns the old value of the registration function
+ * @returns the old value of the registration function
  */
 xmlOutputBufferCreateFilenameFunc
 xmlOutputBufferCreateFilenameDefault(xmlOutputBufferCreateFilenameFunc func)
@@ -2047,18 +2003,17 @@ xmlOutputBufferCreateFilenameDefault(xmlOutputBufferCreateFilenameFunc func)
 }
 
 /**
- * xmlParserInputBufferPush:
- * @in:  a buffered parser input
- * @len:  the size in bytes of the array.
- * @buf:  an char array
+ * @param in  a buffered parser input
+ * @param len  the size in bytes of the array.
+ * @param buf  an char array
  *
- * DEPRECATED: Internal function, don't use.
+ * @deprecated Internal function, don't use.
  *
  * Push the content of the arry in the input buffer
  * This routine handle the I18N transcoding to internal UTF-8
  * This is used when operating the parser in progressive (push) mode.
  *
- * Returns the number of chars read and stored in the buffer, or -1
+ * @returns the number of chars read and stored in the buffer, or -1
  *         in case of error.
  */
 int
@@ -2120,17 +2075,16 @@ endOfInput (void * context ATTRIBUTE_UNUSED,
 }
 
 /**
- * xmlParserInputBufferGrow:
- * @in:  a buffered parser input
- * @len:  indicative value of the amount of chars to read
+ * @param in  a buffered parser input
+ * @param len  indicative value of the amount of chars to read
  *
- * DEPRECATED: Internal function, don't use.
+ * @deprecated Internal function, don't use.
  *
  * Grow up the content of the input buffer, the old data are preserved
  * This routine handle the I18N transcoding to internal UTF-8
  * This routine is used when operating the parser in normal (pull) mode
  *
- * Returns the number of chars read and stored in the buffer, or -1
+ * @returns the number of chars read and stored in the buffer, or -1
  *         in case of error.
  */
 int
@@ -2211,15 +2165,14 @@ xmlParserInputBufferGrow(xmlParserInputBufferPtr in, int len) {
 }
 
 /**
- * xmlParserInputBufferRead:
- * @in:  a buffered parser input
- * @len:  indicative value of the amount of chars to read
+ * @param in  a buffered parser input
+ * @param len  indicative value of the amount of chars to read
  *
- * DEPRECATED: Internal function, don't use.
+ * @deprecated Internal function, don't use.
  *
  * Same as xmlParserInputBufferGrow.
  *
- * Returns the number of chars read and stored in the buffer, or -1
+ * @returns the number of chars read and stored in the buffer, or -1
  *         in case of error.
  */
 int
@@ -2229,17 +2182,16 @@ xmlParserInputBufferRead(xmlParserInputBufferPtr in, int len) {
 
 #ifdef LIBXML_OUTPUT_ENABLED
 /**
- * xmlOutputBufferWrite:
- * @out:  a buffered parser output
- * @len:  the size in bytes of the array.
- * @data:  an char array
+ * @param out  a buffered parser output
+ * @param len  the size in bytes of the array.
+ * @param data  an char array
  *
  * Write the content of the array in the output I/O buffer
  * This routine handle the I18N transcoding from internal UTF-8
  * The buffer is lossless, i.e. will store in case of partial
  * or delayed writes.
  *
- * Returns the number of chars immediately written, or -1
+ * @returns the number of chars immediately written, or -1
  *         in case of error.
  */
 int
@@ -2330,10 +2282,9 @@ xmlOutputBufferWrite(xmlOutputBufferPtr out, int len, const char *data) {
 }
 
 /**
- * xmlOutputBufferWriteEscape:
- * @out:  a buffered parser output
- * @str:  a zero terminated UTF-8 string
- * @escaping:  an optional escaping function (or NULL)
+ * @param out  a buffered parser output
+ * @param str  a zero terminated UTF-8 string
+ * @param escaping  an optional escaping function (or NULL)
  *
  * Write the content of the string in the output I/O buffer
  * This routine escapes the characters and then handle the I18N
@@ -2341,7 +2292,7 @@ xmlOutputBufferWrite(xmlOutputBufferPtr out, int len, const char *data) {
  * The buffer is lossless, i.e. will store in case of partial
  * or delayed writes.
  *
- * Returns the number of chars immediately written, or -1
+ * @returns the number of chars immediately written, or -1
  *         in case of error.
  */
 int
@@ -2406,16 +2357,15 @@ xmlOutputBufferWriteEscape(xmlOutputBufferPtr out, const xmlChar *str,
 }
 
 /**
- * xmlOutputBufferWriteString:
- * @out:  a buffered parser output
- * @str:  a zero terminated C string
+ * @param out  a buffered parser output
+ * @param str  a zero terminated C string
  *
  * Write the content of the string in the output I/O buffer
  * This routine handle the I18N transcoding from internal UTF-8
  * The buffer is lossless, i.e. will store in case of partial
  * or delayed writes.
  *
- * Returns the number of chars immediately written, or -1
+ * @returns the number of chars immediately written, or -1
  *         in case of error.
  */
 int
@@ -2433,12 +2383,11 @@ xmlOutputBufferWriteString(xmlOutputBufferPtr out, const char *str) {
 }
 
 /**
- * xmlOutputBufferWriteQuotedString:
- * @buf:  output buffer
- * @string:  the string to add
+ * @param buf  output buffer
+ * @param string  the string to add
  *
  * routine which manage and grows an output buffer. This one writes
- * a quoted or double quoted #xmlChar string, checking first if it holds
+ * a quoted or double quoted \#xmlChar string, checking first if it holds
  * quote or double-quotes internally
  */
 void
@@ -2483,12 +2432,11 @@ xmlOutputBufferWriteQuotedString(xmlOutputBufferPtr buf,
 }
 
 /**
- * xmlOutputBufferFlush:
- * @out:  a buffered output
+ * @param out  a buffered output
  *
  * flushes the output I/O channel
  *
- * Returns the number of byte written or -1 in case of error.
+ * @returns the number of byte written or -1 in case of error.
  */
 int
 xmlOutputBufferFlush(xmlOutputBufferPtr out) {
@@ -2540,12 +2488,11 @@ xmlOutputBufferFlush(xmlOutputBufferPtr out) {
 #endif /* LIBXML_OUTPUT_ENABLED */
 
 /**
- * xmlParserGetDirectory:
- * @filename:  the path to a file
+ * @param filename  the path to a file
  *
  * lookup the directory for that file
  *
- * Returns a new allocated string containing the directory, or NULL.
+ * @returns a new allocated string containing the directory, or NULL.
  */
 char *
 xmlParserGetDirectory(const char *filename) {
@@ -2580,14 +2527,13 @@ xmlParserGetDirectory(const char *filename) {
 }
 
 /**
- * xmlNoNetExists:
- * @filename:  the path to check
+ * @param filename  the path to check
  *
- * DEPRECATED: Internal function, don't use.
+ * @deprecated Internal function, don't use.
  *
  * Like xmlCheckFilename but handles file URIs.
  *
- * Returns 0, 1, or 2.
+ * @returns 0, 1, or 2.
  */
 int
 xmlNoNetExists(const char *filename) {
@@ -2616,8 +2562,6 @@ xmlNoNetExists(const char *filename) {
  ************************************************************************/
 
 /**
- * xmlInitIOCallbacks:
- *
  * Initialize callback tables.
  */
 void
@@ -2633,17 +2577,16 @@ xmlInitIOCallbacks(void)
 }
 
 /**
- * xmlRegisterInputCallbacks:
- * @matchFunc:  the xmlInputMatchCallback
- * @openFunc:  the xmlInputOpenCallback
- * @readFunc:  the xmlInputReadCallback
- * @closeFunc:  the xmlInputCloseCallback
+ * @param matchFunc  the xmlInputMatchCallback
+ * @param openFunc  the xmlInputOpenCallback
+ * @param readFunc  the xmlInputReadCallback
+ * @param closeFunc  the xmlInputCloseCallback
  *
- * DEPRECATED: Use xmlCtxtSetResourceLoader or similar functions.
+ * @deprecated Use xmlCtxtSetResourceLoader or similar functions.
  *
  * Register a new set of I/O callback for handling parser input.
  *
- * Returns the registered handler number or -1 in case of error
+ * @returns the registered handler number or -1 in case of error
  */
 int
 xmlRegisterInputCallbacks(xmlInputMatchCallback matchFunc,
@@ -2662,8 +2605,6 @@ xmlRegisterInputCallbacks(xmlInputMatchCallback matchFunc,
 }
 
 /**
- * xmlRegisterDefaultInputCallbacks:
- *
  * Registers the default compiled-in I/O handlers.
  */
 void
@@ -2672,12 +2613,10 @@ xmlRegisterDefaultInputCallbacks(void) {
 }
 
 /**
- * xmlPopInputCallbacks:
- *
  * Clear the top input callback from the input stack. this includes the
  * compiled-in I/O.
  *
- * Returns the number of input callback registered or -1 in case of error.
+ * @returns the number of input callback registered or -1 in case of error.
  */
 int
 xmlPopInputCallbacks(void)
@@ -2693,8 +2632,6 @@ xmlPopInputCallbacks(void)
 }
 
 /**
- * xmlCleanupInputCallbacks:
- *
  * clears the entire input callback table. this includes the
  * compiled-in I/O.
  */
@@ -2708,15 +2645,14 @@ xmlCleanupInputCallbacks(void)
 
 #ifdef LIBXML_OUTPUT_ENABLED
 /**
- * xmlRegisterOutputCallbacks:
- * @matchFunc:  the xmlOutputMatchCallback
- * @openFunc:  the xmlOutputOpenCallback
- * @writeFunc:  the xmlOutputWriteCallback
- * @closeFunc:  the xmlOutputCloseCallback
+ * @param matchFunc  the xmlOutputMatchCallback
+ * @param openFunc  the xmlOutputOpenCallback
+ * @param writeFunc  the xmlOutputWriteCallback
+ * @param closeFunc  the xmlOutputCloseCallback
  *
  * Register a new set of I/O callback for handling output.
  *
- * Returns the registered handler number or -1 in case of error
+ * @returns the registered handler number or -1 in case of error
  */
 int
 xmlRegisterOutputCallbacks(xmlOutputMatchCallback matchFunc,
@@ -2735,8 +2671,6 @@ xmlRegisterOutputCallbacks(xmlOutputMatchCallback matchFunc,
 }
 
 /**
- * xmlRegisterDefaultOutputCallbacks:
- *
  * Registers the default compiled-in I/O handlers.
  */
 void
@@ -2745,12 +2679,10 @@ xmlRegisterDefaultOutputCallbacks (void) {
 }
 
 /**
- * xmlPopOutputCallbacks:
- *
  * Remove the top output callbacks from the output stack. This includes the
  * compiled-in I/O.
  *
- * Returns the number of output callback registered or -1 in case of error.
+ * @returns the number of output callback registered or -1 in case of error.
  */
 int
 xmlPopOutputCallbacks(void)
@@ -2766,8 +2698,6 @@ xmlPopOutputCallbacks(void)
 }
 
 /**
- * xmlCleanupOutputCallbacks:
- *
  * clears the entire output callback table. this includes the
  * compiled-in I/O callbacks.
  */
