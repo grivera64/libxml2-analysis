@@ -3582,6 +3582,8 @@ xmlRegNewExecCtxt(xmlRegexpPtr comp, xmlRegExecCallbacks callback, void *data) {
     exec->comp = comp;
     if (comp->compact == NULL)
 	exec->state = comp->states[0];
+    if (exec->state == NULL)
+	return(NULL);
     exec->transno = 0;
     exec->transcount = 0;
     exec->callback = callback;
