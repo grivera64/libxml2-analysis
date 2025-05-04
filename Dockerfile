@@ -79,7 +79,8 @@ ENV UNIFIED_PATH=$LLVM_DIR/lib/libUnifiedMemSafe.so
 
 WORKDIR /libxml2
 COPY . .
-RUN ./autogen.sh
+RUN ./autogen.sh \
+    && ./configure
 
 # Run in background
 CMD ["/bin/bash", "-c", "while true; do sleep 60; done"]
