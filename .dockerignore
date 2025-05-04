@@ -5,11 +5,6 @@ Dockerfile*
 # Ignore unneeded folders
 doc/
 example/
-win32/
-macos/
-os400/
-python/
-result/
 
 # Ignore READMEs
 README*
