@@ -11,5 +11,6 @@ fi
 ./configure
 
 # Build the library
+make clean
 make
 

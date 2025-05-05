@@ -11,5 +11,5 @@ extract-bc xmlmemory.o
 llvm-dis xmlmemory.o.bc
 
 # Analyze the bitcode using the unified pass
-opt -load $UNIFIED_PATH -unified xmlmemory.o.bc -disable-output &2>&1 | tee xmlmemory.txt
+opt -load $UNIFIED_PATH -unified xmlmemory.o.bc -disable-output 2>&1 | tee xmlmemory.txt
 
