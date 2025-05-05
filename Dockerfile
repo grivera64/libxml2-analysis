@@ -78,7 +78,7 @@ RUN cp libUnifiedMemSafe.so $LLVM_DIR/lib/
 ENV UNIFIED_PATH=$LLVM_DIR/lib/libUnifiedMemSafe.so
 
 WORKDIR /libxml2
-COPY . .
+COPY libxml2/ .
 RUN ./autogen.sh \
     && ./configure
 
