@@ -54,5 +54,5 @@ export CC=wllvm
 3. Run analysis on the built libxml2 project
 
 ```bash
-./run_analysis
+./run_analysis.sh
 ```
