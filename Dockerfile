@@ -68,12 +68,19 @@ RUN cp libUnifiedMemSafe.so $LLVM_DIR/lib/
 
 ENV UNIFIED_PATH=$LLVM_DIR/lib/libUnifiedMemSafe.so
 
+# Install wllvm for configuration step
+RUN pip install wllvm
+
+ENV LLVM_COMPILER=clang
+ENV CC=wllvm
+
 WORKDIR /libxml2
 COPY libxml2/ .
-RUN ./autogen.sh \
-    && ./configure
 
-RUN pip install wllvm
+COPY build_libxml2.sh .
+COPY run_analysis.sh .
+RUN chmod +x build_libxml2.sh
+RUN chmod +x run_analysis.sh
 
 # Alias 10 version to normal
 RUN ln -sfn /usr/bin/opt-10 /usr/bin/opt \
