@@ -73,6 +73,8 @@ COPY libxml2/ .
 RUN ./autogen.sh \
     && ./configure
 
+RUN pip install wllvm
+
 # Alias 10 version to normal
 RUN ln -sfn /usr/bin/opt-10 /usr/bin/opt \
     && ln -sfn /usr/bin/clang-10 /usr/bin/clang \
