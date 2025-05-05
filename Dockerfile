@@ -47,15 +47,6 @@ RUN apt-get update && apt-get install -y \
     clang-10 \
     && rm -rf /var/lib/apt/lists/*
 
-# Alias 10 version to normal
-RUN ln -sfn /usr/bin/opt-10 /usr/bin/opt \
-    && ln -sfn /usr/bin/clang-10 /usr/bin/clang \
-    && ln -sfn /usr/bin/llvm-dis-10 /usr/bin/llvm-dis \
-    && ln -sfn /usr/bin/llvm-as-10 /usr/bin/llvm-as \
-    && ln -sfn /usr/bin/lli-10 /usr/bin/lli \
-    && ln -sfn /usr/bin/llc-10 /usr/bin/llc \
-    && ln -sfn /usr/bin/llvm-link-10 /usr/bin/llvm-link
-
 # Clone the repository
 RUN git clone https://github.com/Lightninghkm/Unified-Memory-Safety-Validation.git
 
@@ -81,6 +72,16 @@ WORKDIR /libxml2
 COPY libxml2/ .
 RUN ./autogen.sh \
     && ./configure
+
+# Alias 10 version to normal
+RUN ln -sfn /usr/bin/opt-10 /usr/bin/opt \
+    && ln -sfn /usr/bin/clang-10 /usr/bin/clang \
+    && ln -sfn /usr/bin/llvm-dis-10 /usr/bin/llvm-dis \
+    && ln -sfn /usr/bin/llvm-as-10 /usr/bin/llvm-as \
+    && ln -sfn /usr/bin/lli-10 /usr/bin/lli \
+    && ln -sfn /usr/bin/llc-10 /usr/bin/llc \
+    && ln -sfn /usr/bin/llvm-link-10 /usr/bin/llvm-link \
+    && ln -sfn /usr/bin/llvm-extract-10 /usr/bin/llvm-extract
 
 # Run in background
 CMD ["/bin/bash", "-c", "while true; do sleep 60; done"]
