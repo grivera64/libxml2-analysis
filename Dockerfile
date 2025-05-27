@@ -48,7 +48,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone the repository
-RUN git clone --single-branch -b master-fast --depth=1 https://github.com/Lightninghkm/Unified-Memory-Safety-Validation.git
+# RUN git clone --single-branch -b master-fast --depth=1 https://github.com/Lightninghkm/Unified-Memory-Safety-Validation.git
+
+# Custom fork of Lightninghkm/Unified-Memory-Safety-Validation
+RUN git clone --single-branch -b master-fast --depth=1 https://github.com/grivera64/Unified-Memory-Safety-Validation.git
+
+WORKDIR /GitHub/Unified-Memory-Safety-Validation
+RUN git rev-parse --short HEAD > version.txt
 
 # Build SVF
 WORKDIR /GitHub/Unified-Memory-Safety-Validation/program-dependence-graph/SVF 
