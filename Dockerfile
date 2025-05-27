@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     libzstd-dev \
     software-properties-common \
-    vim \
+    vim ripgrep \
     autoconf libtool automake \
     pkg-config zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -48,7 +48,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone the repository
-RUN git clone https://github.com/Lightninghkm/Unified-Memory-Safety-Validation.git
+RUN git clone --single-branch -b master-fast --depth=1 https://github.com/Lightninghkm/Unified-Memory-Safety-Validation.git
 
 # Build SVF
 WORKDIR /GitHub/Unified-Memory-Safety-Validation/program-dependence-graph/SVF 
