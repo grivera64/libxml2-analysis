@@ -56,3 +56,11 @@ export CC=wllvm
 ```bash
 ./run_analysis.sh
 ```
+
+### Details
+
+In the `-unified` pass, there are three designations:
+
+- `SAFE`: Refers to a object whose references (pointers) are marked as safe
+- `SEQ`: Refers to a object whose references (pointers) can not be verified as safe (marked as unsafe)
+- `DYN`: Refers to a object whose references (pointers) were marked as unsafe
