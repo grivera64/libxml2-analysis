@@ -1,5 +1,4 @@
 #!/usr/bin/env -S bash -le
-
 if ! [ "$(pwd)" == "/libxml2" ]; then
     cd ./libxml2
 fi
@@ -9,8 +8,9 @@ fi
 
 # Configure libxml2 build system
 ./configure
+rg "\-g \-O2" --files-with-matches --glob '!build_libxml2.sh' | xargs sed -i 's/\-g \-O2/\-DDEBUG_MEMORY_LOCATION \-g \-O2/g'
 
 # Build the library
 make clean
-make
+make V=1
 
