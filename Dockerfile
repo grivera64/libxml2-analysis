@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     libzstd-dev \
     software-properties-common \
-    vim \
+    vim ripgrep \
     autoconf libtool automake \
     pkg-config zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -48,7 +48,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone the repository
-RUN git clone https://github.com/Lightninghkm/Unified-Memory-Safety-Validation.git
+# RUN git clone --single-branch -b master-fast --depth=1 https://github.com/Lightninghkm/Unified-Memory-Safety-Validation.git
+
+# Custom fork of Lightninghkm/Unified-Memory-Safety-Validation
+RUN git clone --single-branch -b master-fast --depth=1 https://github.com/grivera64/Unified-Memory-Safety-Validation.git
+
+WORKDIR /GitHub/Unified-Memory-Safety-Validation
+RUN git rev-parse --short HEAD > version.txt
 
 # Build SVF
 WORKDIR /GitHub/Unified-Memory-Safety-Validation/program-dependence-graph/SVF 
@@ -68,10 +74,19 @@ RUN cp libUnifiedMemSafe.so $LLVM_DIR/lib/
 
 ENV UNIFIED_PATH=$LLVM_DIR/lib/libUnifiedMemSafe.so
 
+# Install wllvm for configuration step
+RUN pip install wllvm
+
+ENV LLVM_COMPILER=clang
+ENV CC=wllvm
+
 WORKDIR /libxml2
 COPY libxml2/ .
-RUN ./autogen.sh \
-    && ./configure
+
+COPY build_libxml2.sh .
+COPY run_analysis.sh .
+RUN chmod +x build_libxml2.sh
+RUN chmod +x run_analysis.sh
 
 # Alias 10 version to normal
 RUN ln -sfn /usr/bin/opt-10 /usr/bin/opt \

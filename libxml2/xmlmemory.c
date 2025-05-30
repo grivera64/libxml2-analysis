@@ -175,10 +175,10 @@ xmlMallocLoc(size_t size, const char * file, int line)
     p = (MEMHDR *) malloc(RESERVE_SIZE+size);
 
     if (!p) {
-	xmlGenericError(xmlGenericErrorContext,
-		"xmlMallocLoc : Out of free space\n");
-	xmlMemoryDump();
-	return(NULL);
+        xmlGenericError(xmlGenericErrorContext,
+            "xmlMallocLoc : Out of free space\n");
+        xmlMemoryDump();
+        return(NULL);
     }
     p->mh_tag = MEMTAG;
     p->mh_size = size;
@@ -205,10 +205,10 @@ xmlMallocLoc(size_t size, const char * file, int line)
     ret = HDR_2_CLIENT(p);
 
     if (xmlMemTraceBlockAt == ret) {
-	xmlGenericError(xmlGenericErrorContext,
-			"%p : Malloc(%lu) Ok\n", xmlMemTraceBlockAt,
-			(long unsigned)size);
-	xmlMallocBreakpoint();
+        xmlGenericError(xmlGenericErrorContext,
+                "%p : Malloc(%lu) Ok\n", xmlMemTraceBlockAt,
+                (long unsigned)size);
+        xmlMallocBreakpoint();
     }
 
     TEST_POINT
