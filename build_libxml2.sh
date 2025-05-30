@@ -7,10 +7,7 @@ fi
 ./autogen.sh
 
 # Configure libxml2 build system
-./configure
-rg "\-g \-O2" --files-with-matches --glob '!build_libxml2.sh' | xargs sed -i 's/\-g \-O2/\-DDEBUG_MEMORY_LOCATION \-g \-O0/g'
+./configure CFLAGS='-g -O0 -DDEBUG_MEMORY'
 
 # Build the library
-make clean
 make V=1
-
