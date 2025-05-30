@@ -8,7 +8,7 @@ fi
 
 # Configure libxml2 build system
 ./configure
-rg "\-g \-O2" --files-with-matches --glob '!build_libxml2.sh' | xargs sed -i 's/\-g \-O2/\-DDEBUG_MEMORY_LOCATION \-g \-O2/g'
+rg "\-g \-O2" --files-with-matches --glob '!build_libxml2.sh' | xargs sed -i 's/\-g \-O2/\-DDEBUG_MEMORY_LOCATION \-g \-O0/g'
 
 # Build the library
 make clean
