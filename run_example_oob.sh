@@ -5,6 +5,6 @@ if ! [ "$(pwd)" == "/libxml2" ]; then
 fi
 
 export LD_LIBRARY_PATH="/usr/local/lib/:$LD_LIBRARY_PATH"
-clang -o example_oob `xml2-config --cflags` example_oob.c `xml2-config --libs` -lpthread
+clang -o example_oob -I. -Iinclude/ example_oob.c -L.libs/ -lxml2 -lpthread
 ./example_oob
 

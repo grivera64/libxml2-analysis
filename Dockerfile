@@ -84,14 +84,12 @@ WORKDIR /libxml2
 COPY libxml2/ .
 
 COPY build_libxml2.sh .
-COPY install_libxml2_debug.sh .
 COPY run_analysis.sh .
 COPY run_limits_analysis.sh .
 COPY run_example_oob.sh .
 RUN chmod +x build_libxml2.sh
 RUN chmod +x run_analysis.sh
 RUN chmod +x run_limits_analysis.sh
-RUN chmod +x install_libxml2_debug.sh
 RUN chmod +x run_example_oob.sh
 
 # Alias 10 version to normal
@@ -103,9 +101,6 @@ RUN ln -sfn /usr/bin/opt-10 /usr/bin/opt \
     && ln -sfn /usr/bin/llc-10 /usr/bin/llc \
     && ln -sfn /usr/bin/llvm-link-10 /usr/bin/llvm-link \
     && ln -sfn /usr/bin/llvm-extract-10 /usr/bin/llvm-extract
-
-# Ensure that libxml2 is not installed
-RUN apt-get remove libxml2 -y
 
 # Run in background
 CMD ["/bin/bash", "-c", "while true; do sleep 60; done"]
