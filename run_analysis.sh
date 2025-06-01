@@ -6,21 +6,19 @@ fi
 
 # Extract bitcode for xmlmemory
 extract-bc xmlmemory.o
-extract-bc error.o
-extract-bc parser.o
-extract-bc threads.o
-extract-bc testlimits.o
-# extract-bc testReader.o
 
-llvm-link xmlmemory.o.bc error.o.bc parser.o.bc threads.o.bc testlimits.o.bc -o testlimits.bc
-# llvm-link xmlmemory.o.bc error.o.bc parser.o.bc threads.o.bc testReader.o.bc -o testReader.bc
+# Compile our example_oob.c main file
+wllvm -c -I. -Iinclude/ example_oob.c
+extract-bc example_oob.o
+
+llvm-link xmlmemory.o.bc example_oob.o.bc -o example_oob.bc
 
 # Convert to readable LLVM IR (just for human analysis)
-llvm-dis testlimits.bc
-# llvm-dis testReader.bc
+llvm-dis example_oob.bc
 
+# Generate human-readable callgraph
+opt -analyze -print-callgraph example_oob.bc -o /dev/null 2> example_oob_callgraph.txt
 
 # Analyze the bitcode using the unified pass
-opt -load $UNIFIED_PATH -unified testlimits.bc -disable-output 2>&1 | tee testlimits.txt
-# opt -load $UNIFIED_PATH -unified testReader.bc -disable-output 2>&1 | tee testReader.txt
+opt -load $UNIFIED_PATH -unified example_oob.bc -disable-output 2>&1 | tee example_oob.txt
 
