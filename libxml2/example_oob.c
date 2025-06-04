@@ -35,8 +35,8 @@
 
 int main(void) {
     size_t size = SIZE_MAX - MEMHDR_SIZE + 2; // Size such that RESERVE_SIZE + size overflows to 1
-    void *ptr = xmlMallocLoc(size, __FILE__, __LINE__);
-    ptr = xmlReallocLoc(ptr, size - MEMHDR_SIZE, __FILE__, __LINE__);
+    void *ptr = xmlMalloc(size); // Calls xmlMallocLoc(size, __FILE__, __LINE__)
+    ptr = xmlRealloc(ptr, size - MEMHDR_SIZE);
     xmlFree(ptr);
     return 0;
 }
